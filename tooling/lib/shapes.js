@@ -29,6 +29,15 @@
  *   VERDICT         one entry of work/phase3/verdicts.json.
  *   VERDICTS        work/phase3/verdicts.json, written by
  *                   synthesize-verdicts.js.
+ *   MAP_RESULT      { repo, text }: one mapper's Markdown map of one repo
+ *                   (Phase 1).
+ *   REPORT_INPUT    the plain-language fields of one surviving finding
+ *                   (Phase 5). work/phase5/report-inputs.json is
+ *                   { "items": [REPORT_INPUT...] }.
+ *   MODULE_PLAN     the architect's plan for one module (Phase 6), saved as
+ *                   work/phase6/recs/<module>.json.
+ *   CROSS_CUTTING   decision records and the now/next/later roadmap
+ *                   (Phase 6), saved as work/phase6/cross-cutting.json.
  *
  * Validators return string[] (empty = valid); messages look like
  * `candidates[2].locations[0].line: must be at least 1 (got 0)`.
@@ -43,6 +52,11 @@
  *   validateReceiptIndex(obj)
  *   validatePins(obj)
  *   validateVerdicts(obj)                  also: unique ids
+ *   validateMapResult(obj, config?)        with a config: the repo exists.
+ *   validateReportInputs(obj, config?)     also: unique ids; with a config:
+ *       breaks_at_basis is one of scale.bases and area one of areas.
+ *   validateModulePlan(obj, config?)       with a config: the repo exists.
+ *   validateCrossCutting(obj)              also: unique section ids.
  *
  * The schema checks reuse the validator of tooling/lib/config.js (it accepts
  * any schema object). Only the keywords it supports are used here: type,
@@ -104,12 +118,28 @@ const CANDIDATE = {
     locations: { type: 'array', minItems: 1, items: LOCATION },
     mechanism: str('The exact code mechanism, quoting the query, loop or option.', NON_EMPTY),
     arithmetic: str('Where it breaks, with the sums shown; or "n/a: <why>".'),
-    breaks_at: str('The size at which it breaks or degrades, in the config scale unit.'),
+    breaks_at: { type: ['string', 'null'], description: 'The size at which it breaks or degrades, in the config scale unit; null when not size-driven.' },
+    breaks_at_basis: str('What the breaking size counts: one of the config scale.bases ("not size-driven" when breaks_at is null).', NON_EMPTY),
     severity_guess: str('Hint only; one of the rubric levels or "none".', LEVEL),
     evidence: { type: 'array', minItems: 1, items: EVIDENCE },
     mitigations_searched: strList('Each mitigation looked for and what was found, with a citation.'),
+    library_facts: {
+      type: 'array',
+      description: 'Library behaviour the claim relies on, each with where it was checked.',
+      items: {
+        type: 'object',
+        required: ['library', 'version', 'fact', 'source'],
+        additionalProperties: false,
+        properties: {
+          library: str('Package name.', NON_EMPTY),
+          version: str('Version from the lockfile, or "unknown".', NON_EMPTY),
+          fact: str('The behaviour the claim relies on.', NON_EMPTY),
+          source: { enum: ['lockfile', 'package-source', 'docs', 'unverified'], description: '"unverified" when it could not be checked.' },
+        },
+      },
+    },
     source: str('"new", or "prior-claim:<ID>" for a claim from an earlier audit.', '^(new|prior-claim:\\S+)$'),
-    status: { enum: ['found', 'not_found'], description: 'Optional. "not_found": the cited code does not exist at the pin (an earlier claim that no longer holds); synthesis then refutes it.' },
+    status: { enum: ['found', 'fixed', 'not_found'], description: 'Optional. "fixed": the claim held earlier but is fixed at the pin; "not_found": the cited code does not exist at the pin. Synthesis refutes both, and they are not batched for voting.' },
     rule_pattern_hint: str('If repeatable: the code shape a static rule should match; else empty.'),
     notes: str('Anything else.'),
   },
@@ -279,7 +309,7 @@ const VERDICT = {
     group: str('Hunt group.', GROUP),
     lens: str('Hunt lens.', NAME),
     source: str('As in the candidate.'),
-    status: { enum: ['found', 'not_found'] },
+    status: { enum: ['found', 'fixed', 'not_found'] },
     verdict: { enum: VERDICT_VALUES, description: 'Final verdict, after master overrides.' },
     why: str('One line: the rule that decided it.'),
     severity: str('Rubric level or "none".', LEVEL),
@@ -324,6 +354,128 @@ const VERDICTS = {
     missing_agents: strList('Agents that returned nothing.'),
     unknown_ids: strList('Ids voted on that are not candidates.'),
     verdicts: { type: 'array', items: VERDICT },
+  },
+};
+
+const MAP_RESULT = {
+  type: 'object',
+  description: 'A mapper\'s Markdown description of one repo.',
+  required: ['repo', 'text'],
+  additionalProperties: false,
+  properties: {
+    repo: str('Repo name from the config.', NAME),
+    text: str('The map, as Markdown.', NON_EMPTY),
+  },
+};
+
+const EFFORTS = ['S', 'M', 'L'];
+
+const REPORT_INPUT = {
+  type: 'object',
+  description: 'Plain-language report fields for one finding that survived verification.',
+  required: ['id', 'plain', 'threshold', 'breaks_at', 'breaks_at_basis', 'fix_direction', 'effort', 'area'],
+  additionalProperties: false,
+  properties: {
+    id: str('Finding id.', CANDIDATE_ID),
+    plain: str('One line a non-engineer can follow: what goes wrong, for whom.', NON_EMPTY),
+    threshold: str('The size at which it breaks, with the sums as the skeptics checked them; "n/a: <why>" when not size-driven.'),
+    breaks_at: { type: ['number', 'null'], minimum: 0, description: 'Size at which it breaks, in the unit of breaks_at_basis; 0 = at any size; null = no hard break.' },
+    breaks_at_basis: str('What the size counts: one of the config scale.bases.', NON_EMPTY),
+    fix_direction: str('The direction of the fix, in one or two sentences.', NON_EMPTY),
+    effort: { enum: EFFORTS, description: 'S, M or L, as in the config effort_scale.' },
+    area: str('One of the config areas.', NON_EMPTY),
+  },
+};
+
+// Other top-level keys a workflow run adds (for example a list of failed
+// agents) are kept and not checked.
+const REPORT_INPUTS = {
+  type: 'object',
+  required: ['items'],
+  properties: { items: { type: 'array', items: REPORT_INPUT } },
+};
+
+const MODULE_ID = '^[A-Za-z0-9][A-Za-z0-9._-]*$';
+
+const MODULE_PLAN = {
+  type: 'object',
+  description: 'Recommended changes for one module.',
+  required: ['module', 'repo', 'summary', 'recs'],
+  additionalProperties: false,
+  properties: {
+    module: str('Module id, as built from the config modules rules.', MODULE_ID),
+    repo: str('Repo of the module.', NAME),
+    summary: str('What the module should become, in two or three sentences.', NON_EMPTY),
+    recs: {
+      type: 'array',
+      minItems: 1,
+      items: {
+        type: 'object',
+        required: ['finding_ids', 'change', 'target', 'effort', 'effort_note', 'depends_on', 'order'],
+        additionalProperties: false,
+        properties: {
+          finding_ids: { type: 'array', minItems: 1, items: { type: 'string', pattern: CANDIDATE_ID } },
+          change: str('The change to make.', NON_EMPTY),
+          target: str('The component or behaviour after the change.', NON_EMPTY),
+          effort: { enum: EFFORTS },
+          effort_note: str('Why this size; empty when obvious.'),
+          depends_on: { type: 'array', items: { type: 'string', pattern: MODULE_ID }, description: 'Ids of cross-cutting sections or modules that must change first.' },
+          order: { type: 'integer', minimum: 1, description: 'Position of this change within the module plan, 1 first.' },
+        },
+      },
+    },
+  },
+};
+
+const ROADMAP_ITEM = {
+  type: 'object',
+  required: ['change', 'finding_ids', 'effort'],
+  additionalProperties: false,
+  properties: {
+    change: str('The change, one sentence.', NON_EMPTY),
+    finding_ids: { type: 'array', minItems: 1, items: { type: 'string', pattern: CANDIDATE_ID } },
+    modules: { type: 'array', items: { type: 'string', pattern: MODULE_ID } },
+    effort: { enum: EFFORTS },
+    depends_on: { type: 'array', items: { type: 'string', pattern: MODULE_ID }, description: 'Ids of cross-cutting sections or modules this waits for.' },
+  },
+};
+
+const CROSS_CUTTING = {
+  type: 'object',
+  description: 'Changes that span modules, as lightweight decision records, and the order of work.',
+  required: ['intro', 'sections', 'roadmap'],
+  additionalProperties: false,
+  properties: {
+    intro: str('Two or three sentences that open the target design.', NON_EMPTY),
+    sections: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['id', 'title', 'context', 'options', 'decision', 'consequences', 'status', 'finding_ids'],
+        additionalProperties: false,
+        properties: {
+          id: str('Section id, e.g. cc-bounded-reads.', MODULE_ID),
+          title: str('Short title.', NON_EMPTY),
+          context: str('The problem and the forces at play.', NON_EMPTY),
+          options: { type: 'array', minItems: 1, items: { type: 'string', pattern: NON_EMPTY } },
+          decision: str('The proposed option and why.', NON_EMPTY),
+          consequences: str('What gets better, what gets worse.', NON_EMPTY),
+          status: { const: 'proposed', description: 'The audit proposes; the team decides.' },
+          finding_ids: { type: 'array', items: { type: 'string', pattern: CANDIDATE_ID } },
+          depends_on: { type: 'array', items: { type: 'string', pattern: MODULE_ID }, description: 'Optional: other sections that must come first.' },
+        },
+      },
+    },
+    roadmap: {
+      type: 'object',
+      required: ['now', 'next', 'later'],
+      additionalProperties: false,
+      properties: {
+        now: { type: 'array', items: ROADMAP_ITEM },
+        next: { type: 'array', items: ROADMAP_ITEM },
+        later: { type: 'array', items: ROADMAP_ITEM },
+      },
+    },
   },
 };
 
@@ -437,6 +589,59 @@ function validateVerdicts(obj) {
   return errs;
 }
 
+function repoKnown(config, repo, at, errs) {
+  if (!config || typeof repo !== 'string') return;
+  if (!(config.repos || []).some((r) => r.name === repo)) errs.push(`${at}.repo: unknown repo "${repo}"`);
+}
+
+function validateMapResult(obj, config, at) {
+  at = at || 'map';
+  const errs = check(MAP_RESULT, obj, at);
+  if (isObj(obj)) repoKnown(config, obj.repo, at, errs);
+  return errs;
+}
+
+function validateReportInputs(obj, config) {
+  const errs = check(REPORT_INPUTS, obj, 'report_inputs');
+  const items = isObj(obj) && Array.isArray(obj.items) ? obj.items : [];
+  const seen = new Set();
+  const bases = config && config.scale && Array.isArray(config.scale.bases) ? config.scale.bases : null;
+  const areas = config && Array.isArray(config.areas) ? config.areas : null;
+  items.forEach((it, i) => {
+    if (!isObj(it)) return;
+    const at = `report_inputs.items[${i}]`;
+    if (typeof it.id === 'string') {
+      if (seen.has(it.id)) errs.push(`${at}.id: duplicate "${it.id}"`);
+      seen.add(it.id);
+    }
+    if (bases && typeof it.breaks_at_basis === 'string' && !bases.includes(it.breaks_at_basis)) {
+      errs.push(`${at}.breaks_at_basis: must be one of ${bases.join(', ')} (got "${it.breaks_at_basis}")`);
+    }
+    if (areas && typeof it.area === 'string' && !areas.includes(it.area)) {
+      errs.push(`${at}.area: must be one of ${areas.join(', ')} (got "${it.area}")`);
+    }
+  });
+  return errs;
+}
+
+function validateModulePlan(obj, config, at) {
+  at = at || 'plan';
+  const errs = check(MODULE_PLAN, obj, at);
+  if (isObj(obj)) repoKnown(config, obj.repo, at, errs);
+  return errs;
+}
+
+function validateCrossCutting(obj) {
+  const errs = check(CROSS_CUTTING, obj, 'cross_cutting');
+  const seen = new Set();
+  (isObj(obj) && Array.isArray(obj.sections) ? obj.sections : []).forEach((s, i) => {
+    if (!isObj(s) || typeof s.id !== 'string') return;
+    if (seen.has(s.id)) errs.push(`cross_cutting.sections[${i}].id: duplicate "${s.id}"`);
+    seen.add(s.id);
+  });
+  return errs;
+}
+
 // repo@<10-char pin>:path:line, from a LOCATION and { repo: fullSha }.
 function citeLocation(loc, pins) {
   const sha = pins && pins[loc.repo];
@@ -459,6 +664,17 @@ module.exports = {
   VERDICT,
   VERDICTS,
   VERDICT_VALUES,
+  MAP_RESULT,
+  REPORT_INPUT,
+  REPORT_INPUTS,
+  MODULE_PLAN,
+  ROADMAP_ITEM,
+  CROSS_CUTTING,
+  EFFORTS,
+  validateMapResult,
+  validateReportInputs,
+  validateModulePlan,
+  validateCrossCutting,
   VOTE_VALUES,
   CHECK_VALUES,
   GATE_RESULTS,

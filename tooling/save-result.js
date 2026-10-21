@@ -10,8 +10,9 @@
  *
  * What each phase accepts and where it goes (paths under the config's
  * work folder):
- *   map            { maps: [{ repo, text }] } (or one { repo, text }, or a
- *                  bare array of them). Each text is written to
+ *   map            { maps: [MAP_RESULT] } (or one { repo, text }, or a
+ *                  bare array of them), checked with
+ *                  shapes.validateMapResult and the config. Each text is written to
  *                  phase1/<repo>-map.md below a provenance line (repo, short
  *                  pin, audit date, source file). The repo must be in the
  *                  config.
@@ -22,18 +23,21 @@
  *   verify         RUN_OUTPUT, checked with shapes.validateRunOutput and the
  *                  config. Written to phase3/votes-<N>.json (N from --run,
  *                  default 1).
- *   report-inputs  a JSON object. shapes.js has no shape for it yet, so only
- *                  the outer form is checked (said on stdout). Run 1 writes
+ *   report-inputs  { items: [REPORT_INPUT...] } (other top-level keys are
+ *                  kept), checked with shapes.validateReportInputs and the
+ *                  config, again after a merge. Run 1 writes
  *                  phase5/report-inputs.json; a later run merges into it:
  *                  arrays are joined (items with the same "id" replaced),
  *                  other keys take the new value.
- *   recommend      { recs, cross_cutting }. recs is an object of
- *                  name -> plan, or an array of plans that each have a
- *                  "module" name; each plan goes to phase6/recs/<name>.json.
- *                  cross_cutting goes to phase6/cross-cutting.json; when it
- *                  has "sections" that must be an array, and when it has
- *                  "roadmap" that must hold now, next and later arrays.
- *                  shapes.js has no shape for these yet (said on stdout).
+ *   recommend      { recs, cross_cutting }. recs is an array of
+ *                  MODULE_PLAN, or an object of name -> plan (the plan's
+ *                  "module" is set to the name, and must equal it when
+ *                  given); each plan is checked with
+ *                  shapes.validateModulePlan and goes to
+ *                  phase6/recs/<module>.json. cross_cutting is checked with
+ *                  shapes.validateCrossCutting and goes to
+ *                  phase6/cross-cutting.json; {} (a run without the
+ *                  cross-cutting architect) leaves that file as it was.
  *
  * Nothing is written when the result is invalid. Files are written to a
  * temporary name first and then renamed.
@@ -48,7 +52,7 @@
 const fs = require('fs');
 const path = require('path');
 const { loadConfig, ConfigError } = require('./lib/config');
-const { validateCandidates, validateRunOutput } = require('./lib/shapes');
+const { validateCandidates, validateRunOutput, validateMapResult, validateReportInputs, validateModulePlan, validateCrossCutting } = require('./lib/shapes');
 const { readPins } = require('./pin');
 
 class CliError extends Error {}
@@ -62,7 +66,6 @@ class ResultError extends Error {
 const PHASES = ['map', 'hunt', 'verify', 'report-inputs', 'recommend'];
 const RUN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-const NO_SHAPE = (phase) => `note: tooling/lib/shapes.js has no shape for ${phase} results yet; only the outer form was checked`;
 
 function isObj(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -98,16 +101,14 @@ function readJson(file, what) {
 function planMap(result, ctx) {
   const list = Array.isArray(result) ? result : isObj(result) && Array.isArray(result.maps) ? result.maps : isObj(result) && 'repo' in result ? [result] : null;
   if (!list) throw new ResultError(['result: expected { maps: [{ repo, text }] }, one { repo, text }, or an array of them']);
-  const repos = new Set(ctx.config.repos.map((r) => r.name));
   const errs = [];
   const seen = new Set();
   list.forEach((m, i) => {
     const at = `maps[${i}]`;
-    if (!isObj(m)) { errs.push(`${at}: must be an object`); return; }
-    if (typeof m.repo !== 'string' || !repos.has(m.repo)) errs.push(`${at}.repo: unknown repo "${m.repo}"`);
-    else if (seen.has(m.repo)) errs.push(`${at}.repo: "${m.repo}" appears twice`);
-    else seen.add(m.repo);
-    if (typeof m.text !== 'string' || !m.text.trim()) errs.push(`${at}.text: must be non-empty Markdown text`);
+    errs.push(...validateMapResult(m, ctx.config, at));
+    if (!isObj(m) || typeof m.repo !== 'string') return;
+    if (seen.has(m.repo)) errs.push(`${at}.repo: "${m.repo}" appears twice`);
+    seen.add(m.repo);
   });
   if (!list.length) errs.push('maps: is empty');
   if (errs.length) throw new ResultError(errs);
@@ -169,7 +170,8 @@ function mergeObjects(old, next) {
 
 function planReport(result, ctx) {
   if (!isObj(result)) throw new ResultError(['result: must be a JSON object']);
-  ctx.notes.push(NO_SHAPE('report-inputs'));
+  const errs = validateReportInputs(result, ctx.config);
+  if (errs.length) throw new ResultError(errs);
   const file = path.join(ctx.paths.work, 'phase5', 'report-inputs.json');
   let value = result;
   if (ctx.run !== '1' && fs.existsSync(file)) {
@@ -177,6 +179,8 @@ function planReport(result, ctx) {
     if (!isObj(old)) throw new CliError(`${file} is not a JSON object; fix or move it first`);
     value = mergeObjects(old, result);
     ctx.notes.push(`run ${ctx.run} merged into the existing report-inputs.json`);
+    const after = validateReportInputs(value, ctx.config);
+    if (after.length) throw new ResultError(after.map((m) => `after merging into report-inputs.json: ${m}`));
   }
   return [{ file, text: json(value) }];
 }
@@ -195,25 +199,23 @@ function planRecommend(result, ctx) {
   } else if (isObj(recs)) {
     for (const [name, r] of Object.entries(recs)) {
       if (!FILE_NAME.test(name)) errs.push(`recs.${name}: the name must be file-safe (letters, digits, . _ -)`);
-      else if (!isObj(r) && !Array.isArray(r)) errs.push(`recs.${name}: must be an object or an array`);
-      else plans.push([name, r]);
+      else if (!isObj(r)) errs.push(`recs.${name}: must be a module plan object`);
+      else if (r.module !== undefined && r.module !== name) errs.push(`recs.${name}.module: must equal its key "${name}" (got "${r.module}")`);
+      else plans.push([name, { module: name, ...r }]);
     }
   } else errs.push('recs: must be an object of name -> plan, or an array of plans with a "module" name');
   const names = plans.map(([n]) => n.toLowerCase());
   names.forEach((n, i) => { if (names.indexOf(n) !== i) errs.push(`recs: "${plans[i][0]}" appears twice`); });
-  if (!isObj(cc)) errs.push('cross_cutting: must be an object');
-  else {
-    if ('sections' in cc && !Array.isArray(cc.sections)) errs.push('cross_cutting.sections: must be an array');
-    if ('roadmap' in cc) {
-      if (!isObj(cc.roadmap)) errs.push('cross_cutting.roadmap: must be an object with now, next and later');
-      else for (const k of ['now', 'next', 'later']) if (!Array.isArray(cc.roadmap[k])) errs.push(`cross_cutting.roadmap.${k}: must be an array`);
-    }
-  }
+  plans.forEach(([name, r]) => errs.push(...validateModulePlan(r, ctx.config, `recs.${name}`)));
+  // A run without the cross-cutting architect returns {} for it.
+  const noCross = isObj(cc) && Object.keys(cc).length === 0;
+  if (!isObj(cc)) errs.push('cross_cutting: must be an object ({} on a run without the cross-cutting architect)');
+  else if (!noCross) errs.push(...validateCrossCutting(cc));
   if (errs.length) throw new ResultError(errs);
-  ctx.notes.push(NO_SHAPE('recommend'));
   const dir = path.join(ctx.paths.work, 'phase6');
+  if (noCross) ctx.notes.push('cross_cutting is {} (not this run); cross-cutting.json left as it was');
   return plans.map(([name, r]) => ({ file: path.join(dir, 'recs', `${name}.json`), text: json(r) }))
-    .concat({ file: path.join(dir, 'cross-cutting.json'), text: json(cc) });
+    .concat(noCross ? [] : [{ file: path.join(dir, 'cross-cutting.json'), text: json(cc) }]);
 }
 
 const PLAN = { map: planMap, hunt: planHunt, verify: planVerify, 'report-inputs': planReport, recommend: planRecommend };

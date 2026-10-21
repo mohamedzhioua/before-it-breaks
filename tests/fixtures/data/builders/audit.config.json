@@ -1,0 +1,126 @@
+{
+  "preset": "scalability",
+  "size": "lite",
+  "audit": {
+    "name": "Notes platform fixture audit",
+    "question": "Can one workspace hold half a million notes, and what gives way first?",
+    "type": "scalability",
+    "date": "2027-03-08"
+  },
+  "repos": [
+    {
+      "name": "notes-api",
+      "path": "../repos/notes-api",
+      "role": "backend",
+      "include": [
+        "src/"
+      ],
+      "exclude": [],
+      "context_only": false,
+      "known_gaps": []
+    },
+    {
+      "name": "notes-web",
+      "path": "../repos/notes-web",
+      "role": "frontend",
+      "include": [
+        "app/",
+        "components/"
+      ],
+      "exclude": [],
+      "context_only": false,
+      "known_gaps": []
+    }
+  ],
+  "scale": {
+    "unit": "notes in one workspace",
+    "unit_short": "notes",
+    "target": 500000,
+    "platform_target": 20000000,
+    "tiers": [
+      5000,
+      50000,
+      500000
+    ]
+  },
+  "lenses": [
+    "performance",
+    "reliability",
+    "data",
+    "infra",
+    "frontend"
+  ],
+  "areas": [
+    "background jobs",
+    "database and indexes",
+    "edge and HTTP",
+    "front-end",
+    "infrastructure"
+  ],
+  "groups": [
+    {
+      "key": "SVC-JOBS",
+      "repo": "notes-api",
+      "lens": "reliability",
+      "scope": "src/jobs/",
+      "focus": "Retries and duplicate notifications."
+    },
+    {
+      "key": "SVC-IMPORT",
+      "repo": "notes-api",
+      "lens": "performance",
+      "scope": "src/modules/imports/",
+      "focus": "Whole-file reads during imports."
+    },
+    {
+      "key": "DATA-INDEX",
+      "repo": "notes-api",
+      "lens": "data",
+      "scope": "src/modules/*/",
+      "focus": "Queries no index serves."
+    },
+    {
+      "key": "OPS-RUNTIME",
+      "repo": "notes-api",
+      "lens": "infra",
+      "scope": "src/main.ts and health checks",
+      "focus": "Memory and shutdown."
+    },
+    {
+      "key": "WEB-LISTS",
+      "repo": "notes-web",
+      "lens": "frontend",
+      "scope": "app/ and components/",
+      "focus": "Lists that render every note."
+    }
+  ],
+  "modules": [
+    {
+      "repo": "notes-api",
+      "pattern": "^src/modules/([^/]+)",
+      "id": "svc.$1",
+      "label": "$1",
+      "layer": "Domain",
+      "doc": "system-docs/notes-api/architecture.md#modules"
+    },
+    {
+      "repo": "notes-api",
+      "pattern": "^src/jobs/",
+      "id": "svc.jobs",
+      "label": "background jobs",
+      "layer": "Async"
+    },
+    {
+      "repo": "notes-web",
+      "pattern": "^app/([^/]+)",
+      "id": "web.$1",
+      "label": "$1 page",
+      "layer": "Front-end"
+    }
+  ],
+  "publish": {
+    "tracker": "github",
+    "base_url": "",
+    "docs_host": "github"
+  }
+}

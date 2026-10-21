@@ -1,0 +1,124 @@
+{
+  "items": [
+    {
+      "id": "SVC-JOBS-01",
+      "plain": "A user who once had a failed digest never gets another one.",
+      "threshold": "Fails for the first failed job, at any size.",
+      "breaks_at": 0,
+      "breaks_at_basis": "any size",
+      "fix_direction": "Use a job id that includes the day, and remove failed jobs after a retry window.",
+      "effort": "S",
+      "area": "background jobs"
+    },
+    {
+      "id": "SVC-JOBS-02",
+      "plain": "A stuck digest stays stuck until someone restarts the worker.",
+      "threshold": "n/a: not size-driven.",
+      "breaks_at": null,
+      "breaks_at_basis": "not size-driven",
+      "fix_direction": "Set a stall timeout and a retry limit on the worker.",
+      "effort": "M",
+      "area": "background jobs"
+    },
+    {
+      "id": "SVC-JOBS-03",
+      "plain": "Sending one notification to a big group queues one job per person.",
+      "threshold": "Around 10k recipients the queue backs up for minutes.",
+      "breaks_at": 10000,
+      "breaks_at_basis": "recipients per send",
+      "fix_direction": "Batch recipients, a few hundred per job.",
+      "effort": "S",
+      "area": "infrastructure"
+    },
+    {
+      "id": "SVC-IMPORT-01",
+      "plain": "Large note imports time out.",
+      "threshold": "About 2k rows at one remote call per row exceed the request time limit.",
+      "breaks_at": 2000,
+      "breaks_at_basis": "rows per file",
+      "fix_direction": "Fetch the profiles once per import, in bulk.",
+      "effort": "M",
+      "area": "background jobs"
+    },
+    {
+      "id": "SVC-IMPORT-02",
+      "plain": "Reindexing a big workspace gets slower with every page.",
+      "threshold": "Past about 40k notes each page reads more than it returns.",
+      "breaks_at": 40000,
+      "breaks_at_basis": "per-tenant items",
+      "fix_direction": "Page by the last seen id instead of skipping.",
+      "effort": "M",
+      "area": "edge and HTTP"
+    },
+    {
+      "id": "DATA-INDEX-01",
+      "plain": "Opening a large workspace reads the whole notes collection.",
+      "threshold": "Near 100k notes the list takes seconds.",
+      "breaks_at": 100000,
+      "breaks_at_basis": "per-tenant items",
+      "fix_direction": "Add an index on workspaceId and the sort field.",
+      "effort": "S",
+      "area": "database and indexes"
+    },
+    {
+      "id": "DATA-INDEX-02",
+      "plain": "Signing in gets slower as the user count grows.",
+      "threshold": "Near 300k users the lookup is noticeable.",
+      "breaks_at": 300000,
+      "breaks_at_basis": "per-tenant items",
+      "fix_direction": "Add a unique index on email.",
+      "effort": "S",
+      "area": "database and indexes"
+    },
+    {
+      "id": "DATA-INDEX-03",
+      "plain": "The notes collection may outgrow its storage plan.",
+      "threshold": "Calculated near 2M notes platform-wide, depending on settings not seen.",
+      "breaks_at": 2000000,
+      "breaks_at_basis": "platform items",
+      "fix_direction": "Plan an archive for old notes.",
+      "effort": "L",
+      "area": "database and indexes"
+    },
+    {
+      "id": "OPS-RUNTIME-01",
+      "plain": "Each open workspace keeps memory that is never freed.",
+      "threshold": "Grows with use, no single breaking size.",
+      "breaks_at": null,
+      "breaks_at_basis": "per-tenant items",
+      "fix_direction": "Cap the in-memory cache and expire entries.",
+      "effort": "M",
+      "area": "edge and HTTP"
+    },
+    {
+      "id": "OPS-RUNTIME-02",
+      "plain": "Health checks add database load on every probe.",
+      "threshold": "n/a: not size-driven.",
+      "breaks_at": null,
+      "breaks_at_basis": "not size-driven",
+      "fix_direction": "Answer the liveness probe without the database.",
+      "effort": "S",
+      "area": "infrastructure"
+    },
+    {
+      "id": "WEB-LISTS-01",
+      "plain": "The workspace page freezes for big workspaces.",
+      "threshold": "The page freezes from about 5k notes, by calculation.",
+      "breaks_at": 5000,
+      "breaks_at_basis": "per-tenant items",
+      "fix_direction": "Render the list in windows and fetch it in pages.",
+      "effort": "M",
+      "area": "edge and HTTP"
+    },
+    {
+      "id": "WEB-LISTS-02",
+      "plain": "Typing in the note filter lags on long lists.",
+      "threshold": "Noticeable from about 50k notes.",
+      "breaks_at": 50000,
+      "breaks_at_basis": "per-tenant items",
+      "fix_direction": "Sort once and debounce the filter.",
+      "effort": "S",
+      "area": "front-end"
+    }
+  ]
+}

@@ -1,0 +1,596 @@
+{
+  "candidates": [
+    {
+      "id": "SVC-JOBS-01",
+      "repo": "notes-api",
+      "group": "SVC-JOBS",
+      "lens": "reliability",
+      "title": "Failed digest jobs keep their id and block every later digest",
+      "claim": "Failed digest jobs keep their id and block every later digest; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/jobs/notify.queue.ts",
+          "line": 8
+        }
+      ],
+      "mechanism": "The code at src/jobs/notify.queue.ts line 8 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "critical",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} grep -n . {pin:notes-api} -- src/jobs/notify.queue.ts",
+          "expect": "The cited lines."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "SVC-JOBS-02",
+      "repo": "notes-api",
+      "group": "SVC-JOBS",
+      "lens": "reliability",
+      "title": "Digest worker has no stall timeout",
+      "claim": "Digest worker has no stall timeout; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/jobs/digest.worker.ts",
+          "line": 12
+        }
+      ],
+      "mechanism": "The code at src/jobs/digest.worker.ts line 12 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "high",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} grep -n . {pin:notes-api} -- src/jobs/digest.worker.ts",
+          "expect": "The cited lines."
+        },
+        {
+          "cmd": "redis-cli LLEN bull:notifications:failed",
+          "expect": "Output that settles the threshold."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "SVC-JOBS-03",
+      "repo": "notes-api",
+      "group": "SVC-JOBS",
+      "lens": "reliability",
+      "title": "Notification fan-out adds one job per recipient",
+      "claim": "Notification fan-out adds one job per recipient; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/jobs/notify.queue.ts",
+          "line": 20
+        }
+      ],
+      "mechanism": "The code at src/jobs/notify.queue.ts line 20 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "low",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} grep -n . {pin:notes-api} -- src/jobs/notify.queue.ts",
+          "expect": "The cited lines."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "SVC-IMPORT-01",
+      "repo": "notes-api",
+      "group": "SVC-IMPORT",
+      "lens": "performance",
+      "title": "Import fetches one user profile per row",
+      "claim": "Import fetches one user profile per row; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/modules/imports/import.service.ts",
+          "line": 9
+        }
+      ],
+      "mechanism": "The code at src/modules/imports/import.service.ts line 9 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "critical",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} grep -n . {pin:notes-api} -- src/modules/imports/import.service.ts",
+          "expect": "The cited lines."
+        },
+        {
+          "cmd": "LIVE k6 run imports-2000-rows.js on staging",
+          "expect": "Output that settles the threshold."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "prior-claim:P-1",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "SVC-IMPORT-02",
+      "repo": "notes-api",
+      "group": "SVC-IMPORT",
+      "lens": "performance",
+      "title": "Reindex pages through notes with skip and limit",
+      "claim": "Reindex pages through notes with skip and limit; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/modules/imports/import.service.ts",
+          "line": 17
+        },
+        {
+          "repo": "notes-api",
+          "path": "src/modules/notes/notes.repository.ts",
+          "line": 6
+        }
+      ],
+      "mechanism": "The code at src/modules/imports/import.service.ts line 17 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "high",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} grep -n . {pin:notes-api} -- src/modules/imports/import.service.ts",
+          "expect": "The cited lines."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "SVC-IMPORT-03",
+      "repo": "notes-api",
+      "group": "SVC-IMPORT",
+      "lens": "performance",
+      "title": "Reindex loop slows down page by page",
+      "claim": "Reindex loop slows down page by page; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/modules/imports/import.service.ts",
+          "line": 18
+        }
+      ],
+      "mechanism": "The code at src/modules/imports/import.service.ts line 18 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "high",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} grep -n . {pin:notes-api} -- src/modules/imports/import.service.ts",
+          "expect": "The cited lines."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "prior-claim:P-4",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "DATA-INDEX-01",
+      "repo": "notes-api",
+      "group": "DATA-INDEX",
+      "lens": "data",
+      "title": "Workspace note list has no index on workspaceId",
+      "claim": "Workspace note list has no index on workspaceId; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/modules/notes/notes.repository.ts",
+          "line": 6
+        }
+      ],
+      "mechanism": "The code at src/modules/notes/notes.repository.ts line 6 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "high",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} grep -n . {pin:notes-api} -- src/modules/notes/notes.repository.ts",
+          "expect": "The cited lines."
+        },
+        {
+          "cmd": "mongosh --quiet --eval \"db.notes.find({ workspaceId: 'w1' }).explain('queryPlanner')\"",
+          "expect": "Output that settles the threshold."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "DATA-INDEX-02",
+      "repo": "notes-api",
+      "group": "DATA-INDEX",
+      "lens": "data",
+      "title": "User lookup by email scans the users collection",
+      "claim": "User lookup by email scans the users collection; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/modules/users/users.repository.ts",
+          "line": 14
+        }
+      ],
+      "mechanism": "The code at src/modules/users/users.repository.ts line 14 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "medium",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} grep -n . {pin:notes-api} -- src/modules/users/users.repository.ts",
+          "expect": "The cited lines."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "DATA-INDEX-03",
+      "repo": "notes-api",
+      "group": "DATA-INDEX",
+      "lens": "data",
+      "title": "Notes collection grows without an archive path",
+      "claim": "Notes collection grows without an archive path; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/modules/notes/note.model.ts",
+          "line": 20
+        }
+      ],
+      "mechanism": "The code at src/modules/notes/note.model.ts line 20 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "medium",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} grep -n . {pin:notes-api} -- src/modules/notes/note.model.ts",
+          "expect": "The cited lines."
+        },
+        {
+          "cmd": "mongosh --quiet --eval \"db.notes.stats().size\"",
+          "expect": "Output that settles the threshold."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "DATA-INDEX-04",
+      "repo": "notes-api",
+      "group": "DATA-INDEX",
+      "lens": "data",
+      "title": "Search query sorts in memory",
+      "claim": "Search query sorts in memory; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/modules/notes/notes.search.ts",
+          "line": 3
+        }
+      ],
+      "mechanism": "The code at src/modules/notes/notes.search.ts line 3 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "medium",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} grep -n . {pin:notes-api} -- src/modules/notes/notes.search.ts",
+          "expect": "The cited lines."
+        },
+        {
+          "cmd": "mongosh --quiet --eval \"db.notes.getIndexes()\"",
+          "expect": "Output that settles the threshold."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "prior-claim:P-2",
+      "status": "not_found",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "DATA-INDEX-05",
+      "repo": "notes-api",
+      "group": "DATA-INDEX",
+      "lens": "data",
+      "title": "User list export loads every user",
+      "claim": "User list export loads every user; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/modules/users/users.repository.ts",
+          "line": 30
+        }
+      ],
+      "mechanism": "The code at src/modules/users/users.repository.ts line 30 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "medium",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} grep -n . {pin:notes-api} -- src/modules/users/users.repository.ts",
+          "expect": "The cited lines."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "OPS-RUNTIME-01",
+      "repo": "notes-api",
+      "group": "OPS-RUNTIME",
+      "lens": "infra",
+      "title": "Process memory grows with open workspaces",
+      "claim": "Process memory grows with open workspaces; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/main.ts",
+          "line": 30
+        }
+      ],
+      "mechanism": "The code at src/main.ts line 30 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "high",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} grep -n . {pin:notes-api} -- src/main.ts",
+          "expect": "The cited lines."
+        },
+        {
+          "cmd": "LIVE kubectl get deployment notes-api -o yaml",
+          "expect": "Output that settles the threshold."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "OPS-RUNTIME-02",
+      "repo": "notes-api",
+      "group": "OPS-RUNTIME",
+      "lens": "infra",
+      "title": "Health check calls the database on every probe",
+      "claim": "Health check calls the database on every probe; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/modules/health/health.controller.ts",
+          "line": 5
+        }
+      ],
+      "mechanism": "The code at src/modules/health/health.controller.ts line 5 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "medium",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} grep -n . {pin:notes-api} -- src/modules/health/health.controller.ts",
+          "expect": "The cited lines."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "OPS-RUNTIME-03",
+      "repo": "notes-api",
+      "group": "OPS-RUNTIME",
+      "lens": "infra",
+      "title": "Shutdown does not wait for running jobs",
+      "claim": "Shutdown does not wait for running jobs; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/main.ts",
+          "line": 44
+        }
+      ],
+      "mechanism": "The code at src/main.ts line 44 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "medium",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} grep -n . {pin:notes-api} -- src/main.ts",
+          "expect": "The cited lines."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "WEB-LISTS-01",
+      "repo": "notes-web",
+      "group": "WEB-LISTS",
+      "lens": "frontend",
+      "title": "Workspace page renders every note at once",
+      "claim": "Workspace page renders every note at once; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-web",
+          "path": "app/workspaces/page.tsx",
+          "line": 22
+        }
+      ],
+      "mechanism": "The code at app/workspaces/page.tsx line 22 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "high",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-web} grep -n . {pin:notes-web} -- app/workspaces/page.tsx",
+          "expect": "The cited lines."
+        },
+        {
+          "cmd": "LIVE open the workspace page with 5000 notes and record the render time",
+          "expect": "Output that settles the threshold."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "WEB-LISTS-02",
+      "repo": "notes-web",
+      "group": "WEB-LISTS",
+      "lens": "frontend",
+      "title": "Note list re-sorts on every keystroke",
+      "claim": "Note list re-sorts on every keystroke; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-web",
+          "path": "components/note-list/list.tsx",
+          "line": 40
+        }
+      ],
+      "mechanism": "The code at components/note-list/list.tsx line 40 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "low",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-web} grep -n . {pin:notes-web} -- components/note-list/list.tsx",
+          "expect": "The cited lines."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "WEB-LISTS-03",
+      "repo": "notes-web",
+      "group": "WEB-LISTS",
+      "lens": "frontend",
+      "title": "Settings page loads all members",
+      "claim": "Settings page loads all members; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-web",
+          "path": "app/settings/page.tsx",
+          "line": 11
+        }
+      ],
+      "mechanism": "The code at app/settings/page.tsx line 11 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "medium",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-web} grep -n . {pin:notes-web} -- app/settings/page.tsx",
+          "expect": "The cited lines."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "SVC-JOBS-04",
+      "repo": "notes-api",
+      "group": "SVC-JOBS",
+      "lens": "reliability",
+      "title": "Legacy export job retries forever",
+      "claim": "Legacy export job retries forever; the effect grows with the notes in a workspace.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/jobs/export.job.ts",
+          "line": 4
+        }
+      ],
+      "mechanism": "The code at src/jobs/export.job.ts line 4 does the work in one unbounded step.",
+      "arithmetic": "Invented sums for the fixture.",
+      "breaks_at": "see report inputs",
+      "severity_guess": "medium",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} grep -n . {pin:notes-api} -- src/jobs/export.job.ts",
+          "expect": "The cited lines."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or a batch size near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    }
+  ]
+}

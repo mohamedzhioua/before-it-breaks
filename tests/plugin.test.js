@@ -168,7 +168,7 @@ test('save map writes one file per repo with a provenance line', () => {
   const b = run('save-result.js', ['map', bad, ws]);
   assert.equal(b.code, 1);
   assert.match(b.err, /maps\[0\]\.repo: unknown repo "billing"/);
-  assert.match(b.err, /maps\[1\]\.text: must be non-empty/);
+  assert.match(b.err, /maps\[1\]\.text: must not be empty/);
   assert.equal(fs.readFileSync(path.join(ws, 'work', 'phase1', 'notes-api-map.md'), 'utf8'), text, 'unchanged');
 });
 
@@ -216,35 +216,71 @@ test('save verify writes votes-<run>.json and refuses a bad vote', () => {
   assert.ok(!fs.existsSync(path.join(ws, 'work', 'phase3', 'votes-1.json')));
 });
 
-test('save report-inputs writes run 1 and merges later runs by id', () => {
+// A valid REPORT_INPUT (shapes.js) for the demo config.
+function item(id, plain) {
+  return { id, plain, threshold: 'About 2k rows, one remote call each.', breaks_at: 2000, breaks_at_basis: 'rows per file', fix_direction: 'Fetch profiles in bulk.', effort: 'S', area: 'background jobs' };
+}
+
+test('save report-inputs checks the shape, writes run 1 and merges later runs by id', () => {
   const { ws } = workspace('report');
   const out = path.join(ws, 'work', 'phase5', 'report-inputs.json');
-  let r = run('save-result.js', ['report-inputs', resultFile(ws, 'r1.json', { items: [{ id: 'SVC-JOBS-01', one_liner: 'a' }], docs: { changed: 1 } }), ws]);
+  let r = run('save-result.js', ['report-inputs', resultFile(ws, 'r1.json', { items: [item('SVC-JOBS-01', 'a')], docs: { changed: 1 } }), ws]);
   assert.equal(r.code, 0, r.out + r.err);
-  assert.match(r.out, /no shape for report-inputs/);
-  r = run('save-result.js', ['report-inputs', resultFile(ws, 'r2.json', { items: [{ id: 'SVC-JOBS-01', one_liner: 'b' }, { id: 'DATA-INDEX-01', one_liner: 'c' }] }), '--run', '2', ws]);
+  assert.doesNotMatch(r.out, /no shape/);
+  r = run('save-result.js', ['report-inputs', resultFile(ws, 'r2.json', { items: [item('SVC-JOBS-01', 'b'), item('DATA-INDEX-01', 'c')] }), '--run', '2', ws]);
   assert.equal(r.code, 0, r.out + r.err);
-  assert.deepEqual(readJson(out), {
-    items: [{ id: 'SVC-JOBS-01', one_liner: 'b' }, { id: 'DATA-INDEX-01', one_liner: 'c' }],
-    docs: { changed: 1 },
-  });
+  assert.deepEqual(readJson(out), { items: [item('SVC-JOBS-01', 'b'), item('DATA-INDEX-01', 'c')], docs: { changed: 1 } });
+  const before = fs.readFileSync(out, 'utf8');
+  r = run('save-result.js', ['report-inputs', resultFile(ws, 'r-bad.json', { items: [{ ...item('SVC-JOBS-02', 'd'), area: 'the moon', effort: 'XL' }] }), '--run', '3', ws]);
+  assert.equal(r.code, 1);
+  assert.match(r.err, /nothing was saved/);
+  assert.match(r.err, /items\[0\]\.area: must be one of/);
+  assert.match(r.err, /items\[0\]\.effort: must be one of S, M, L/);
+  assert.equal(fs.readFileSync(out, 'utf8'), before, 'unchanged');
   assert.equal(run('save-result.js', ['report-inputs', resultFile(ws, 'r3.json', [1, 2]), ws]).code, 1);
   assert.equal(run('save-result.js', ['report-inputs', resultFile(ws, 'r4.json', '{ not json'), ws]).code, 2);
 });
 
-test('save recommend writes module plans and cross-cutting, refuses bad names', () => {
-  const { ws } = workspace('recommend');
-  const cc = { sections: [{ title: 'Move imports to a queue', status: 'proposed' }], roadmap: { now: ['a'], next: [], later: [] } };
-  let r = run('save-result.js', ['recommend', resultFile(ws, 'rec.json', { recs: [{ module: 'api.imports', changes: [] }], cross_cutting: cc }), ws]);
-  assert.equal(r.code, 0, r.out + r.err);
-  assert.deepEqual(readJson(path.join(ws, 'work', 'phase6', 'recs', 'api.imports.json')), { module: 'api.imports', changes: [] });
-  assert.deepEqual(readJson(path.join(ws, 'work', 'phase6', 'cross-cutting.json')), cc);
+// A valid MODULE_PLAN and CROSS_CUTTING (shapes.js) for the demo config.
+function plan(module) {
+  return { module, repo: 'notes-api', summary: 'Imports read users in bulk.', recs: [{ finding_ids: ['SVC-IMPORT-01'], change: 'Fetch profiles in bulk.', target: 'A fixed number of calls per batch.', effort: 'M', effort_note: '', depends_on: [], order: 1 }] };
+}
+const CROSS = {
+  intro: 'One decision spans the modules.',
+  sections: [{ id: 'cc-imports', title: 'Move imports to a queue', context: 'Imports run inside the request.', options: ['Keep them inline', 'A queue'], decision: 'A queue.', consequences: 'Imports finish later but never time out.', status: 'proposed', finding_ids: ['SVC-IMPORT-01'] }],
+  roadmap: { now: [{ change: 'Queue the imports.', finding_ids: ['SVC-IMPORT-01'], effort: 'M' }], next: [], later: [] },
+};
 
-  r = run('save-result.js', ['recommend', resultFile(ws, 'rec-bad.json', { recs: { '../escape': {} }, cross_cutting: { roadmap: { now: [] } } }), ws]);
+test('save recommend checks plans and cross-cutting, and refuses bad names', () => {
+  const { ws } = workspace('recommend');
+  const ccFile = path.join(ws, 'work', 'phase6', 'cross-cutting.json');
+  let r = run('save-result.js', ['recommend', resultFile(ws, 'rec.json', { recs: [plan('svc.imports')], cross_cutting: CROSS, failed: [] }), ws]);
+  assert.equal(r.code, 0, r.out + r.err);
+  assert.deepEqual(readJson(path.join(ws, 'work', 'phase6', 'recs', 'svc.imports.json')), plan('svc.imports'));
+  assert.deepEqual(readJson(ccFile), CROSS);
+
+  // Object form: the key names the module. A run without the cross-cutting architect sends {}.
+  const noName = plan('svc.notes');
+  delete noName.module;
+  r = run('save-result.js', ['recommend', resultFile(ws, 'rec-2.json', { recs: { 'svc.notes': noName }, cross_cutting: {} }), '--run', '2', ws]);
+  assert.equal(r.code, 0, r.out + r.err);
+  assert.equal(readJson(path.join(ws, 'work', 'phase6', 'recs', 'svc.notes.json')).module, 'svc.notes');
+  assert.deepEqual(readJson(ccFile), CROSS, 'cross-cutting.json kept');
+  assert.match(r.out, /cross-cutting\.json left as it was/);
+
+  r = run('save-result.js', ['recommend', resultFile(ws, 'rec-bad.json', { recs: { '../escape': {}, 'svc.users': plan('svc.other') }, cross_cutting: { roadmap: { now: [] } } }), ws]);
   assert.equal(r.code, 1);
   assert.match(r.err, /must be file-safe/);
-  assert.match(r.err, /roadmap\.next: must be an array/);
+  assert.match(r.err, /recs\.svc\.users\.module: must equal its key/);
+  assert.match(r.err, /cross_cutting\.roadmap\.next: required/);
   assert.ok(!fs.existsSync(path.join(ws, 'work', 'phase6', 'escape.json')));
+
+  r = run('save-result.js', ['recommend', resultFile(ws, 'rec-bad2.json', { recs: [{ ...plan('svc.users'), recs: [] }], cross_cutting: { ...CROSS, sections: [{ ...CROSS.sections[0], status: 'accepted' }] } }), ws]);
+  assert.equal(r.code, 1);
+  assert.match(r.err, /recs\.svc\.users\.recs: needs at least 1 item/);
+  assert.match(r.err, /status: must be "proposed"/);
+  assert.ok(!fs.existsSync(path.join(ws, 'work', 'phase6', 'recs', 'svc.users.json')));
+  assert.deepEqual(readJson(ccFile), CROSS);
 });
 
 test('save-result usage and config errors exit 2', () => {

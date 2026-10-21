@@ -1,0 +1,1890 @@
+{
+  "date": "2027-03-08",
+  "skeptic_lenses": [
+    "reach",
+    "mech",
+    "math"
+  ],
+  "survive_votes": 2,
+  "missing_agents": [],
+  "unknown_ids": [],
+  "verdicts": [
+    {
+      "id": "SVC-JOBS-01",
+      "title": "Failed digest jobs keep their id and block every later digest",
+      "repo": "notes-api",
+      "group": "SVC-JOBS",
+      "lens": "reliability",
+      "source": "new",
+      "verdict": "PROVEN-STATIC",
+      "why": "survived the skeptics; evidence reproduced",
+      "severity": "critical",
+      "corrected": false,
+      "votes": {
+        "reach": {
+          "id": "SVC-JOBS-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "critical",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/jobs/notify.queue.ts:8"
+          ],
+          "reason": "reach lens: the mechanism holds as cited."
+        },
+        "mech": {
+          "id": "SVC-JOBS-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "critical",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/jobs/notify.queue.ts:8"
+          ],
+          "reason": "mech lens: the mechanism holds as cited."
+        },
+        "math": {
+          "id": "SVC-JOBS-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "critical",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/jobs/notify.queue.ts:8"
+          ],
+          "reason": "math lens: the mechanism holds as cited."
+        }
+      },
+      "verifier": {
+        "id": "SVC-JOBS-01",
+        "receipt": "86de9aa1a2cb",
+        "verdict": "CONFIRMED",
+        "rerun": "git grep at the pin: MATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "86de9aa1a2cb",
+      "gates": {
+        "g1_reachable": "PASS",
+        "g2_trigger": "PASS",
+        "g3_mechanism": "PASS",
+        "g4_bounds": "PASS",
+        "g5_no_mitigation": "PASS",
+        "g6_reproduces": "PASS"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "PASS",
+        "real_impact": "PASS",
+        "poc_validation": "PASS",
+        "math_bounds": "PASS",
+        "environment": "PASS"
+      }
+    },
+    {
+      "id": "SVC-JOBS-02",
+      "title": "Digest worker has no stall timeout",
+      "repo": "notes-api",
+      "group": "SVC-JOBS",
+      "lens": "reliability",
+      "source": "new",
+      "verdict": "PROVEN-STATIC",
+      "why": "survived the skeptics; evidence reproduced",
+      "severity": "high",
+      "corrected": false,
+      "votes": {
+        "reach": {
+          "id": "SVC-JOBS-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/jobs/digest.worker.ts:12"
+          ],
+          "reason": "reach lens: the mechanism holds as cited."
+        },
+        "mech": {
+          "id": "SVC-JOBS-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/jobs/digest.worker.ts:12"
+          ],
+          "reason": "mech lens: the mechanism holds as cited."
+        },
+        "math": {
+          "id": "SVC-JOBS-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/jobs/digest.worker.ts:12"
+          ],
+          "reason": "math lens: the mechanism holds as cited."
+        }
+      },
+      "verifier": {
+        "id": "SVC-JOBS-02",
+        "receipt": "caaa7450f55f",
+        "verdict": "CONFIRMED",
+        "rerun": "git grep at the pin: MATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "caaa7450f55f",
+      "gates": {
+        "g1_reachable": "PASS",
+        "g2_trigger": "PASS",
+        "g3_mechanism": "PASS",
+        "g4_bounds": "PASS",
+        "g5_no_mitigation": "PASS",
+        "g6_reproduces": "PASS"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "PASS",
+        "real_impact": "PASS",
+        "poc_validation": "PASS",
+        "math_bounds": "PASS",
+        "environment": "PASS"
+      }
+    },
+    {
+      "id": "SVC-JOBS-03",
+      "title": "Notification fan-out adds one job per recipient",
+      "repo": "notes-api",
+      "group": "SVC-JOBS",
+      "lens": "reliability",
+      "source": "new",
+      "verdict": "PROVEN-STATIC",
+      "why": "survived the skeptics; evidence reproduced",
+      "severity": "low",
+      "corrected": false,
+      "votes": {
+        "reach": {
+          "id": "SVC-JOBS-03",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "low",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/jobs/notify.queue.ts:20"
+          ],
+          "reason": "reach lens: the mechanism holds as cited."
+        },
+        "mech": {
+          "id": "SVC-JOBS-03",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "low",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/jobs/notify.queue.ts:20"
+          ],
+          "reason": "mech lens: the mechanism holds as cited."
+        },
+        "math": {
+          "id": "SVC-JOBS-03",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "low",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/jobs/notify.queue.ts:20"
+          ],
+          "reason": "math lens: the mechanism holds as cited."
+        }
+      },
+      "verifier": {
+        "id": "SVC-JOBS-03",
+        "receipt": "d0c17f17e513",
+        "verdict": "CONFIRMED",
+        "rerun": "git grep at the pin: MATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "d0c17f17e513",
+      "gates": {
+        "g1_reachable": "PASS",
+        "g2_trigger": "PASS",
+        "g3_mechanism": "PASS",
+        "g4_bounds": "PASS",
+        "g5_no_mitigation": "PASS",
+        "g6_reproduces": "PASS"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "PASS",
+        "real_impact": "PASS",
+        "poc_validation": "PASS",
+        "math_bounds": "PASS",
+        "environment": "PASS"
+      }
+    },
+    {
+      "id": "SVC-IMPORT-01",
+      "title": "Import fetches one user profile per row",
+      "repo": "notes-api",
+      "group": "SVC-IMPORT",
+      "lens": "performance",
+      "source": "prior-claim:P-1",
+      "verdict": "PROVEN-STATIC",
+      "why": "survived the skeptics; evidence reproduced",
+      "severity": "critical",
+      "corrected": true,
+      "votes": {
+        "reach": {
+          "id": "SVC-IMPORT-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "critical",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/imports/import.service.ts:9"
+          ],
+          "reason": "reach lens: the mechanism holds as cited."
+        },
+        "mech": {
+          "id": "SVC-IMPORT-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "critical",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/imports/import.service.ts:9"
+          ],
+          "reason": "mech lens: the mechanism holds as cited."
+        },
+        "math": {
+          "id": "SVC-IMPORT-01",
+          "vote": "PARTIAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "critical",
+          "corrected_threshold": "Breaks near 2k rows per file, not 10k: each row waits on one remote call.",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/imports/import.service.ts:9"
+          ],
+          "reason": "math lens: the mechanism holds as cited."
+        }
+      },
+      "verifier": {
+        "id": "SVC-IMPORT-01",
+        "receipt": "69100cb9b269",
+        "verdict": "CONFIRMED",
+        "rerun": "git grep at the pin: MATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "69100cb9b269",
+      "gates": {
+        "g1_reachable": "PASS",
+        "g2_trigger": "PASS",
+        "g3_mechanism": "PASS",
+        "g4_bounds": "PASS",
+        "g5_no_mitigation": "PASS",
+        "g6_reproduces": "PASS"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "PASS",
+        "real_impact": "PASS",
+        "poc_validation": "PASS",
+        "math_bounds": "PASS",
+        "environment": "PASS"
+      }
+    },
+    {
+      "id": "SVC-IMPORT-02",
+      "title": "Reindex pages through notes with skip and limit",
+      "repo": "notes-api",
+      "group": "SVC-IMPORT",
+      "lens": "performance",
+      "source": "new",
+      "verdict": "PROVEN-STATIC",
+      "why": "survived the skeptics; evidence reproduced",
+      "severity": "high",
+      "corrected": false,
+      "votes": {
+        "reach": {
+          "id": "SVC-IMPORT-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/imports/import.service.ts:17"
+          ],
+          "reason": "reach lens: the mechanism holds as cited."
+        },
+        "mech": {
+          "id": "SVC-IMPORT-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/imports/import.service.ts:17"
+          ],
+          "reason": "mech lens: the mechanism holds as cited."
+        },
+        "math": {
+          "id": "SVC-IMPORT-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/imports/import.service.ts:17"
+          ],
+          "reason": "math lens: the mechanism holds as cited."
+        }
+      },
+      "verifier": {
+        "id": "SVC-IMPORT-02",
+        "receipt": "b8495921a9b8",
+        "verdict": "CONFIRMED",
+        "rerun": "git grep at the pin: MATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "b8495921a9b8",
+      "gates": {
+        "g1_reachable": "PASS",
+        "g2_trigger": "PASS",
+        "g3_mechanism": "PASS",
+        "g4_bounds": "PASS",
+        "g5_no_mitigation": "PASS",
+        "g6_reproduces": "PASS"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "PASS",
+        "real_impact": "PASS",
+        "poc_validation": "PASS",
+        "math_bounds": "PASS",
+        "environment": "PASS"
+      },
+      "merged_from": [
+        "SVC-IMPORT-03"
+      ]
+    },
+    {
+      "id": "SVC-IMPORT-03",
+      "title": "Reindex loop slows down page by page",
+      "repo": "notes-api",
+      "group": "SVC-IMPORT",
+      "lens": "performance",
+      "source": "prior-claim:P-4",
+      "verdict": "MERGED",
+      "why": "survived the skeptics; evidence reproduced",
+      "severity": "high",
+      "corrected": false,
+      "votes": {
+        "reach": {
+          "id": "SVC-IMPORT-03",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/imports/import.service.ts:18"
+          ],
+          "reason": "reach lens: the mechanism holds as cited."
+        },
+        "mech": {
+          "id": "SVC-IMPORT-03",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/imports/import.service.ts:18"
+          ],
+          "reason": "mech lens: the mechanism holds as cited."
+        },
+        "math": {
+          "id": "SVC-IMPORT-03",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/imports/import.service.ts:18"
+          ],
+          "reason": "math lens: the mechanism holds as cited."
+        }
+      },
+      "verifier": {
+        "id": "SVC-IMPORT-03",
+        "receipt": "3540086550f8",
+        "verdict": "CONFIRMED",
+        "rerun": "git grep at the pin: MATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "3540086550f8",
+      "gates": {
+        "g1_reachable": "PASS",
+        "g2_trigger": "PASS",
+        "g3_mechanism": "PASS",
+        "g4_bounds": "PASS",
+        "g5_no_mitigation": "PASS",
+        "g6_reproduces": "PASS"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "PASS",
+        "real_impact": "PASS",
+        "poc_validation": "PASS",
+        "math_bounds": "PASS",
+        "environment": "PASS"
+      },
+      "override": {
+        "action": "merge",
+        "reason": "Same loop and the same cause as SVC-IMPORT-02.",
+        "approved_by": "fixture owner"
+      },
+      "synthesized_verdict": "PROVEN-STATIC",
+      "merged_into": "SVC-IMPORT-02"
+    },
+    {
+      "id": "DATA-INDEX-01",
+      "title": "Workspace note list has no index on workspaceId",
+      "repo": "notes-api",
+      "group": "DATA-INDEX",
+      "lens": "data",
+      "source": "new",
+      "verdict": "PROVEN-STATIC",
+      "why": "survived the skeptics; evidence reproduced",
+      "severity": "high",
+      "corrected": false,
+      "votes": {
+        "reach": {
+          "id": "DATA-INDEX-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/notes/notes.repository.ts:6"
+          ],
+          "reason": "reach lens: the mechanism holds as cited."
+        },
+        "mech": {
+          "id": "DATA-INDEX-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/notes/notes.repository.ts:6"
+          ],
+          "reason": "mech lens: the mechanism holds as cited."
+        },
+        "math": {
+          "id": "DATA-INDEX-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/notes/notes.repository.ts:6"
+          ],
+          "reason": "math lens: the mechanism holds as cited."
+        }
+      },
+      "verifier": {
+        "id": "DATA-INDEX-01",
+        "receipt": "959ceed64265",
+        "verdict": "CONFIRMED",
+        "rerun": "git grep at the pin: MATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "959ceed64265",
+      "gates": {
+        "g1_reachable": "PASS",
+        "g2_trigger": "PASS",
+        "g3_mechanism": "PASS",
+        "g4_bounds": "PASS",
+        "g5_no_mitigation": "PASS",
+        "g6_reproduces": "PASS"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "PASS",
+        "real_impact": "PASS",
+        "poc_validation": "PASS",
+        "math_bounds": "PASS",
+        "environment": "PASS"
+      }
+    },
+    {
+      "id": "DATA-INDEX-02",
+      "title": "User lookup by email scans the users collection",
+      "repo": "notes-api",
+      "group": "DATA-INDEX",
+      "lens": "data",
+      "source": "new",
+      "verdict": "PROVEN-STATIC",
+      "why": "survived the skeptics; evidence reproduced",
+      "severity": "medium",
+      "corrected": false,
+      "votes": {
+        "reach": {
+          "id": "DATA-INDEX-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/users/users.repository.ts:14"
+          ],
+          "reason": "reach lens: the mechanism holds as cited."
+        },
+        "mech": {
+          "id": "DATA-INDEX-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/users/users.repository.ts:14"
+          ],
+          "reason": "mech lens: the mechanism holds as cited."
+        },
+        "math": {
+          "id": "DATA-INDEX-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/users/users.repository.ts:14"
+          ],
+          "reason": "math lens: the mechanism holds as cited."
+        }
+      },
+      "verifier": {
+        "id": "DATA-INDEX-02",
+        "receipt": "958c0484fae0",
+        "verdict": "CONFIRMED",
+        "rerun": "git grep at the pin: MATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "958c0484fae0",
+      "gates": {
+        "g1_reachable": "PASS",
+        "g2_trigger": "PASS",
+        "g3_mechanism": "PASS",
+        "g4_bounds": "PASS",
+        "g5_no_mitigation": "PASS",
+        "g6_reproduces": "PASS"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "PASS",
+        "real_impact": "PASS",
+        "poc_validation": "PASS",
+        "math_bounds": "PASS",
+        "environment": "PASS"
+      }
+    },
+    {
+      "id": "DATA-INDEX-03",
+      "title": "Notes collection grows without an archive path",
+      "repo": "notes-api",
+      "group": "DATA-INDEX",
+      "lens": "data",
+      "source": "new",
+      "verdict": "UNPROVEN",
+      "why": "the skeptics accept the mechanism, but only a live system can settle the evidence",
+      "severity": "medium",
+      "corrected": false,
+      "votes": {
+        "reach": {
+          "id": "DATA-INDEX-03",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/notes/note.model.ts:20"
+          ],
+          "reason": "reach lens: the mechanism holds as cited."
+        },
+        "mech": {
+          "id": "DATA-INDEX-03",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/notes/note.model.ts:20"
+          ],
+          "reason": "mech lens: the mechanism holds as cited."
+        },
+        "math": {
+          "id": "DATA-INDEX-03",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/notes/note.model.ts:20"
+          ],
+          "reason": "math lens: the mechanism holds as cited."
+        }
+      },
+      "verifier": {
+        "id": "DATA-INDEX-03",
+        "receipt": "24f645ed304f",
+        "verdict": "UNVERIFIABLE",
+        "rerun": "git grep at the pin: MATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "24f645ed304f",
+      "gates": {
+        "g1_reachable": "PASS",
+        "g2_trigger": "PASS",
+        "g3_mechanism": "PASS",
+        "g4_bounds": "PASS",
+        "g5_no_mitigation": "PASS",
+        "g6_reproduces": "UNKNOWN"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "PASS",
+        "real_impact": "PASS",
+        "poc_validation": "UNKNOWN",
+        "math_bounds": "PASS",
+        "environment": "PASS"
+      }
+    },
+    {
+      "id": "DATA-INDEX-04",
+      "title": "Search query sorts in memory",
+      "repo": "notes-api",
+      "group": "DATA-INDEX",
+      "lens": "data",
+      "source": "prior-claim:P-2",
+      "status": "not_found",
+      "verdict": "REFUTED",
+      "why": "the cited code does not exist at the pinned commit",
+      "severity": "none",
+      "corrected": false,
+      "votes": {
+        "reach": {
+          "id": "DATA-INDEX-04",
+          "vote": "REFUTED",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "FAIL",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "FAIL",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "none",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/notes/notes.search.ts:3"
+          ],
+          "reason": "reach lens: the cited code is not there."
+        },
+        "mech": {
+          "id": "DATA-INDEX-04",
+          "vote": "REFUTED",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "FAIL",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "FAIL",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "none",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/notes/notes.search.ts:3"
+          ],
+          "reason": "mech lens: the cited code is not there."
+        },
+        "math": {
+          "id": "DATA-INDEX-04",
+          "vote": "REFUTED",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "FAIL",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "none",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/notes/notes.search.ts:3"
+          ],
+          "reason": "math lens: the cited code is not there."
+        }
+      },
+      "verifier": {
+        "id": "DATA-INDEX-04",
+        "receipt": "3c898fe98d4c",
+        "verdict": "REFUTED",
+        "rerun": "git grep at the pin: MISMATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "3c898fe98d4c",
+      "gates": {
+        "g1_reachable": "FAIL",
+        "g2_trigger": "FAIL",
+        "g3_mechanism": "FAIL",
+        "g4_bounds": "FAIL",
+        "g5_no_mitigation": "FAIL",
+        "g6_reproduces": "FAIL"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "FAIL",
+        "real_impact": "FAIL",
+        "poc_validation": "FAIL",
+        "math_bounds": "FAIL",
+        "environment": "FAIL"
+      }
+    },
+    {
+      "id": "DATA-INDEX-05",
+      "title": "User list export loads every user",
+      "repo": "notes-api",
+      "group": "DATA-INDEX",
+      "lens": "data",
+      "source": "new",
+      "verdict": "REMOVED",
+      "why": "survived the skeptics; evidence reproduced",
+      "severity": "medium",
+      "corrected": false,
+      "votes": {
+        "reach": {
+          "id": "DATA-INDEX-05",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/users/users.repository.ts:30"
+          ],
+          "reason": "reach lens: the mechanism holds as cited."
+        },
+        "mech": {
+          "id": "DATA-INDEX-05",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/users/users.repository.ts:30"
+          ],
+          "reason": "mech lens: the mechanism holds as cited."
+        },
+        "math": {
+          "id": "DATA-INDEX-05",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/users/users.repository.ts:30"
+          ],
+          "reason": "math lens: the mechanism holds as cited."
+        }
+      },
+      "verifier": {
+        "id": "DATA-INDEX-05",
+        "receipt": "3339636a9226",
+        "verdict": "CONFIRMED",
+        "rerun": "git grep at the pin: MATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "3339636a9226",
+      "gates": {
+        "g1_reachable": "PASS",
+        "g2_trigger": "PASS",
+        "g3_mechanism": "PASS",
+        "g4_bounds": "PASS",
+        "g5_no_mitigation": "PASS",
+        "g6_reproduces": "PASS"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "PASS",
+        "real_impact": "PASS",
+        "poc_validation": "PASS",
+        "math_bounds": "PASS",
+        "environment": "PASS"
+      },
+      "override": {
+        "action": "remove",
+        "reason": "The export is the legacy CSV tool, which is out of scope.",
+        "approved_by": "fixture owner"
+      },
+      "synthesized_verdict": "PROVEN-STATIC"
+    },
+    {
+      "id": "OPS-RUNTIME-01",
+      "title": "Process memory grows with open workspaces",
+      "repo": "notes-api",
+      "group": "OPS-RUNTIME",
+      "lens": "infra",
+      "source": "new",
+      "verdict": "PROVEN-STATIC",
+      "why": "survived the skeptics; evidence reproduced",
+      "severity": "high",
+      "corrected": false,
+      "votes": {
+        "reach": {
+          "id": "OPS-RUNTIME-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/main.ts:30"
+          ],
+          "reason": "reach lens: the mechanism holds as cited."
+        },
+        "mech": {
+          "id": "OPS-RUNTIME-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/main.ts:30"
+          ],
+          "reason": "mech lens: the mechanism holds as cited."
+        },
+        "math": {
+          "id": "OPS-RUNTIME-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/main.ts:30"
+          ],
+          "reason": "math lens: the mechanism holds as cited."
+        }
+      },
+      "verifier": {
+        "id": "OPS-RUNTIME-01",
+        "receipt": "fd1fd1f94e83",
+        "verdict": "CONFIRMED",
+        "rerun": "git grep at the pin: MATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "fd1fd1f94e83",
+      "gates": {
+        "g1_reachable": "PASS",
+        "g2_trigger": "PASS",
+        "g3_mechanism": "PASS",
+        "g4_bounds": "PASS",
+        "g5_no_mitigation": "PASS",
+        "g6_reproduces": "PASS"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "PASS",
+        "real_impact": "PASS",
+        "poc_validation": "PASS",
+        "math_bounds": "PASS",
+        "environment": "PASS"
+      }
+    },
+    {
+      "id": "OPS-RUNTIME-02",
+      "title": "Health check calls the database on every probe",
+      "repo": "notes-api",
+      "group": "OPS-RUNTIME",
+      "lens": "infra",
+      "source": "new",
+      "verdict": "PROVEN",
+      "why": "measured on staging; the result matched the calculation",
+      "severity": "medium",
+      "corrected": false,
+      "votes": {
+        "reach": {
+          "id": "OPS-RUNTIME-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/health/health.controller.ts:5"
+          ],
+          "reason": "reach lens: the mechanism holds as cited."
+        },
+        "mech": {
+          "id": "OPS-RUNTIME-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/health/health.controller.ts:5"
+          ],
+          "reason": "mech lens: the mechanism holds as cited."
+        },
+        "math": {
+          "id": "OPS-RUNTIME-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/modules/health/health.controller.ts:5"
+          ],
+          "reason": "math lens: the mechanism holds as cited."
+        }
+      },
+      "verifier": {
+        "id": "OPS-RUNTIME-02",
+        "receipt": "4b091c5ab83b",
+        "verdict": "CONFIRMED",
+        "rerun": "git grep at the pin: MATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "4b091c5ab83b",
+      "gates": {
+        "g1_reachable": "PASS",
+        "g2_trigger": "PASS",
+        "g3_mechanism": "PASS",
+        "g4_bounds": "PASS",
+        "g5_no_mitigation": "PASS",
+        "g6_reproduces": "PASS"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "PASS",
+        "real_impact": "PASS",
+        "poc_validation": "PASS",
+        "math_bounds": "PASS",
+        "environment": "PASS"
+      }
+    },
+    {
+      "id": "OPS-RUNTIME-03",
+      "title": "Shutdown does not wait for running jobs",
+      "repo": "notes-api",
+      "group": "OPS-RUNTIME",
+      "lens": "infra",
+      "source": "new",
+      "verdict": "NEEDS-REVIEW",
+      "why": "split: votes REAL/REFUTED/OUT_OF_SCOPE, verifier CONFIRMED",
+      "severity": "none",
+      "corrected": false,
+      "votes": {
+        "reach": {
+          "id": "OPS-RUNTIME-03",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/main.ts:44"
+          ],
+          "reason": "reach lens: the mechanism holds as cited."
+        },
+        "mech": {
+          "id": "OPS-RUNTIME-03",
+          "vote": "REFUTED",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "FAIL",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "FAIL",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "none",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/main.ts:44"
+          ],
+          "reason": "mech lens: the cited code is not there."
+        },
+        "math": {
+          "id": "OPS-RUNTIME-03",
+          "vote": "OUT_OF_SCOPE",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "none",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/main.ts:44"
+          ],
+          "reason": "math lens: the mechanism holds as cited."
+        }
+      },
+      "verifier": {
+        "id": "OPS-RUNTIME-03",
+        "receipt": "4511c743a355",
+        "verdict": "CONFIRMED",
+        "rerun": "git grep at the pin: MATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "4511c743a355",
+      "gates": {
+        "g1_reachable": "PASS",
+        "g2_trigger": "PASS",
+        "g3_mechanism": "PASS",
+        "g4_bounds": "PASS",
+        "g5_no_mitigation": "PASS",
+        "g6_reproduces": "PASS"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "PASS",
+        "real_impact": "PASS",
+        "poc_validation": "PASS",
+        "math_bounds": "PASS",
+        "environment": "PASS"
+      }
+    },
+    {
+      "id": "WEB-LISTS-01",
+      "title": "Workspace page renders every note at once",
+      "repo": "notes-web",
+      "group": "WEB-LISTS",
+      "lens": "frontend",
+      "source": "new",
+      "verdict": "PROVEN-STATIC",
+      "why": "survived the skeptics; evidence reproduced",
+      "severity": "high",
+      "corrected": false,
+      "votes": {
+        "reach": {
+          "id": "WEB-LISTS-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-web@99cb0c083e:app/workspaces/page.tsx:22"
+          ],
+          "reason": "reach lens: the mechanism holds as cited."
+        },
+        "mech": {
+          "id": "WEB-LISTS-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-web@99cb0c083e:app/workspaces/page.tsx:22"
+          ],
+          "reason": "mech lens: the mechanism holds as cited."
+        },
+        "math": {
+          "id": "WEB-LISTS-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-web@99cb0c083e:app/workspaces/page.tsx:22"
+          ],
+          "reason": "math lens: the mechanism holds as cited."
+        }
+      },
+      "verifier": {
+        "id": "WEB-LISTS-01",
+        "receipt": "24a93682c5c1",
+        "verdict": "CONFIRMED",
+        "rerun": "git grep at the pin: MATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "24a93682c5c1",
+      "gates": {
+        "g1_reachable": "PASS",
+        "g2_trigger": "PASS",
+        "g3_mechanism": "PASS",
+        "g4_bounds": "PASS",
+        "g5_no_mitigation": "PASS",
+        "g6_reproduces": "PASS"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "PASS",
+        "real_impact": "PASS",
+        "poc_validation": "PASS",
+        "math_bounds": "PASS",
+        "environment": "PASS"
+      }
+    },
+    {
+      "id": "WEB-LISTS-02",
+      "title": "Note list re-sorts on every keystroke",
+      "repo": "notes-web",
+      "group": "WEB-LISTS",
+      "lens": "frontend",
+      "source": "new",
+      "verdict": "PROVEN-STATIC",
+      "why": "survived the skeptics; evidence reproduced",
+      "severity": "low",
+      "corrected": false,
+      "votes": {
+        "reach": {
+          "id": "WEB-LISTS-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "low",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-web@99cb0c083e:components/note-list/list.tsx:40"
+          ],
+          "reason": "reach lens: the mechanism holds as cited."
+        },
+        "mech": {
+          "id": "WEB-LISTS-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "low",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-web@99cb0c083e:components/note-list/list.tsx:40"
+          ],
+          "reason": "mech lens: the mechanism holds as cited."
+        },
+        "math": {
+          "id": "WEB-LISTS-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "low",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-web@99cb0c083e:components/note-list/list.tsx:40"
+          ],
+          "reason": "math lens: the mechanism holds as cited."
+        }
+      },
+      "verifier": {
+        "id": "WEB-LISTS-02",
+        "receipt": "e401bed84cf5",
+        "verdict": "CONFIRMED",
+        "rerun": "git grep at the pin: MATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "e401bed84cf5",
+      "gates": {
+        "g1_reachable": "PASS",
+        "g2_trigger": "PASS",
+        "g3_mechanism": "PASS",
+        "g4_bounds": "PASS",
+        "g5_no_mitigation": "PASS",
+        "g6_reproduces": "PASS"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "PASS",
+        "real_impact": "PASS",
+        "poc_validation": "PASS",
+        "math_bounds": "PASS",
+        "environment": "PASS"
+      }
+    },
+    {
+      "id": "WEB-LISTS-03",
+      "title": "Settings page loads all members",
+      "repo": "notes-web",
+      "group": "WEB-LISTS",
+      "lens": "frontend",
+      "source": "new",
+      "verdict": "HELD",
+      "why": "survived the skeptics; evidence reproduced",
+      "severity": "medium",
+      "corrected": false,
+      "votes": {
+        "reach": {
+          "id": "WEB-LISTS-03",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-web@99cb0c083e:app/settings/page.tsx:11"
+          ],
+          "reason": "reach lens: the mechanism holds as cited."
+        },
+        "mech": {
+          "id": "WEB-LISTS-03",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-web@99cb0c083e:app/settings/page.tsx:11"
+          ],
+          "reason": "mech lens: the mechanism holds as cited."
+        },
+        "math": {
+          "id": "WEB-LISTS-03",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-web@99cb0c083e:app/settings/page.tsx:11"
+          ],
+          "reason": "math lens: the mechanism holds as cited."
+        }
+      },
+      "verifier": {
+        "id": "WEB-LISTS-03",
+        "receipt": "886b21128176",
+        "verdict": "CONFIRMED",
+        "rerun": "git grep at the pin: MATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "886b21128176",
+      "gates": {
+        "g1_reachable": "PASS",
+        "g2_trigger": "PASS",
+        "g3_mechanism": "PASS",
+        "g4_bounds": "PASS",
+        "g5_no_mitigation": "PASS",
+        "g6_reproduces": "PASS"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "PASS",
+        "real_impact": "PASS",
+        "poc_validation": "PASS",
+        "math_bounds": "PASS",
+        "environment": "PASS"
+      },
+      "override": {
+        "action": "hold",
+        "reason": "The owners are rewriting this page; held until the new version is pinned.",
+        "approved_by": "fixture owner"
+      },
+      "synthesized_verdict": "PROVEN-STATIC"
+    },
+    {
+      "id": "SVC-JOBS-04",
+      "title": "Legacy export job retries forever",
+      "repo": "notes-api",
+      "group": "SVC-JOBS",
+      "lens": "reliability",
+      "source": "new",
+      "verdict": "OUT-OF-SCOPE",
+      "why": "most skeptics voted it out of scope",
+      "severity": "none",
+      "corrected": false,
+      "votes": {
+        "reach": {
+          "id": "SVC-JOBS-04",
+          "vote": "OUT_OF_SCOPE",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "none",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/jobs/export.job.ts:4"
+          ],
+          "reason": "reach lens: the mechanism holds as cited."
+        },
+        "mech": {
+          "id": "SVC-JOBS-04",
+          "vote": "OUT_OF_SCOPE",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "none",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/jobs/export.job.ts:4"
+          ],
+          "reason": "mech lens: the mechanism holds as cited."
+        },
+        "math": {
+          "id": "SVC-JOBS-04",
+          "vote": "OUT_OF_SCOPE",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked against the cited lines."
+            }
+          ],
+          "severity": "none",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [
+            "notes-api@9956e98aa3:src/jobs/export.job.ts:4"
+          ],
+          "reason": "math lens: the mechanism holds as cited."
+        }
+      },
+      "verifier": {
+        "id": "SVC-JOBS-04",
+        "receipt": "0002c1a28360",
+        "verdict": "CONFIRMED",
+        "rerun": "git grep at the pin: MATCH",
+        "citation_drift": "",
+        "notes": "Fixture check."
+      },
+      "receipt": "0002c1a28360",
+      "gates": {
+        "g1_reachable": "PASS",
+        "g2_trigger": "PASS",
+        "g3_mechanism": "PASS",
+        "g4_bounds": "PASS",
+        "g5_no_mitigation": "PASS",
+        "g6_reproduces": "PASS"
+      },
+      "fp_check": {
+        "process": "PASS",
+        "reachability": "PASS",
+        "real_impact": "PASS",
+        "poc_validation": "PASS",
+        "math_bounds": "PASS",
+        "environment": "PASS"
+      }
+    }
+  ]
+}

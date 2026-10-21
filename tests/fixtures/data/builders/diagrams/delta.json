@@ -1,0 +1,10 @@
+[
+  {
+    "element": "digest worker",
+    "current": "Fixed job ids, failed jobs kept forever",
+    "target": "Dated job ids, failed jobs removed after a retry window",
+    "why": "One failure blocks every later digest",
+    "section": "cc-queue-policy",
+    "finding_ids": ["SVC-JOBS-01"]
+  }
+]

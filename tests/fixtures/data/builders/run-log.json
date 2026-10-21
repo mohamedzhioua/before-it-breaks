@@ -1,0 +1,28 @@
+{
+  "entries": [
+    {
+      "phase": "verify",
+      "run": "1",
+      "agents": 3,
+      "agent_type": "before-it-breaks:audit-skeptic",
+      "model": "fixture-model-a",
+      "effort": "high",
+      "wall_clock_s": null,
+      "tokens": null,
+      "note": "fixture",
+      "recorded_at": "2027-03-08T12:00:00Z"
+    },
+    {
+      "phase": "verify",
+      "run": "1",
+      "agents": 1,
+      "agent_type": "before-it-breaks:audit-verifier",
+      "model": "fixture-model-b",
+      "effort": "low",
+      "wall_clock_s": null,
+      "tokens": null,
+      "note": "fixture",
+      "recorded_at": "2027-03-08T12:05:00Z"
+    }
+  ]
+}

@@ -138,7 +138,7 @@ const { spawnSync } = require('child_process');
 const { loadConfig, ConfigError } = require('./lib/config');
 const { validateCandidates } = require('./lib/shapes');
 const { readPins } = require('./pin');
-const { BUILTINS } = require('./check-clean');
+const { buildMasks, mask, detect } = require('./lib/mask');
 
 class CliError extends Error {}
 
@@ -730,30 +730,8 @@ function childEnv(tmp, binDirs) {
 
 const GIT_PRE = ['-c', 'core.attributesFile=', '-c', 'core.fsmonitor=false', '-c', 'log.showSignature=false', '-c', 'core.pager=cat', '-c', 'gpg.program='];
 
-// Detectors: the must-zero built-ins of check-clean.js and the config's
-// secret_patterns. Masks: the same, each match widened to the rest of its
-// word (used for the command text only).
-function buildMasks(config) {
-  const out = BUILTINS.filter((b) => b.sev === 'must' && b.cls === 'D').map((b) => ({
-    label: b.label,
-    detect: new RegExp(b.re.source, b.re.flags.replace('g', '')),
-    re: new RegExp('(?:' + b.re.source + ')[^\\s"\'<>]*', b.re.flags.replace('g', '') + 'g'),
-  }));
-  config.evidence.secret_patterns.forEach((p, i) => out.push({ label: `secret_patterns[${i}]`, detect: new RegExp(p, 'i'), re: new RegExp(p, 'gi') }));
-  return out;
-}
-
-function mask(text, masks) {
-  let t = text;
-  for (const m of masks) t = t.replace(m.re, `[masked: ${m.label}]`);
-  return t;
-}
-
-// Label of the first pattern that matches, or null.
-function detect(text, masks) {
-  const hit = masks.find((m) => m.detect.test(text));
-  return hit ? hit.label : null;
-}
+// Detectors and masks (buildMasks, mask, detect) live in lib/mask.js, shared
+// with the builders.
 
 // Every spelling of a folder a program might print.
 function spellings(dir) {

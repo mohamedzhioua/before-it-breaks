@@ -23,7 +23,7 @@
   "severity_rubric": {
     "critical": "Breaks for every user, or loses or corrupts data, at or below the target size.",
     "high": "Breaks or becomes unusable for some users at or below the target size.",
-    "medium": "Degrades noticeably before the target size, or breaks only beyond it.",
+    "medium": "Degrades noticeably (slower, costlier, retries, partial results) at or below the target size without failing outright. A failure that only appears beyond the target is refuted for this audit and noted as beyond target.",
     "low": "Wasteful or fragile, with no failure expected inside the target size."
   },
   "effort_scale": {
@@ -93,7 +93,8 @@
     "measurements": "04-measurements.md",
     "recommendations": "05-recommendations.md",
     "docs_dir": "system-docs",
-    "work_dir": "work"
+    "work_dir": "work",
+    "target_architecture": "01-target-architecture.md"
   },
   "publish": {
     "tracker": "none",

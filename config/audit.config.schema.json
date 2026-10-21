@@ -321,7 +321,7 @@
       }
     },
     "outputs": {
-      "description": "File and folder names of the deliverables, relative to the workspace.",
+      "description": "File and folder names of the deliverables, relative to the workspace; target_architecture is a file name inside docs_dir.",
       "type": "object",
       "required": ["summary", "report", "log", "measurements", "recommendations", "docs_dir", "work_dir"],
       "additionalProperties": false,
@@ -332,7 +332,8 @@
         "measurements": { "$ref": "#/$defs/relPath" },
         "recommendations": { "$ref": "#/$defs/relPath" },
         "docs_dir": { "$ref": "#/$defs/relPath" },
-        "work_dir": { "$ref": "#/$defs/relPath" }
+        "work_dir": { "$ref": "#/$defs/relPath" },
+        "target_architecture": { "$ref": "#/$defs/relPath" }
       }
     },
     "publish": {

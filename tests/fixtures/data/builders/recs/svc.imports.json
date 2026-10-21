@@ -1,0 +1,21 @@
+{
+  "module": "svc.imports",
+  "repo": "notes-api",
+  "summary": "Imports read users in bulk and page by id.",
+  "recs": [
+    {
+      "finding_ids": [
+        "SVC-IMPORT-01",
+        "SVC-IMPORT-02"
+      ],
+      "change": "Fetch profiles in bulk and page by the last seen id.",
+      "target": "An import that does a fixed number of calls per batch.",
+      "effort": "M",
+      "effort_note": "",
+      "depends_on": [
+        "cc-bounded-reads"
+      ],
+      "order": 1
+    }
+  ]
+}

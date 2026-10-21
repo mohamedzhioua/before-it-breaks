@@ -1,0 +1,32 @@
+{
+  "module": "svc.jobs",
+  "repo": "notes-api",
+  "summary": "Jobs get ids that cannot collide with old failures, and every worker has a timeout.",
+  "recs": [
+    {
+      "finding_ids": [
+        "SVC-JOBS-01"
+      ],
+      "change": "Give digest jobs a dated id and remove failed jobs after a retry window.",
+      "target": "A digest queue where one failure never blocks the next run.",
+      "effort": "S",
+      "effort_note": "",
+      "depends_on": [
+        "cc-queue-policy"
+      ],
+      "order": 1
+    },
+    {
+      "finding_ids": [
+        "SVC-JOBS-02",
+        "SVC-JOBS-03"
+      ],
+      "change": "Add stall timeouts and batch recipients.",
+      "target": "Workers that give up on stuck jobs and send in batches.",
+      "effort": "M",
+      "effort_note": "Touches every worker.",
+      "depends_on": [],
+      "order": 2
+    }
+  ]
+}

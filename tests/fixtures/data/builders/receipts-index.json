@@ -1,0 +1,364 @@
+{
+  "date": "2027-03-08",
+  "pins": {
+    "notes-api": "9956e98aa34a72d05dd8cfa2ff8afefb91a23025",
+    "notes-web": "99cb0c083ef128d7d1835172e6463f567199d6ae"
+  },
+  "totals": {
+    "ran": 18,
+    "failed": 0,
+    "skipped_live": 7,
+    "skipped_unsafe": 0,
+    "skipped_error": 0
+  },
+  "candidates": [
+    {
+      "id": "SVC-JOBS-01",
+      "receipt": "86de9aa1a2cb",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 0,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    },
+    {
+      "id": "SVC-JOBS-02",
+      "receipt": "caaa7450f55f",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        },
+        {
+          "n": 2,
+          "status": "skipped-live",
+          "reason": "needs a live system",
+          "exit": null
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 1,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    },
+    {
+      "id": "SVC-JOBS-03",
+      "receipt": "d0c17f17e513",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 0,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    },
+    {
+      "id": "SVC-IMPORT-01",
+      "receipt": "69100cb9b269",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        },
+        {
+          "n": 2,
+          "status": "skipped-live",
+          "reason": "needs a live system",
+          "exit": null
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 1,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    },
+    {
+      "id": "SVC-IMPORT-02",
+      "receipt": "b8495921a9b8",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 0,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    },
+    {
+      "id": "SVC-IMPORT-03",
+      "receipt": "3540086550f8",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 0,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    },
+    {
+      "id": "DATA-INDEX-01",
+      "receipt": "959ceed64265",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        },
+        {
+          "n": 2,
+          "status": "skipped-live",
+          "reason": "needs a live system",
+          "exit": null
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 1,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    },
+    {
+      "id": "DATA-INDEX-02",
+      "receipt": "958c0484fae0",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 0,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    },
+    {
+      "id": "DATA-INDEX-03",
+      "receipt": "24f645ed304f",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        },
+        {
+          "n": 2,
+          "status": "skipped-live",
+          "reason": "needs a live system",
+          "exit": null
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 1,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    },
+    {
+      "id": "DATA-INDEX-04",
+      "receipt": "3c898fe98d4c",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        },
+        {
+          "n": 2,
+          "status": "skipped-live",
+          "reason": "needs a live system",
+          "exit": null
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 1,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    },
+    {
+      "id": "DATA-INDEX-05",
+      "receipt": "3339636a9226",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 0,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    },
+    {
+      "id": "OPS-RUNTIME-01",
+      "receipt": "fd1fd1f94e83",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        },
+        {
+          "n": 2,
+          "status": "skipped-live",
+          "reason": "needs a live system",
+          "exit": null
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 1,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    },
+    {
+      "id": "OPS-RUNTIME-02",
+      "receipt": "4b091c5ab83b",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 0,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    },
+    {
+      "id": "OPS-RUNTIME-03",
+      "receipt": "4511c743a355",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 0,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    },
+    {
+      "id": "WEB-LISTS-01",
+      "receipt": "24a93682c5c1",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        },
+        {
+          "n": 2,
+          "status": "skipped-live",
+          "reason": "needs a live system",
+          "exit": null
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 1,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    },
+    {
+      "id": "WEB-LISTS-02",
+      "receipt": "e401bed84cf5",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 0,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    },
+    {
+      "id": "WEB-LISTS-03",
+      "receipt": "886b21128176",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 0,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    },
+    {
+      "id": "SVC-JOBS-04",
+      "receipt": "0002c1a28360",
+      "commands": [
+        {
+          "n": 1,
+          "status": "ran",
+          "reason": "",
+          "exit": 0
+        }
+      ],
+      "ran": 1,
+      "failed": 0,
+      "skipped_live": 0,
+      "skipped_unsafe": 0,
+      "skipped_error": 0
+    }
+  ]
+}

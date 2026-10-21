@@ -1,0 +1,102 @@
+{
+  "intro": "Two decisions span the modules: one policy for background jobs and one rule for reading lists.",
+  "sections": [
+    {
+      "id": "cc-queue-policy",
+      "title": "One policy for background jobs",
+      "context": "Each queue sets its own ids, retries and clean-up.",
+      "options": [
+        "Keep per-queue settings",
+        "One shared job policy"
+      ],
+      "decision": "One shared job policy, applied by a small helper.",
+      "consequences": "Fewer surprises; every queue must be touched once.",
+      "status": "proposed",
+      "finding_ids": [
+        "SVC-JOBS-01",
+        "SVC-JOBS-02"
+      ]
+    },
+    {
+      "id": "cc-bounded-reads",
+      "title": "Every list read is bounded",
+      "context": "Several reads load a whole workspace at once.",
+      "options": [
+        "Fix each read",
+        "A paging helper used everywhere"
+      ],
+      "decision": "A paging helper, with a lint rule that flags reads without it.",
+      "consequences": "Reads become predictable; callers must handle pages.",
+      "status": "proposed",
+      "finding_ids": [
+        "SVC-IMPORT-02",
+        "DATA-INDEX-01",
+        "WEB-LISTS-01"
+      ],
+      "depends_on": [
+        "cc-queue-policy"
+      ]
+    }
+  ],
+  "roadmap": {
+    "now": [
+      {
+        "change": "Give digest jobs dated ids and clean up failed jobs.",
+        "finding_ids": [
+          "SVC-JOBS-01",
+          "SVC-JOBS-02"
+        ],
+        "modules": [
+          "svc.jobs"
+        ],
+        "effort": "S",
+        "depends_on": []
+      }
+    ],
+    "next": [
+      {
+        "change": "Stream note imports in batches. Page by id.",
+        "finding_ids": [
+          "SVC-IMPORT-01",
+          "SVC-IMPORT-02"
+        ],
+        "modules": [
+          "svc.imports"
+        ],
+        "effort": "M",
+        "depends_on": [
+          "cc-bounded-reads"
+        ]
+      },
+      {
+        "change": "Add the missing workspace and email indexes.",
+        "finding_ids": [
+          "DATA-INDEX-01",
+          "DATA-INDEX-02"
+        ],
+        "modules": [
+          "svc.notes",
+          "svc.users"
+        ],
+        "effort": "S",
+        "depends_on": []
+      }
+    ],
+    "later": [
+      {
+        "change": "Render and fetch the workspace page in windows.",
+        "finding_ids": [
+          "WEB-LISTS-01",
+          "WEB-LISTS-02"
+        ],
+        "modules": [
+          "web.workspaces"
+        ],
+        "effort": "M",
+        "depends_on": [
+          "cc-bounded-reads"
+        ]
+      }
+    ]
+  }
+}

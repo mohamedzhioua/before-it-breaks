@@ -1,0 +1,22 @@
+{
+  "module": "svc.notes",
+  "repo": "notes-api",
+  "summary": "Note reads always go through an index and a page size.",
+  "recs": [
+    {
+      "finding_ids": [
+        "DATA-INDEX-01",
+        "DATA-INDEX-03"
+      ],
+      "change": "Add the workspace index and plan an archive.",
+      "target": "Bounded note reads.",
+      "effort": "S",
+      "effort_note": "two collections and one migration",
+      "depends_on": [
+        "cc-bounded-reads",
+        "svc.imports"
+      ],
+      "order": 1
+    }
+  ]
+}

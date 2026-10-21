@@ -1,0 +1,22 @@
+[
+  {
+    "id": "P-1",
+    "wording": "Imports slow down sharply past a few thousand rows.",
+    "source": "an earlier internal review"
+  },
+  {
+    "id": "P-2",
+    "wording": "Search sorts its results in memory.",
+    "source": "an earlier internal review"
+  },
+  {
+    "id": "P-3",
+    "wording": "Digest emails are sometimes sent twice.",
+    "source": "a support ticket summary"
+  },
+  {
+    "id": "P-4",
+    "wording": "Reindexing a large workspace takes hours.",
+    "source": "an earlier internal review"
+  }
+]

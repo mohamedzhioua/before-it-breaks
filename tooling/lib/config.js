@@ -60,7 +60,8 @@
  * resolvePaths(config, wsDir) -> { workspace, configFile, kit, repos,
  *   outputs, work, docs, rules }
  *   All absolute. repos maps repo name -> folder (null for an example repo
- *   without a path); outputs maps each outputs key -> file or folder.
+ *   without a path); outputs maps each outputs key -> file or folder
+ *   (outputs.target_architecture is resolved inside outputs.docs_dir).
  */
 
 const fs = require('fs');
@@ -501,6 +502,8 @@ function resolvePaths(config, wsDir) {
   }
   const outputs = {};
   for (const [k, p] of Object.entries(config.outputs || {})) outputs[k] = path.resolve(workspace, p);
+  // The target-architecture page is named inside the docs folder.
+  if (outputs.target_architecture && outputs.docs_dir) outputs.target_architecture = path.resolve(outputs.docs_dir, config.outputs.target_architecture);
   return {
     workspace,
     configFile: path.join(workspace, CONFIG_NAME),
