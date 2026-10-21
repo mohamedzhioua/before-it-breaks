@@ -3,7 +3,8 @@
     {
       "id": "SVC-JOBS-01",
       "action": "add",
-      "reason": "Trying to add a finding that no hunter reported."
+      "reason": "Trying to add a finding that no hunter reported.",
+      "approved_by": "Notes platform tech lead"
     }
   ]
 }

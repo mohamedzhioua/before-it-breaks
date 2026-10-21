@@ -90,7 +90,7 @@ After synthesis, the lead writes `work/phase3/master-overrides.json` as `{ "over
 | `re-scope` | Keeps the verdict; only for a finding that survived | `title` and/or `severity`; severity may only stay or go down |
 | `hold` | Verdict HELD, held back from the report | — |
 
-Every override needs an existing candidate id and a non-empty `reason`; `approved_by` names who approved it and is copied into the verdicts and the log (the kit's skills require it). There is **no add action**: anything else, or any broken rule, stops synthesis with exit code 2 and nothing is written. A problem the lead noticed personally goes back through hunt and verify like any other. Run `kit synthesize` again after every change to the file.
+Every override needs an existing candidate id and a non-empty `reason`; `approved_by` names who approved it and is copied into the verdicts and the log; synthesis refuses an override without it. There is **no add action**: anything else, or any broken rule, stops synthesis with exit code 2 and nothing is written. A problem the lead noticed personally goes back through hunt and verify like any other. Run `kit synthesize` again after every change to the file.
 
 ## How the gates map onto fp-check
 

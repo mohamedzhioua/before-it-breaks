@@ -81,8 +81,8 @@ Run each step with the `run-phase` skill (`/before-it-breaks:run-phase <step>`).
 | 2 Hunt | `hunt`, one run per `--run N`; the rule writer joins the last run when static rules are on (here: {{rules_state}}) | the user has reviewed the `evidence --dry-run` list |
 | 3 Verify | `evidence`, `batches`, `verify` per run, `synthesize`, `overrides`, `synthesize` again, `build log` | every candidate has all skeptic votes and a verifier check; every override approved and recorded |
 | 4 Measure | optional, **designed, not yet proven**: only the read-only checks the user has given access for | access agreed in writing; never production load |
-| 5 Report | `report-inputs`, `build report` (and `build issues`, `build explorer` if wanted) | none; copy the counts into the README from the report |
-| 6 Recommend | `recommend` (**experimental**), `build recommendations` | none; every proposal keeps status `proposed` |
+| 5 Report | `report-inputs`, `build report` | none; copy the counts into the README from the report |
+| 6 Recommend | `recommend` (**experimental**), `build recommendations`, then `build issues` and `build explorer` if wanted (they need the recommendations built first) | none; every proposal keeps status `proposed` |
 | Close | `check secrets` (keep its record), `check unchanged`, `check links` | a person writes `{{config.outputs.summary}}` from its template |
 
 Two habits that keep work from being lost:

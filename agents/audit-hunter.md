@@ -23,7 +23,7 @@ Only report a candidate when you believe it passes all six. The skeptics will ch
 3. **Mechanism**: you can name the exact query, loop, option or missing guard that causes the failure.
 4. **Bounds**: you showed the arithmetic of where it breaks, or explained why no sum applies.
 5. **No mitigation**: you searched for the guard that would prevent it (index, limit, batching, timeout, lock, retry policy, cache, upstream cap) and did not find one. List what you searched.
-6. **Reproduces**: your evidence commands, re-run at the pin by a script, will show the code facts you rely on.
+6. **Reproduces**: when a script runs your evidence commands again at the pinned commit, they show the code facts you rely on.
 
 ## Rules
 

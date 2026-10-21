@@ -331,7 +331,7 @@ const VERDICT = {
     },
     override: {
       type: 'object',
-      required: ['action', 'reason'],
+      required: ['action', 'reason', 'approved_by'],
       additionalProperties: false,
       properties: { action: { enum: ['remove', 'merge', 're-scope', 'hold'] }, reason: str('Why.', NON_EMPTY), approved_by: str('Who approved the override.', NON_EMPTY) },
     },

@@ -47,8 +47,9 @@
  *              for a finding that survived (PROVEN-STATIC, PROVEN,
  *              UNPROVEN), and the severity may only stay or go down.
  *   hold       verdict HELD (held back from the report)
- * Every override needs a non-empty reason and an existing candidate id; it
- * may carry "approved_by" (who approved it), copied into verdicts.json;
+ * Every override needs a non-empty reason, a non-empty "approved_by" (the
+ * person who approved it, copied into verdicts.json) and an existing
+ * candidate id;
  * one override per candidate, and no other keys than the action uses (so
  * no "verdict"). A merge target may not itself be removed or merged. Any
  * other action (including "add") or broken rule stops the run with exit 2
@@ -121,7 +122,7 @@ function overrideProblems(verdicts, overrides, config) {
       if (!['id', 'action', 'reason', 'approved_by', ...KEYS[o.action]].includes(k)) errs.push(`${at}.${k}: not allowed with action ${o.action}`);
     }
     if (typeof o.reason !== 'string' || !o.reason.trim()) errs.push(`${at}.reason: required (say why)`);
-    if (o.approved_by !== undefined && (typeof o.approved_by !== 'string' || !o.approved_by.trim())) errs.push(`${at}.approved_by: must be a non-empty string (who approved it)`);
+    if (typeof o.approved_by !== 'string' || !o.approved_by.trim()) errs.push(`${at}.approved_by: required (the name of the person who approved this override)`);
     const v = byId.get(o.id);
     if (!v) { errs.push(`${at}.id: "${o.id}" is not a candidate`); return; }
     if (seen.has(o.id)) errs.push(`${at}.id: "${o.id}" has more than one override`);
@@ -274,8 +275,7 @@ function applyOverrides(verdicts, overrides) {
   const byId = new Map(verdicts.map((v) => [v.id, v]));
   for (const o of overrides) {
     const v = byId.get(o.id);
-    v.override = { action: o.action, reason: o.reason.trim() };
-    if (o.approved_by !== undefined) v.override.approved_by = o.approved_by.trim();
+    v.override = { action: o.action, reason: o.reason.trim(), approved_by: o.approved_by.trim() };
     if (o.action === 'remove' || o.action === 'merge' || o.action === 'hold') {
       v.synthesized_verdict = v.verdict;
       v.verdict = { remove: 'REMOVED', merge: 'MERGED', hold: 'HELD' }[o.action];

@@ -1,0 +1,50 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: checks (${{ matrix.os }}, node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Git identity for tests that create repos
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci.invalid"
+      - name: Run every check
+        run: node tests/run-all.js
+
+  semgrep-rules:
+    name: semgrep rule tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: semgrep/semgrep:1.181.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the rule tests
+        shell: sh
+        run: |
+          command -v bash >/dev/null 2>&1 || apk add --no-cache bash
+          bash rules/semgrep/run-tests.sh

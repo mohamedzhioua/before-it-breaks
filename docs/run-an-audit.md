@@ -41,9 +41,9 @@ Run the line `doctor` printed from inside the workspace, then `/hooks` (check th
 | overrides | write `work/phase3/master-overrides.json`, get approval, `kit synthesize <ws>` again | the same |
 | build log | `kit build log <ws>` | `03-verification-log.md`, plus `claim-verdicts.json` and `final-verdicts.json` in `work/phase3/` |
 | report-inputs | agent phase `report-inputs` | `work/phase5/report-inputs.json` |
-| build report | `kit build report <ws>`, then as wanted `kit build issues <ws>` and `kit build explorer <ws>` | `02-audit-report.md`, `work/phase6/issues.*`, `work/explorer-data.json` |
+| build report | `kit build report <ws>` | `02-audit-report.md` |
 | recommend (experimental) | agent phase `recommend` | `work/phase6/recs/`, `work/phase6/cross-cutting.json` |
-| build recommendations | `kit build recommendations <ws>` | `05-recommendations.md`, the target-architecture page |
+| build recommendations | `kit build recommendations <ws>`, then as wanted `kit build issues <ws>` and `kit build explorer <ws>` (both read `work/phase6/finding-modules.json`, which this step writes) | `05-recommendations.md`, the target-architecture page, `work/phase6/issues.*`, `work/explorer-data.json` |
 | measure (optional) | `kit build measurements <ws>`; run only the checks access was agreed for | `04-measurements.md`, `work/phase4/` |
 | closing checks | `kit check secrets <ws>`, `kit check unchanged <ws>`, `kit check links <ws>` | `work/secrets-scan.json` and `.md` |
 

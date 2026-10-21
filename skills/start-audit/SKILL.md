@@ -15,16 +15,16 @@ Speak plainly: the user may be a manager or founder, not an engineer. Explain an
 
 Ask these in **one batch**, numbered, each with its options, so the user can answer in one reply. Give a sensible default for each and say they can answer "default".
 
-1. **What do you want to know?**
+1. **Which question should the audit answer?**
    - "Will it hold when we grow a lot?" → preset `scalability`
    - "Why does it fail, run twice or lose work?" → preset `reliability`
    - "Why is it slow today?" → preset `performance` (measuring later is strongly advised)
-2. **What is the size that matters, and what is your target?** For example "notes in one workspace, target one million", or "rows in one import file". Ask for the unit, the target, and (optional) a platform-wide target.
+2. **Which quantity grows, and how large must it get?** For example "notes in one workspace, target one million", or "rows in one import file". Ask for the unit, the target, and (optional) a platform-wide target.
 3. **What is it built with?** Language, framework, database, cache or queue.
 4. **How big is the code, and how many repositories?** A rough line count or "small / medium / large" is enough. Ask for the folder of each repository.
-5. **What access can you give?** Code only (the default), a read-only database user on a replica, pasted cache or queue stats, a staging environment with an agreed load window. **Never production load.**
+5. **Beyond the code, what can the audit look at?** Nothing else (code only, the default), a read-only database user on a replica, pasted cache or queue stats, a staging environment with an agreed load window. **Never production load.**
 6. **What is the budget?** In time and in AI usage. Say plainly: if the budget is tight we cut **scope** (fewer repos or module groups), never **checks** (every candidate still gets three skeptics and one verifier).
-7. **Who is on the team?** One person to run the audit (comfortable with a terminal and Claude Code), one person who knows the system and will answer questions and approve every override, and who will read the results.
+7. **Who takes part?** Someone to run the audit, at ease in a terminal and in Claude Code; someone who knows the system, answers questions and approves every override; and the people who will read the results.
 8. **Is there an earlier audit whose claims should be re-checked?** If yes, where is it?
 9. **Where do you track work?** GitLab, GitHub, another tracker, or none.
 10. **Where should the workspace folder go?** It must be outside this kit and outside the repos being audited (default: a folder named after the audit in the user's home `audits` folder).
@@ -38,7 +38,7 @@ If the answer to question 1 (or anything else the user asks for) is a **security
 - Preset: from question 1.
 - Size: read `${CLAUDE_PLUGIN_ROOT}/config/sizes.json` and pick the size whose description fits the answer to question 4. If the code is larger than the largest size, recommend one workspace per service and ask which service to start with.
 - Stack: if it is not Node.js/TypeScript, say that the method still works but the bundled static rules will not, so rules are switched off unless the user wants a rule-writing pass.
-- Access: code only means the best verdict is PROVEN-STATIC (thresholds calculated from the code, not measured). Say so.
+- Access: with code only, no verdict can go above PROVEN-STATIC (limits worked out from the code, never measured). Say so.
 - Summarise the settings in a short table and ask the user to confirm **once** before creating anything.
 
 ## 4. Create the workspace

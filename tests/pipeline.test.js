@@ -296,7 +296,7 @@ test('synthesize gives the expected verdicts, applies overrides and refuses "add
   assert.match(add.err, /"add" is not allowed; overrides may remove, merge, re-scope or hold a finding, never add one/);
   assert.doesNotMatch(add.err, /\n\s+at /);
 
-  fs.writeFileSync(path.join(p3, 'master-overrides.json'), JSON.stringify({ overrides: [{ id: 'SVC-JOBS-01', action: 'hold', reason: ' ' }] }));
+  fs.writeFileSync(path.join(p3, 'master-overrides.json'), JSON.stringify({ overrides: [{ id: 'SVC-JOBS-01', action: 'hold', reason: ' ', approved_by: 'Notes platform tech lead' }] }));
   assert.match(kit(['synthesize', ws]).err, /reason: required/);
 
   const report = args(['report-inputs', ws]);
@@ -335,23 +335,26 @@ test('overrides may only narrow: severity down, survivors only, no merge into a 
   const verdicts = synthesize(config, candidates, outputs, receipts).verdicts;
   const check = (list) => overrideProblems(verdicts, list, config).join('\n');
   const why = 'Checked by the lead.';
-  assert.equal(check([{ id: 'SVC-JOBS-01', action: 're-scope', severity: 'medium', reason: why }]), '', 'lowering is fine');
-  assert.equal(check([{ id: 'SVC-JOBS-01', action: 're-scope', severity: 'high', reason: why }]), '', 'keeping is fine');
-  assert.match(check([{ id: 'SVC-JOBS-01', action: 're-scope', severity: 'critical', reason: why }]), /above the synthesized "high"/);
-  assert.match(check([{ id: 'SVC-IMPORT-02', action: 're-scope', title: 'New title', reason: why }]), /only to a finding that survived \(this one is REFUTED\)/);
-  assert.match(check([{ id: 'SVC-JOBS-01', action: 're-scope', severity: 'urgent', reason: why }]), /severity: must be one of/);
+  const by = 'Notes platform tech lead';
+  assert.equal(check([{ id: 'SVC-JOBS-01', action: 're-scope', severity: 'medium', reason: why, approved_by: by }]), '', 'lowering is fine');
+  assert.equal(check([{ id: 'SVC-JOBS-01', action: 're-scope', severity: 'high', reason: why, approved_by: by }]), '', 'keeping is fine');
+  assert.match(check([{ id: 'SVC-JOBS-01', action: 're-scope', severity: 'critical', reason: why, approved_by: by }]), /above the synthesized "high"/);
+  assert.match(check([{ id: 'SVC-IMPORT-02', action: 're-scope', title: 'New title', reason: why, approved_by: by }]), /only to a finding that survived \(this one is REFUTED\)/);
+  assert.match(check([{ id: 'SVC-JOBS-01', action: 're-scope', severity: 'urgent', reason: why, approved_by: by }]), /severity: must be one of/);
   assert.match(check([
-    { id: 'OPS-RUNTIME-01', action: 'remove', reason: why },
-    { id: 'SVC-JOBS-02', action: 'merge', into: 'OPS-RUNTIME-01', reason: why },
+    { id: 'OPS-RUNTIME-01', action: 'remove', reason: why, approved_by: by },
+    { id: 'SVC-JOBS-02', action: 'merge', into: 'OPS-RUNTIME-01', reason: why, approved_by: by },
   ]), /"OPS-RUNTIME-01" is itself removed or merged/);
   assert.match(check([
-    { id: 'SVC-IMPORT-03', action: 'merge', into: 'SVC-IMPORT-01', reason: why },
-    { id: 'SVC-JOBS-02', action: 'merge', into: 'SVC-IMPORT-03', reason: why },
+    { id: 'SVC-IMPORT-03', action: 'merge', into: 'SVC-IMPORT-01', reason: why, approved_by: by },
+    { id: 'SVC-JOBS-02', action: 'merge', into: 'SVC-IMPORT-03', reason: why, approved_by: by },
   ]), /"SVC-IMPORT-03" is itself removed or merged/);
-  assert.match(check([{ id: 'SVC-IMPORT-02', action: 'hold', verdict: 'PROVEN-STATIC', reason: why }]), /verdict: not allowed with action hold/);
-  assert.match(check([{ id: 'SVC-JOBS-01', action: 'hold', reason: why }, { id: 'SVC-JOBS-01', action: 'remove', reason: why }]), /more than one override/);
-  assert.equal(check([{ id: 'SVC-JOBS-01', action: 'hold', reason: why, approved_by: 'Lead' }]), '', 'approved_by is allowed on every action');
-  assert.match(check([{ id: 'SVC-JOBS-01', action: 'hold', reason: why, approved_by: ' ' }]), /approved_by: must be a non-empty string/);
+  assert.match(check([{ id: 'SVC-IMPORT-02', action: 'hold', verdict: 'PROVEN-STATIC', reason: why, approved_by: by }]), /verdict: not allowed with action hold/);
+  assert.match(check([{ id: 'SVC-JOBS-01', action: 'hold', reason: why, approved_by: by }, { id: 'SVC-JOBS-01', action: 'remove', reason: why, approved_by: by }]), /more than one override/);
+  assert.equal(check([{ id: 'SVC-JOBS-01', action: 'hold', reason: why, approved_by: 'Lead' }]), '', 'approved_by is accepted on every action');
+  assert.match(check([{ id: 'SVC-JOBS-01', action: 'hold', reason: why }]), /approved_by: required/, 'approved_by is required');
+  assert.match(check([{ id: 'SVC-JOBS-01', action: 'hold', reason: why, approved_by: ' ' }]), /approved_by: required/, 'a blank approver is refused');
+  assert.match(check([{ id: 'SVC-JOBS-01', action: 'hold', reason: why, approved_by: 7 }]), /approved_by: required/, 'a non-string approver is refused');
 });
 
 // ---------- config: rubric and effort scale replace the defaults ----------

@@ -34,7 +34,7 @@ This table is also what `run-phase` checks before it starts a step: the gate of 
 | report-inputs | `work/phase5/report-inputs.json` | — |
 | build report | `02-audit-report.md` | — |
 | recommend (experimental) | `work/phase6/cross-cutting.json` and `work/phase6/recs/` | — |
-| build recommendations | `05-recommendations.md` | — |
+| build recommendations | `05-recommendations.md` (and, if built after it, `work/phase6/issues.csv` and `work/explorer-data.json`) | — |
 | measure (optional; designed, not yet proven) | `04-measurements.md` and results under `work/phase4/` | access agreed with the user, never production load |
 | closing checks | the `check secrets` record, `check unchanged` and `check links` all passing | the executive summary `01-executive-summary.md` is written by a person |
 
