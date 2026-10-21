@@ -1,0 +1,20 @@
+{
+  "audit": { "type": "scalability" },
+  "lenses": ["performance", "reliability", "data", "infra"],
+  "areas": [
+    "background jobs",
+    "database and indexes",
+    "edge and HTTP",
+    "infrastructure"
+  ],
+  "models": {
+    "hunter": { "model": "inherit", "effort": "high" },
+    "skeptic": { "model": "inherit", "effort": "high" },
+    "verifier": { "model": "sonnet", "effort": "low" }
+  },
+  "verify": {
+    "skeptic_lenses": ["reach", "mech", "math"],
+    "survive_votes": 2,
+    "batch_size": 30
+  }
+}

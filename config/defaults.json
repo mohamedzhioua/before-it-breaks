@@ -1,0 +1,126 @@
+{
+  "scale": {
+    "bases": [
+      "per-tenant items",
+      "platform items",
+      "recipients per send",
+      "rows per file",
+      "any size",
+      "not size-driven"
+    ]
+  },
+  "known_limits": [],
+  "library_assumptions": [],
+  "out_of_scope": ["security"],
+  "areas": [
+    "background jobs",
+    "database and indexes",
+    "edge and HTTP",
+    "front-end",
+    "infrastructure"
+  ],
+  "modules": [],
+  "severity_rubric": {
+    "critical": "Breaks for every user, or loses or corrupts data, at or below the target size.",
+    "high": "Breaks or becomes unusable for some users at or below the target size.",
+    "medium": "Degrades noticeably before the target size, or breaks only beyond it.",
+    "low": "Wasteful or fragile, with no failure expected inside the target size."
+  },
+  "effort_scale": {
+    "S": "Under a day for one engineer; no migration.",
+    "M": "A few days; may need a small migration or a config change in several places.",
+    "L": "A week or more, a data migration, or a design change across services."
+  },
+  "verify": {
+    "skeptic_lenses": ["reach", "mech", "math"],
+    "survive_votes": 2,
+    "batch_size": 30
+  },
+  "models": {
+    "lead": { "model": "opus", "effort": "high" },
+    "mapper": { "model": "inherit", "effort": "medium" },
+    "hunter": { "model": "inherit", "effort": "high" },
+    "rule_writer": { "model": "inherit", "effort": "medium" },
+    "skeptic": { "model": "inherit", "effort": "high" },
+    "verifier": { "model": "sonnet", "effort": "low" },
+    "architect": { "model": "inherit", "effort": "medium" },
+    "docs_writer": { "model": "sonnet", "effort": "medium" }
+  },
+  "agents": {
+    "namespace": "before-it-breaks:",
+    "types": {
+      "mapper": "audit-mapper",
+      "hunter": "audit-hunter",
+      "rule_writer": "audit-rule-writer",
+      "skeptic": "audit-skeptic",
+      "verifier": "audit-verifier",
+      "architect": "audit-architect",
+      "docs_writer": "audit-docs-writer"
+    }
+  },
+  "concurrency": {
+    "max_agents_per_workflow": 12,
+    "max_concurrent": 6,
+    "verify_pool": 3
+  },
+  "evidence": {
+    "shell": "auto",
+    "timeout_ms": 60000,
+    "max_lines": 200,
+    "allowed_heads": [
+      "git", "grep", "rg", "cat", "head", "tail", "sed", "awk", "wc",
+      "sort", "uniq", "cut", "tr", "ls", "jq", "semgrep"
+    ],
+    "git_read_subcommands": [
+      "show", "log", "grep", "ls-files", "ls-tree", "rev-parse", "blame", "diff", "cat-file"
+    ],
+    "live_prefixes": ["mongosh", "psql", "redis-cli", "LIVE"],
+    "secret_patterns": [
+      "(password|passwd|secret|token|api[_-]?key)\\s*[:=]\\s*\\S+",
+      "authorization:\\s*\\S+(\\s+\\S+)?"
+    ]
+  },
+  "rules": {
+    "enabled": true,
+    "engine": "semgrep",
+    "languages": ["typescript"],
+    "sets": ["typescript"]
+  },
+  "outputs": {
+    "summary": "01-executive-summary.md",
+    "report": "02-audit-report.md",
+    "log": "03-verification-log.md",
+    "measurements": "04-measurements.md",
+    "recommendations": "05-recommendations.md",
+    "docs_dir": "system-docs",
+    "work_dir": "work"
+  },
+  "publish": {
+    "tracker": "none",
+    "base_url": "",
+    "docs_host": "github"
+  },
+  "measure": {
+    "access": [
+      { "kind": "mongo", "safe_form": "A read-only database user on a replica, never the primary.", "unlocks": "Query plans, index lists and collection sizes." },
+      { "kind": "redis", "safe_form": "Pasted output of the cache's own stats command.", "unlocks": "Memory use, key counts and eviction checks." },
+      { "kind": "queue", "safe_form": "Pasted queue dashboard or stats output.", "unlocks": "Backlog, retry and stuck-job checks." },
+      { "kind": "k8s", "safe_form": "Read-only cluster access (get and describe only), or pasted manifests.", "unlocks": "Real replica counts, resource limits and probe settings." },
+      { "kind": "bench", "safe_form": "A staging environment with an agreed load window. Never production.", "unlocks": "Load tests, the only route to a PROVEN verdict." }
+    ],
+    "kinds": {
+      "mongo": "^(mongosh|mongo)\\b|\\.explain\\(",
+      "redis": "^redis-cli\\b",
+      "queue": "\\b(bull|bullmq|queue)\\b",
+      "k8s": "^(kubectl|helm)\\b",
+      "lib": "node_modules/|^npm (ls|view|explain)\\b",
+      "bench": "^(k6|autocannon|artillery|wrk|ab)\\b"
+    }
+  },
+  "read_only": {
+    "deny_bash": [
+      "git push", "git commit", "git checkout", "git reset", "git stash",
+      "npm install", "pnpm install", "yarn add"
+    ]
+  }
+}

@@ -1,0 +1,533 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Before It Breaks audit configuration",
+  "description": "One audit.config.json per audit workspace. You write it by hand (or let `kit init` start it); generated state such as pins and run logs lives in work/, never here. Fields you leave out are filled from config/defaults.json, then from the preset you name. This schema uses only a small JSON Schema subset so the kit can check it without dependencies: type, required, properties, additionalProperties, enum, const, items, minItems, pattern, minimum, default, $ref/$defs.",
+  "type": "object",
+  "required": ["audit", "repos", "scale", "lenses", "groups"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "description": "Relative path or URL of this schema, so editors can autocomplete and flag typos.",
+      "type": "string"
+    },
+    "preset": {
+      "description": "Starting point chosen from the decision guide. Its values sit between the kit defaults and your own fields: anything you write here still wins.",
+      "enum": ["scalability", "reliability", "performance"]
+    },
+    "size": {
+      "description": "Rough audit size from the decision guide (see config/sizes.json). It is guidance for planning repos, hunt groups and verify runs; it does not change any other field.",
+      "enum": ["lite", "standard", "full"]
+    },
+    "audit": {
+      "description": "What this audit is about, in plain words. These sentences are copied into agent prompts and report headers.",
+      "type": "object",
+      "required": ["name", "question", "type", "date"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "Short title used in report headings, e.g. \"Notes platform growth audit\".",
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "question": {
+          "description": "The one question the audit must answer, e.g. \"Can a single workspace hold half a million notes, and what gives way first?\".",
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "type": {
+          "description": "Kind of audit; normally the same as the preset.",
+          "enum": ["scalability", "reliability", "performance"]
+        },
+        "date": {
+          "description": "Audit date as YYYY-MM-DD. Workflows cannot read the clock, so the date travels in through their arguments.",
+          "type": "string",
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+        }
+      }
+    },
+    "kit": {
+      "description": "Where the kit itself lives. Written by `kit init` inside a workspace; leave it out elsewhere and the kit uses its own folder.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "root": {
+          "description": "Absolute path of the kit checkout or plugin folder.",
+          "type": "string",
+          "pattern": "\\S"
+        }
+      }
+    },
+    "repos": {
+      "description": "Every repository the audit reads. Code is only ever read; nothing in these folders is changed.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/repo" }
+    },
+    "scale": {
+      "description": "The size that matters and the size you are aiming for. Thresholds are reported against these tiers.",
+      "type": "object",
+      "required": ["unit", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "unit": {
+          "description": "The growing quantity, said in full, e.g. \"notes in one workspace\".",
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "unit_short": {
+          "description": "One-word form used in tables, e.g. \"notes\". Defaults to the last word of `unit`.",
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "target": {
+          "description": "The size you want one tenant (or the unit's owner) to reach.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "platform_target": {
+          "description": "Optional size for the whole platform (all tenants together). Must be at least `target`.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "tiers": {
+          "description": "Strictly ascending sizes at which findings are graded. Every tier must be at most `target`. Left out: 10000 and 100000 (those below the target) followed by the target itself.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "integer", "minimum": 1 }
+        },
+        "bases": {
+          "description": "Allowed answers to \"what does this finding grow with?\". The defaults cover per-tenant data, platform data, fan-out, file rows, and items that do not depend on size.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "\\S" }
+        }
+      }
+    },
+    "known_limits": {
+      "description": "Hard limits of the platform that agents may rely on without proving them again, e.g. \"Edge proxy rejects request bodies over 2 MiB\".",
+      "type": "array",
+      "items": { "type": "string", "pattern": "\\S" }
+    },
+    "library_assumptions": {
+      "description": "Library behaviours the hunters and skeptics should check, each one line, e.g. \"queue library: a failed job id cannot be reused until removed\".",
+      "type": "array",
+      "items": { "type": "string", "pattern": "\\S" }
+    },
+    "out_of_scope": {
+      "description": "Topics agents must not report on; anything they notice there goes to notes, not findings. Example: \"security\", \"legacy import tool\".",
+      "type": "array",
+      "items": { "type": "string", "pattern": "\\S" }
+    },
+    "lenses": {
+      "description": "Hunt lenses in use. Each one is a method file the hunters read first (method/lenses/<lens>.md). The kit ships performance, reliability, data, infra and frontend; any other name must also appear in custom_lenses.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$" }
+    },
+    "custom_lenses": {
+      "description": "Lenses you wrote yourself, e.g. \"search-index\". Listing one here lets `lenses` use it; you must also provide its lens file.",
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$" }
+    },
+    "groups": {
+      "description": "Hunt groups: one hunter agent per group, each with one repo and one lens.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/group" }
+    },
+    "areas": {
+      "description": "Report sections that findings are filed under, e.g. \"background jobs\", \"database and indexes\".",
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "pattern": "\\S" }
+    },
+    "modules": {
+      "description": "How file paths map to named modules in the architecture view. The first rule whose pattern matches a path wins.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/module" }
+    },
+    "severity_rubric": {
+      "description": "Severity levels and what each means, in report order (most severe first).",
+      "type": "object",
+      "additionalProperties": { "type": "string", "pattern": "\\S" }
+    },
+    "effort_scale": {
+      "description": "Effort sizes for recommended fixes and what each means, smallest first.",
+      "type": "object",
+      "additionalProperties": { "type": "string", "pattern": "\\S" }
+    },
+    "verify": {
+      "description": "How candidate findings are challenged before they count.",
+      "type": "object",
+      "required": ["skeptic_lenses", "survive_votes", "batch_size"],
+      "additionalProperties": false,
+      "properties": {
+        "skeptic_lenses": {
+          "description": "One skeptic per lens tries to refute each candidate. At least three, so a cut in budget never cuts the checks.",
+          "type": "array",
+          "minItems": 3,
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$" }
+        },
+        "survive_votes": {
+          "description": "How many skeptics must fail to refute a candidate for it to survive. At most the number of skeptic lenses.",
+          "type": "integer",
+          "minimum": 1,
+          "default": 2
+        },
+        "batch_size": {
+          "description": "Candidates per verify batch.",
+          "type": "integer",
+          "minimum": 1,
+          "default": 30
+        }
+      }
+    },
+    "models": {
+      "description": "Model and effort per role. Leave a role out to keep its default; `inherit` means the workflow sends no model option and the session's model is used.",
+      "type": "object",
+      "required": ["lead", "mapper", "hunter", "rule_writer", "skeptic", "verifier", "architect", "docs_writer"],
+      "additionalProperties": false,
+      "properties": {
+        "lead": { "$ref": "#/$defs/modelChoice" },
+        "mapper": { "$ref": "#/$defs/modelChoice" },
+        "hunter": { "$ref": "#/$defs/modelChoice" },
+        "rule_writer": { "$ref": "#/$defs/modelChoice" },
+        "skeptic": { "$ref": "#/$defs/modelChoice" },
+        "verifier": { "$ref": "#/$defs/modelChoice" },
+        "architect": { "$ref": "#/$defs/modelChoice" },
+        "docs_writer": { "$ref": "#/$defs/modelChoice" }
+      }
+    },
+    "agents": {
+      "description": "How agent types are named. With the plugin installed the namespace is the plugin name plus a colon; after `kit install-agents` set it to an empty string.",
+      "type": "object",
+      "required": ["namespace", "types"],
+      "additionalProperties": false,
+      "properties": {
+        "namespace": {
+          "description": "Prefix put in front of every agent type.",
+          "type": "string",
+          "pattern": "^([a-z0-9]+(-[a-z0-9]+)*:)?$",
+          "default": "before-it-breaks:"
+        },
+        "types": {
+          "description": "Agent file name per role (without the namespace).",
+          "type": "object",
+          "required": ["mapper", "hunter", "rule_writer", "skeptic", "verifier", "architect", "docs_writer"],
+          "additionalProperties": false,
+          "properties": {
+            "mapper": { "$ref": "#/$defs/agentName" },
+            "hunter": { "$ref": "#/$defs/agentName" },
+            "rule_writer": { "$ref": "#/$defs/agentName" },
+            "skeptic": { "$ref": "#/$defs/agentName" },
+            "verifier": { "$ref": "#/$defs/agentName" },
+            "architect": { "$ref": "#/$defs/agentName" },
+            "docs_writer": { "$ref": "#/$defs/agentName" }
+          }
+        }
+      }
+    },
+    "concurrency": {
+      "description": "Limits on how many agents run. Larger phases are split into several workflow runs.",
+      "type": "object",
+      "required": ["max_agents_per_workflow", "max_concurrent", "verify_pool"],
+      "additionalProperties": false,
+      "properties": {
+        "max_agents_per_workflow": {
+          "description": "Most agents one workflow run may start.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_concurrent": {
+          "description": "Most agents running at the same moment. At most `max_agents_per_workflow`.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "verify_pool": {
+          "description": "Verify batches worked on in parallel.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "evidence": {
+      "description": "Rules for re-running the read-only commands that back each finding.",
+      "type": "object",
+      "required": ["shell", "timeout_ms", "max_lines", "allowed_heads", "git_read_subcommands", "live_prefixes", "secret_patterns"],
+      "additionalProperties": false,
+      "properties": {
+        "shell": {
+          "description": "`auto` finds a POSIX shell (Git Bash on Windows); otherwise give `bash` or an absolute path to one.",
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "timeout_ms": {
+          "description": "Time limit per command, in milliseconds.",
+          "type": "integer",
+          "minimum": 1000
+        },
+        "max_lines": {
+          "description": "Output lines kept per command.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "allowed_heads": {
+          "description": "Programs a command may start with. Anything else is skipped as unsafe.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" }
+        },
+        "git_read_subcommands": {
+          "description": "git subcommands treated as read-only.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z-]*$" }
+        },
+        "live_prefixes": {
+          "description": "Command starts that need a live system (a database shell, say). Those commands are recorded but not run by the kit.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "\\S" }
+        },
+        "secret_patterns": {
+          "description": "JavaScript regular expressions (case-insensitive) whose matches are masked in captured output. Your entries are added to the kit's default masks; the defaults cannot be removed.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "\\S" }
+        }
+      }
+    },
+    "rules": {
+      "description": "Static-analysis rules run over the repos.",
+      "type": "object",
+      "required": ["enabled", "engine", "languages", "sets"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "description": "Turn the rules stage off for stacks the bundled rules do not cover.",
+          "type": "boolean"
+        },
+        "engine": {
+          "description": "Rule engine. Only Semgrep is supported.",
+          "const": "semgrep"
+        },
+        "languages": {
+          "description": "Languages to scan, e.g. \"typescript\".",
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9_-]+$" }
+        },
+        "sets": {
+          "description": "Bundled rule folders under rules/semgrep/ to use.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9_-]+$" }
+        }
+      }
+    },
+    "outputs": {
+      "description": "File and folder names of the deliverables, relative to the workspace.",
+      "type": "object",
+      "required": ["summary", "report", "log", "measurements", "recommendations", "docs_dir", "work_dir"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "$ref": "#/$defs/relPath" },
+        "report": { "$ref": "#/$defs/relPath" },
+        "log": { "$ref": "#/$defs/relPath" },
+        "measurements": { "$ref": "#/$defs/relPath" },
+        "recommendations": { "$ref": "#/$defs/relPath" },
+        "docs_dir": { "$ref": "#/$defs/relPath" },
+        "work_dir": { "$ref": "#/$defs/relPath" }
+      }
+    },
+    "publish": {
+      "description": "Where results are published, which decides link formats and the issue export.",
+      "type": "object",
+      "required": ["tracker", "base_url", "docs_host"],
+      "additionalProperties": false,
+      "properties": {
+        "tracker": {
+          "description": "Issue tracker: `gitlab` writes a CSV import, `github` a markdown checklist, `none` nothing.",
+          "enum": ["gitlab", "github", "none"]
+        },
+        "base_url": {
+          "description": "Web address of the repository that will hold the docs, used to build links. Empty keeps links relative.",
+          "type": "string"
+        },
+        "docs_host": {
+          "description": "Which host's markdown and diagram rendering the docs should suit.",
+          "enum": ["gitlab", "github"]
+        }
+      }
+    },
+    "measure": {
+      "description": "The measure phase (designed, not yet proven): what access unlocks which checks, and how commands are sorted by kind.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "access": {
+          "description": "Access levels you may grant, the safe way to grant each, and what each one makes provable.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "safe_form", "unlocks"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" },
+              "safe_form": { "type": "string", "pattern": "\\S" },
+              "unlocks": { "type": "string", "pattern": "\\S" }
+            }
+          }
+        },
+        "kinds": {
+          "description": "Measurement kind -> JavaScript regular expression matched against a command.",
+          "type": "object",
+          "additionalProperties": { "type": "string", "pattern": "\\S" }
+        }
+      }
+    },
+    "read_only": {
+      "description": "Commands the audit session must never run. `kit init` turns them into deny rules in the workspace's .claude/settings.json.",
+      "type": "object",
+      "required": ["deny_bash"],
+      "additionalProperties": false,
+      "properties": {
+        "deny_bash": {
+          "description": "Command prefixes to deny. Your entries are added to the kit's default list; the defaults cannot be removed.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "\\S" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "repo": {
+      "description": "One repository. Give `path` normally; in an example plan you may give `url` and `ref` (and a `pin`, which may be \"TODO\") instead.",
+      "type": "object",
+      "required": ["name", "role"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "Short kebab-case name used everywhere else, e.g. \"notes-api\".",
+          "type": "string"
+        },
+        "path": {
+          "description": "Folder of the checkout, absolute or relative to the workspace.",
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "url": {
+          "description": "Clone address (example plans).",
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "ref": {
+          "description": "Tag or branch to clone (example plans).",
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "pin": {
+          "description": "Commit the example plan was written against, or \"TODO\" until it is chosen.",
+          "type": "string",
+          "pattern": "^([0-9a-f]{7,40}|TODO)$"
+        },
+        "role": {
+          "description": "What the repo is, which picks the mapper checklist.",
+          "enum": ["backend", "frontend", "infra", "other"]
+        },
+        "include": {
+          "description": "Folders or files to read, relative to the repo. Empty means the whole repo.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "\\S" }
+        },
+        "exclude": {
+          "description": "Folders or files to skip, relative to the repo.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "\\S" }
+        },
+        "context_only": {
+          "description": "Read for context (e.g. deployment manifests) but never hunted in; no group may point at it.",
+          "type": "boolean"
+        },
+        "known_gaps": {
+          "description": "Things you know the audit cannot see in this repo, stated in the report's limits.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "\\S" }
+        }
+      }
+    },
+    "group": {
+      "description": "One hunt group.",
+      "type": "object",
+      "required": ["key", "repo", "lens", "scope"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "description": "Upper-case id such as \"SVC-JOBS\"; it prefixes every candidate the group finds.",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Name of a repo from `repos` that is not context-only.",
+          "type": "string"
+        },
+        "lens": {
+          "description": "One of `lenses`.",
+          "type": "string"
+        },
+        "scope": {
+          "description": "Which code this hunter reads, e.g. \"src/jobs/ and the queue setup\".",
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "focus": {
+          "description": "What to look for first, in a sentence.",
+          "type": "string"
+        },
+        "claims": {
+          "description": "Ids of earlier-audit claims (work/claims.json) this group must re-check.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "\\S" }
+        },
+        "maps": {
+          "description": "Phase-1 map files the hunter reads before starting.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "\\S" }
+        }
+      }
+    },
+    "module": {
+      "description": "One path-to-module rule.",
+      "type": "object",
+      "required": ["repo", "pattern", "id", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "repo": { "description": "Repo the rule applies to.", "type": "string" },
+        "pattern": { "description": "JavaScript regular expression matched against repo-relative paths; capture groups can be used as $1, $2 in `id` and `label`.", "type": "string", "pattern": "\\S" },
+        "id": { "description": "Module id, e.g. \"svc.$1\".", "type": "string", "pattern": "\\S" },
+        "label": { "description": "Name shown in diagrams.", "type": "string", "pattern": "\\S" },
+        "layer": { "description": "Architecture layer, e.g. \"Domain\" or \"Edge\".", "type": "string" },
+        "doc": { "description": "Workspace-relative link to the module's description.", "type": "string" }
+      }
+    },
+    "modelChoice": {
+      "description": "Model and effort for one role.",
+      "type": "object",
+      "required": ["model", "effort"],
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "description": "`opus`, `sonnet`, `fable`, `inherit`, or a full model id starting with \"claude-\".",
+          "type": "string",
+          "pattern": "^(opus|sonnet|fable|inherit|claude-[a-z0-9][a-z0-9.-]*)$"
+        },
+        "effort": {
+          "description": "Reasoning effort.",
+          "enum": ["low", "medium", "high", "xhigh", "max"]
+        }
+      }
+    },
+    "agentName": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "relPath": {
+      "type": "string",
+      "pattern": "^[^/\\\\:]([^:]*[^/\\\\])?$"
+    }
+  }
+}

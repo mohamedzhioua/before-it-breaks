@@ -1,0 +1,125 @@
+{
+  "$schema": "../../config/audit.config.schema.json",
+  "preset": "scalability",
+  "size": "lite",
+  "audit": {
+    "name": "Notes platform growth audit",
+    "question": "Can a single workspace hold half a million notes, and what gives way first?",
+    "type": "scalability",
+    "date": "2027-03-08"
+  },
+  "repos": [
+    {
+      "name": "notes-api",
+      "path": "../repos/notes-api",
+      "role": "backend",
+      "include": ["src/"],
+      "exclude": ["src/**/*.spec.ts"],
+      "context_only": false,
+      "known_gaps": ["The search indexer runs as a separate service that is not in scope."]
+    },
+    {
+      "name": "notes-web",
+      "path": "../repos/notes-web",
+      "role": "frontend",
+      "include": ["app/", "components/"],
+      "exclude": [],
+      "context_only": false,
+      "known_gaps": []
+    },
+    {
+      "name": "notes-ops",
+      "path": "../repos/notes-ops",
+      "role": "infra",
+      "include": ["deploy/"],
+      "exclude": [],
+      "context_only": true,
+      "known_gaps": ["Autoscaling settings live in the hosting console, not in this repo."]
+    }
+  ],
+  "scale": {
+    "unit": "notes in one workspace",
+    "unit_short": "notes",
+    "target": 500000,
+    "platform_target": 20000000,
+    "tiers": [5000, 50000, 500000]
+  },
+  "known_limits": [
+    "Edge proxy rejects request bodies over 2 MiB",
+    "Edge proxy closes idle connections after 90 s",
+    "The search service returns at most 1000 hits per query"
+  ],
+  "library_assumptions": [
+    "Job queue: a failed job keeps its id until it is removed, so re-adding with the same id is a no-op",
+    "HTTP client: no request timeout unless one is set"
+  ],
+  "out_of_scope": ["security", "the legacy CSV export tool"],
+  "lenses": ["performance", "reliability", "data", "infra", "frontend"],
+  "groups": [
+    {
+      "key": "SVC-JOBS",
+      "repo": "notes-api",
+      "lens": "reliability",
+      "scope": "src/jobs/ and the queue set-up in src/queue/",
+      "focus": "Retries, duplicate notifications, jobs that never finish.",
+      "claims": [],
+      "maps": ["notes-api-map.md"]
+    },
+    {
+      "key": "SVC-IMPORT",
+      "repo": "notes-api",
+      "lens": "performance",
+      "scope": "src/modules/imports/",
+      "focus": "Whole-file reads and per-row queries during note imports.",
+      "maps": ["notes-api-map.md"]
+    },
+    {
+      "key": "DATA-INDEX",
+      "repo": "notes-api",
+      "lens": "data",
+      "scope": "src/modules/*/repository.ts and the index definitions",
+      "focus": "Queries on notes and users that no index serves; unbounded result sets.",
+      "maps": ["notes-api-map.md"]
+    },
+    {
+      "key": "OPS-RUNTIME",
+      "repo": "notes-api",
+      "lens": "infra",
+      "scope": "src/main.ts, health checks, shutdown handling, read together with the notes-ops manifests",
+      "focus": "Memory limits, connection pools and what happens during a rolling deploy."
+    },
+    {
+      "key": "WEB-LISTS",
+      "repo": "notes-web",
+      "lens": "frontend",
+      "scope": "app/workspaces/ and components/note-list/",
+      "focus": "Lists that render or fetch every note of a workspace at once.",
+      "maps": ["notes-web-map.md"]
+    }
+  ],
+  "modules": [
+    {
+      "repo": "notes-api",
+      "pattern": "^src/modules/([^/]+)",
+      "id": "svc.$1",
+      "label": "$1",
+      "layer": "Domain",
+      "doc": "system-docs/notes-api/architecture.md#modules"
+    },
+    {
+      "repo": "notes-web",
+      "pattern": "^app/([^/]+)",
+      "id": "web.$1",
+      "label": "$1 page",
+      "layer": "Front-end"
+    }
+  ],
+  "models": {
+    "hunter": { "effort": "xhigh" }
+  },
+  "publish": {
+    "tracker": "github",
+    "base_url": "",
+    "docs_host": "github"
+  }
+}

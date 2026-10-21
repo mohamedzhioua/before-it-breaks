@@ -1,0 +1,23 @@
+{
+  "lite": {
+    "description": "Small code base: one or two repos, a few hunt groups, one verify run.",
+    "max_lines": 30000,
+    "repos": { "min": 1, "max": 2 },
+    "hunt_groups": { "min": 3, "max": 4 },
+    "verify_runs": { "min": 1, "max": 1 }
+  },
+  "standard": {
+    "description": "Medium code base: several hunt groups, one or two verify runs.",
+    "max_lines": 150000,
+    "repos": { "min": 1, "max": 4 },
+    "hunt_groups": { "min": 5, "max": 8 },
+    "verify_runs": { "min": 1, "max": 2 }
+  },
+  "full": {
+    "description": "Large code base: many hunt groups over several repos, two verify runs. Above the full size, split by service and run one workspace per service from a shared config base.",
+    "max_lines": 300000,
+    "repos": { "min": 2, "max": 6 },
+    "hunt_groups": { "min": 10, "max": 12 },
+    "verify_runs": { "min": 2, "max": 2 }
+  }
+}

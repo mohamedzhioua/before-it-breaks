@@ -1,0 +1,19 @@
+{
+  "audit": { "type": "performance" },
+  "lenses": ["performance", "data", "frontend"],
+  "areas": [
+    "database and indexes",
+    "edge and HTTP",
+    "front-end"
+  ],
+  "models": {
+    "hunter": { "model": "inherit", "effort": "high" },
+    "skeptic": { "model": "inherit", "effort": "high" },
+    "verifier": { "model": "sonnet", "effort": "low" }
+  },
+  "verify": {
+    "skeptic_lenses": ["reach", "mech", "math"],
+    "survive_votes": 2,
+    "batch_size": 30
+  }
+}

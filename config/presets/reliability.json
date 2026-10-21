@@ -1,0 +1,20 @@
+{
+  "audit": { "type": "reliability" },
+  "lenses": ["reliability", "data", "infra"],
+  "areas": [
+    "background jobs",
+    "retries and idempotency",
+    "database and indexes",
+    "infrastructure"
+  ],
+  "models": {
+    "hunter": { "model": "inherit", "effort": "high" },
+    "skeptic": { "model": "inherit", "effort": "xhigh" },
+    "verifier": { "model": "sonnet", "effort": "low" }
+  },
+  "verify": {
+    "skeptic_lenses": ["reach", "mech", "math"],
+    "survive_votes": 2,
+    "batch_size": 25
+  }
+}
