@@ -59,7 +59,12 @@
  *
  * resolvePaths(config, wsDir) -> { workspace, configFile, kit, repos,
  *   outputs, work, docs, rules }
- *   All absolute. repos maps repo name -> folder (null for an example repo
+ *   All absolute. kit is always the running kit (KIT_ROOT); kit.root in the
+ *   config is only a record of the kit init ran from.
+ *
+ * kitRootMoved(config, paths) -> the recorded kit.root when it is not the
+ *   running kit, else null (doctor warns: prompts need a refresh).
+ * repos maps repo name -> folder (null for an example repo
  *   without a path); outputs maps each outputs key -> file or folder
  *   (outputs.target_architecture is resolved inside outputs.docs_dir).
  */
@@ -78,6 +83,9 @@ const DEFAULT_TIERS = [10000, 100000];
 // Lens method files shipped with the kit; any other lens must be declared in
 // custom_lenses (and needs its own lens file).
 const BUNDLED_LENSES = ['performance', 'reliability', 'data', 'infra', 'frontend'];
+// Skeptic briefs shipped with the kit (method/skeptics/); any other skeptic
+// lens needs <workspace>/method/skeptics/<name>.md.
+const BUNDLED_SKEPTICS = ['reach', 'mech', 'math'];
 // Keys that could reach an object's prototype; never merged, always an error.
 const FORBIDDEN_KEYS = ['__proto__', 'constructor', 'prototype'];
 // Safety lists where a config may only add entries to the kit defaults.
@@ -492,9 +500,10 @@ function withDefaults(raw) {
 
 function resolvePaths(config, wsDir) {
   const workspace = path.resolve(wsDir || '.');
-  const kit = isPlainObject(config.kit) && typeof config.kit.root === 'string'
-    ? path.resolve(config.kit.root)
-    : KIT_ROOT;
+  // Always the running kit: after a plugin update the kit lives in a new
+  // folder, and kit.root in the config (written by init) is only a record
+  // of where it was. doctor warns when the two differ (kitRootMoved).
+  const kit = KIT_ROOT;
   const repos = {};
   for (const r of arr(config.repos)) {
     if (!isPlainObject(r)) continue;
@@ -514,6 +523,19 @@ function resolvePaths(config, wsDir) {
     docs: outputs.docs_dir,
     rules: path.join(workspace, 'rules'),
   };
+}
+
+// The recorded kit.root when it names another folder than the running kit
+// (paths.kit), else null. Compared after resolving links; on Windows
+// without regard to case.
+function kitRootMoved(config, paths) {
+  const root = isPlainObject(config.kit) && typeof config.kit.root === 'string' ? config.kit.root : null;
+  if (!root) return null;
+  const real = (p) => {
+    try { return fs.realpathSync.native(path.resolve(p)); } catch (e) { return path.resolve(p); }
+  };
+  const norm = (p) => (process.platform === 'win32' ? real(p).toLowerCase() : real(p));
+  return norm(root) === norm(paths.kit) ? null : root;
 }
 
 function loadConfig(wsDir, opts) {
@@ -547,10 +569,12 @@ module.exports = {
   loadConfig,
   validateConfig,
   resolvePaths,
+  kitRootMoved,
   deepMerge,
   withDefaults,
   ConfigError,
   BUNDLED_LENSES,
+  BUNDLED_SKEPTICS,
   SUPPORTED_KEYWORDS,
   KIT_ROOT,
   SCHEMA_FILE,

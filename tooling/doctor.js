@@ -17,8 +17,14 @@
  *             runner itself starts no shell.)
  *   optional  bash when rules are off, semgrep (rules stage), claude (the
  *             Claude Code CLI). Skip semgrep and claude with --no-optional.
+ * Also required: every configured lens and skeptic lens has its method file
+ * (the check of `kit check workflows --workspace`).
  * Prints a WARNING (not a failure) for each value kit init filled with a
- * neutral default that is still unchanged (audit.placeholders).
+ * neutral default that is still unchanged (audit.placeholders), and when
+ * kit.root in the config is not the kit that is running (after a plugin
+ * update, for example): the tools always use the running kit, but
+ * MASTER-PROMPT.md and LAUNCHER-PROMPT.md still name the old folder until
+ * `kit init <ws> --refresh-prompts` renders them again.
  * Then prints the line that starts Claude Code (lead model and effort from
  * the config) with read access to every repo, and a reminder to check /hooks for Stop hooks from other plugins.
  *
@@ -29,7 +35,8 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { loadConfig, ConfigError } = require('./lib/config');
+const { loadConfig, ConfigError, kitRootMoved } = require('./lib/config');
+const { checkLensFiles } = require('./check-workflows');
 const { repoState, readPins } = require('./pin');
 const { compareToPins } = require('./check-unchanged');
 const { launchLine, placeholderWarnings } = require('./init-workspace');
@@ -91,6 +98,8 @@ function run(opts, io) {
   try {
     ({ config, paths } = loadConfig(opts.workspace));
     add(true, true, 'config', 'audit.config.json is valid');
+    const methods = checkLensFiles(null, { config, paths });
+    add(true, !methods.length, 'method files', methods.length ? methods.join('; ') : 'every lens and skeptic lens has its file');
   } catch (e) {
     if (!(e instanceof ConfigError)) throw e;
     add(true, false, 'config', e.errors.join('; '));
@@ -141,6 +150,10 @@ function run(opts, io) {
   for (const c of checks) io.out(`${c.ok ? 'ok  ' : c.required ? 'FAIL' : '--  '} ${c.name}: ${c.detail}`);
   const failed = checks.filter((c) => c.required && !c.ok).length;
   if (config) for (const w of placeholderWarnings(config)) io.out(`WARNING ${w}`);
+  const moved = config ? kitRootMoved(config, paths) : null;
+  if (moved) {
+    io.out(`WARNING kit.root in audit.config.json (${moved}) is not the running kit (${paths.kit}); the tools use the running kit, but the prompts still name the old one. Run: node "${paths.kit.split(path.sep).join('/')}/kit.js" init "${paths.workspace.split(path.sep).join('/')}" --refresh-prompts`);
+  }
 
   if (config) {
     const dirs = config.repos.filter((r) => paths.repos[r.name]).map((r) => paths.repos[r.name]);

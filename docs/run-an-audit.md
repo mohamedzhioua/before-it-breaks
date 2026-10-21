@@ -71,7 +71,11 @@ kit args <phase> --run <N> <ws> > <ws>/work/args/<phase>-<N>.json
 
 4. Append a dated entry to `HANDOFF.md` with the next step.
 
-`args` for verify reads `runs.json`; `args recommend` accepts `--target-design <file>`; `--date YYYY-MM-DD` overrides the audit date.
+Script notes: `kit init` writes one default module rule per repo (check it); `check secrets` applies the home-path and email rules to the published files only and the secret patterns to everything; `doctor` warns when `kit.root` is stale, so run `init <ws> --refresh-prompts` after a plugin update; `check mermaid` needs `--modules <dir>`; `build report` and `build recommendations` take `--strict`, which exits 1 on `check:` warnings; hunt summaries are saved to `work/phase2/hunt-<N>.json`.
+
+`kit args recommend` needs `kit synthesize` to have run first; it starts one planner per module that holds surviving findings, and finding ids that map to no module go to the cross-cutting agent. `doctor` has a required "method files" line: every lens and skeptic brief in use must exist.
+
+`args` for verify reads `runs.json`; `args report-inputs` accepts `--target-design <file>`; `--date YYYY-MM-DD` overrides the audit date.
 
 ## Workspace layout
 

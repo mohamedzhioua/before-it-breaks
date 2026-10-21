@@ -45,7 +45,7 @@ semgrep scan --metrics=off --config rules/semgrep/typescript --json -o scale-hit
 semgrep scan --metrics=off --config rules/semgrep/typescript path/to/repo/src
 ```
 
-`--config <folder>` loads only the YAML files, so the test files are never treated as rules. Semgrep scans only files tracked by git when the target is inside a git repository. The two front-end rules match any `.ts` or `.tsx` file: point them at the front-end folder named in your audit config, or run them separately with `--config rules/semgrep/typescript/scale-front-large-fixed-page-fetch.yaml`.
+With `--config <folder>`, Semgrep picks up just the `.yaml` rule files; the sample code beside them is never read as a rule. Semgrep scans only files tracked by git when the target is inside a git repository. The two front-end rules match any `.ts` or `.tsx` file: point them at the front-end folder named in your audit config, or run them separately with `--config rules/semgrep/typescript/scale-front-large-fixed-page-fetch.yaml`.
 
 Check that the rule files are well formed:
 

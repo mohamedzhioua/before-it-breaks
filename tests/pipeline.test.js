@@ -64,6 +64,7 @@ test('kit help lists every command; unknown commands exit 2', (t) => {
     assert.match(r.out, new RegExp(`^  ${g} <${Object.keys(subs).join('\\|')}>`, 'm'), g);
   }
   assert.match(r.out, /^ {2}help\b/m);
+  assert.match(r.out, /check mermaid requires --modules <dir>/);
   const bad = kit(['frobnicate']);
   assert.equal(bad.code, 2);
   assert.match(bad.err, /unknown command "frobnicate"/);
@@ -385,26 +386,41 @@ test('a custom severity rubric or effort scale replaces the default one, in the 
 
 // ---------- args for report-inputs and recommend ----------
 
-test('kit args recommend splits modules over runs within the cap; report-inputs passes target_design', (t) => {
+test('kit args recommend resolves modules from the surviving findings and splits them over runs within the cap; report-inputs passes target_design', (t) => {
   const { ws } = setup(t, 'recommend', (cfg) => {
     cfg.concurrency = { max_agents_per_workflow: 2, max_concurrent: 1, verify_pool: 1 };
-    cfg.modules = ['jobs', 'imports', 'notes'].map((m) => ({ repo: 'notes-api', pattern: `^src/${m}/`, id: `svc.${m}`, label: m, layer: 'Domain' }));
+    // Two rules, three resolved modules: svc.jobs, svc.imports, svc.notes.
+    cfg.modules = [
+      { repo: 'notes-api', pattern: '^src/(jobs)/', id: 'svc.$1', label: '$1', layer: 'Domain' },
+      { repo: 'notes-api', pattern: '^src/modules/([^/]+)/', id: 'svc.$1', label: '$1', layer: 'Domain' },
+    ];
   });
+  assert.equal(kit(['args', 'recommend', ws]).code, 2, 'recommend needs verdicts.json');
+  assert.equal(kit(['evidence', ws]).code, 0);
+  fs.copyFileSync(path.join(DATA, 'fixture-votes-B1.json'), path.join(ws, 'work', 'phase3', 'votes-B1.json'));
+  assert.equal(kit(['synthesize', ws]).code, 0);
+  const verdicts = JSON.parse(fs.readFileSync(path.join(ws, 'work', 'phase3', 'verdicts.json'), 'utf8')).verdicts;
+  const survived = verdicts.filter((v) => ['PROVEN', 'PROVEN-STATIC', 'UNPROVEN'].includes(v.verdict)).map((v) => v.id);
+
   const first = args(['recommend', ws]);
-  assert.equal(first.runs_total, 2);
   assert.ok(path.isAbsolute(first.report_inputs_file) && first.report_inputs_file.endsWith(path.join('phase5', 'report-inputs.json')));
-  let modules = 0;
+  const all = [];
   for (let n = 1; n <= first.runs_total; n++) {
     const r = args(['recommend', '--run', String(n), ws]);
     assert.ok(r.modules.length + (r.cross_cutting ? 1 : 0) <= 2, `run ${n}`);
     assert.equal(r.cross_cutting, n === first.runs_total);
-    modules += r.modules.length;
+    assert.deepEqual(r.unmapped_finding_ids, first.unmapped_finding_ids);
+    all.push(...r.modules);
   }
-  assert.equal(modules, 3);
-
-  assert.equal(kit(['evidence', ws]).code, 0);
-  fs.copyFileSync(path.join(DATA, 'fixture-votes-B1.json'), path.join(ws, 'work', 'phase3', 'votes-B1.json'));
-  assert.equal(kit(['synthesize', ws]).code, 0);
+  assert.ok(all.length >= 2, `modules: ${JSON.stringify(all)}`);
+  assert.equal(first.runs_total, Math.ceil((all.length + 1) / 2));
+  for (const m of all) {
+    assert.deepEqual(Object.keys(m).sort(), ['finding_ids', 'id', 'label', 'layer', 'repo']);
+    assert.match(m.id, /^svc\.(jobs|imports|notes)$/);
+    assert.ok(m.finding_ids.length >= 1);
+  }
+  assert.equal(new Set(all.map((m) => m.id)).size, all.length, 'one entry per resolved module');
+  assert.deepEqual(all.flatMap((m) => m.finding_ids).concat(first.unmapped_finding_ids).sort(), survived.slice().sort(), 'every surviving finding exactly once');
   assert.equal(args(['report-inputs', ws]).target_design, null);
   fs.writeFileSync(path.join(ws, 'target-design.md'), '# Planned design\n');
   const withDesign = args(['report-inputs', '--target-design', 'target-design.md', ws]);

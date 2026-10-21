@@ -12,7 +12,10 @@
  *
  * The file is completed with the kit defaults and its preset first (see
  * tooling/lib/config.js), so only what you wrote, or what the layers could
- * not fill, is reported.
+ * not fill, is reported. Then every configured lens and skeptic lens must
+ * have its method file (bundled: <kit>/method/lenses|skeptics/<name>.md;
+ * custom: <workspace>/method/lenses|skeptics/<name>.md); a missing one is
+ * an error too.
  *
  * Output: `OK` (followed by a WARNING line for each value kit init filled
  * with a neutral default that is still unchanged), or a header line followed by one numbered error per line.
@@ -22,6 +25,7 @@
 const path = require('path');
 const { loadConfig, ConfigError } = require('./lib/config');
 const { placeholderWarnings } = require('./init-workspace');
+const { checkLensFiles } = require('./check-workflows');
 
 class CliError extends Error {}
 
@@ -61,6 +65,12 @@ function main(argv, io) {
       if (e.stage !== 'validate') throw new CliError(e.errors.join('; '));
       io.out(`${display(e.file)}: ${e.errors.length} error${e.errors.length === 1 ? '' : 's'}`);
       e.errors.forEach((msg, i) => io.out(`  ${i + 1}. ${msg}`));
+      return 1;
+    }
+    const missing = checkLensFiles(null, loaded);
+    if (missing.length) {
+      io.out(`${display(loaded.paths.configFile)}: ${missing.length} error${missing.length === 1 ? '' : 's'}`);
+      missing.forEach((msg, i) => io.out(`  ${i + 1}. ${msg}`));
       return 1;
     }
     io.out('OK');

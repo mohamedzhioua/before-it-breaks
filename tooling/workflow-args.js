@@ -35,7 +35,7 @@
  *                  (concurrency.verify_pool), skeptic_briefs, receipts_dir.
  *                  Args stay small enough to paste into a Workflow call:
  *                  hunt carries only the config's group entries, report-inputs
- *                  only finding ids, recommend only the config's modules.
+ *                  and recommend only finding ids.
  *   report-inputs  report_batches [{ batch: "R<n>", ids }] of the findings
  *                  that survived (PROVEN-STATIC, PROVEN, UNPROVEN in
  *                  work/phase3/verdicts.json), areas, scale_bases,
@@ -43,7 +43,14 @@
  *                  target_design (absolute path of --target-design, a file
  *                  describing a planned design to compare against; relative
  *                  to the workspace; null when not given).
- *   recommend      modules of run N (one architect each), cross_cutting
+ *   recommend      modules of run N, one architect each: the findings that
+ *                  survived (as for report-inputs) are placed by the primary
+ *                  location of their candidate through config.modules, the
+ *                  same mapping kit build recommendations uses
+ *                  (tooling/lib/modules.js), giving one entry per resolved
+ *                  module: [{ id, label, repo, layer, finding_ids }];
+ *                  unmapped_finding_ids (no module rule places them; the
+ *                  cross-cutting architect covers them), cross_cutting
  *                  (true on the last run: one more architect writes the
  *                  cross-cutting decisions), report_inputs_file
  *                  (work/phase5/report-inputs.json), verdicts_file,
@@ -64,13 +71,13 @@
 
 const fs = require('fs');
 const path = require('path');
-const { loadConfig, ConfigError, BUNDLED_LENSES } = require('./lib/config');
+const { loadConfig, ConfigError, BUNDLED_LENSES, BUNDLED_SKEPTICS } = require('./lib/config');
 const { readPins } = require('./pin');
+const { groupFindings } = require('./lib/modules');
 
 class CliError extends Error {}
 
 const PHASES = ['map', 'hunt', 'verify', 'report-inputs', 'recommend'];
-const BUNDLED_SKEPTICS = ['reach', 'mech', 'math'];
 const SURVIVED = ['PROVEN-STATIC', 'PROVEN', 'UNPROVEN'];
 const DATE = /^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/;
 
@@ -236,12 +243,24 @@ function reportPart(config, paths, n) {
   };
 }
 
+// Surviving finding ids, in verdicts.json order.
+function survivors(paths) {
+  const doc = readJson(path.join(paths.work, 'phase3', 'verdicts.json'), 'work/phase3/verdicts.json is missing: run `kit synthesize` first');
+  return (doc.verdicts || []).filter((v) => SURVIVED.includes(v.verdict)).map((v) => v.id);
+}
+
 function recommendPart(config, paths, n) {
   const cap = config.concurrency.max_agents_per_workflow;
-  const runs = parts(config.modules, Math.max(1, Math.ceil((config.modules.length + 1) / cap)));
+  const cdoc = readJson(path.join(paths.work, 'candidates.json'), 'work/candidates.json is missing: run the hunt phase first');
+  const list = Array.isArray(cdoc) ? cdoc : (cdoc && Array.isArray(cdoc.candidates) ? cdoc.candidates : []);
+  const byId = new Map(list.filter((c) => c && typeof c.id === 'string').map((c) => [c.id, c]));
+  const { modules, unmapped } = groupFindings(config, survivors(paths), byId);
+  const entries = modules.map((m) => ({ id: m.id, label: m.label, repo: m.repo, layer: m.layer, finding_ids: m.finding_ids }));
+  const runs = parts(entries, Math.max(1, Math.ceil((entries.length + 1) / cap)));
   return {
     runs_total: runs.length,
     modules: pick(runs, n),
+    unmapped_finding_ids: unmapped,
     cross_cutting: n === runs.length,
     report_inputs_file: path.join(paths.work, 'phase5', 'report-inputs.json'),
     verdicts_file: path.join(paths.work, 'phase3', 'verdicts.json'),

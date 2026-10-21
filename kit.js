@@ -33,7 +33,7 @@ const GROUPS = {
     secrets: T('scan-secrets.js'), workflows: T('check-workflows.js'), clean: T('check-clean.js'),
   },
 };
-const GROUP_HELP = { build: 'build an output document', check: 'run a check' };
+const GROUP_HELP = { build: 'build an output document', check: 'run a check (check mermaid requires --modules <dir>)' };
 
 function help(write) {
   write('usage: node kit.js <command> [arguments]\n\ncommands:');

@@ -25,7 +25,7 @@ Rules for this page:
 
 ## 1. Can it reach {{target}} {{config.scale.unit_short}}?
 
-_The answer in one sentence ("yes", "not as it is today", "yes, after these changes"), then two or three sentences on why. Say whether hardware or the code is the limit._
+_The answer in one sentence ("yes", "not yet — here is what breaks first", "yes, after these changes"), then two or three sentences on why. Say whether hardware or the code is the limit._
 
 ## 2. What breaks first, and at what size
 

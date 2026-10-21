@@ -8,7 +8,7 @@ The room is mixed: managers and product people next to engineers. So:
 
 - **Headlines and slide text are plain:** what fails, from what size, what customers or operators see. No finding ids, commit hashes, agent types or model names on the slide face.
 - **Ids, commits, models and file paths go in the speaker notes and the appendix**, where an engineer can check them.
-- **Severity is always written as a word**, never shown by colour alone.
+- **Write each severity out in words**; colour may support it but must not carry it alone.
 - Every slide that shows a breaking size says "calculated" unless a measurement backs it.
 
 ## Main slides
@@ -17,12 +17,12 @@ The room is mixed: managers and product people next to engineers. So:
 |---|---|---|---|
 | 1 | Cover | The audit question, as a question | One sentence on how the audit worked; the pin date; what is out of scope |
 | 2 | Goal and scope | One question, what was read, what was not | Repos and versions in plain words; out-of-scope list |
-| 3 | The answer | "Yes", "Not as it is today", or "Yes, after these changes" | Two sentences of why; chart 1 (severity bars) |
+| 3 | The answer | "Yes", "Not yet — here is what breaks first", or "Yes, after these changes" | Two sentences of why; chart 1 (severity bars) |
 | 4 | What fails first | "N problems already fail at <smallest tier>" | Chart 2 (breaking-size ladder) |
 | 5 | The worst problems | What breaks first | A short table: what fails, from about which size, what people see |
 | 6 | Why it breaks | The few patterns behind most problems | Two to four plain boxes, each ending with what users see |
 | 7 | Where the risk sits | Which parts of the system carry most risk | Module or area table, or the heatmap from the recommendations |
-| 8 | How the audit ran | Six steps, each behind a check | The pipeline diagram below |
+| 8 | How the audit ran | Seven steps (0–6), each behind a check | The pipeline diagram below |
 | 9 | Who did the work | Agents per phase | Chart 3 (agents per phase), from the run log only |
 | 10 | How far to trust it | Suspected in, confirmed out | Chart 4 (verification funnel); "overrides removed, merged or held back, never added" |
 | 11 | Proposed design | Today versus proposed; the team decides | A current-versus-target picture keyed to the decision records |

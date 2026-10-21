@@ -9,6 +9,6 @@ For anyone deciding how much weight to give an audit made with this kit. These a
 - **Scope sets coverage.** Hunters read the groups you define. Code outside every group, repos marked `context_only`, and topics in `out_of_scope` are not hunted. There is no completeness guarantee.
 - **Costs are not predictable precisely.** Time and AI usage grow with the number of repos, groups and candidates, and multi-agent phases use far more than ordinary chat. Record what each phase actually used in the run log; the kit gives no fixed figures.
 - **Models change.** The kit was built and used with Claude models available in late 2026. Other and later models are untested; the config uses aliases so it keeps working, but results may differ.
-- **Experimental parts.** The recommend phase (module plans, decision records, roadmap) is experimental: it has not been scripted in a full audit yet.
+- **Experimental parts.** The recommend phase (module plans, decision records, roadmap) is experimental: it has not been scripted in a full audit yet, and it does not yet guarantee a plan for every finding in a planned module; `recommend` lists any finding id it got no plan for in `failed`.
 - **Out of reach: security, load testing, observability.** The kit does not look for vulnerabilities, measure production behaviour or replace monitoring.
 - **The evidence allowlist is not a sandbox**, and the agents read untrusted code. See [security](security.md).

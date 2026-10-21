@@ -166,7 +166,9 @@ function cannedAnswer(prompt, opts) {
   }
   if (label.startsWith('docs:')) return { files: [], unresolved: [], notes: 'stub' };
   if (label.startsWith('plan:')) {
-    return { plans: [{ module: 'svc.notes', repo: 'notes-api', summary: 'Stub plan.', recs: [{ finding_ids: ['SVC-JOBS-01'], change: 'Bound the list.', target: 'Pages of 100.', effort: 'S', effort_note: 'one query', depends_on: [], order: 1 }] }] };
+    const p = props.plans.items.properties;
+    const ids = p.recs.items.properties.finding_ids.items.enum;
+    return { plans: [{ module: p.module.enum[0], repo: p.repo.enum[0], summary: 'Stub plan.', recs: [{ finding_ids: ids, change: 'Bound the list.', target: 'Pages of 100.', effort: 'S', effort_note: 'one query', depends_on: [], order: 1 }] }] };
   }
   if (label === 'cross-cutting') {
     return {
@@ -542,6 +544,39 @@ test('report-inputs lists every finding id an architect left out', async () => {
   assert.match(none.result.failed[0], /^report:R1: no result \(ids /);
 });
 
+test('recommend args hold one entry per resolved module with its finding ids; a left-out id is listed in failed', async () => {
+  const a = ARGS.recommend;
+  const { groupFindings } = require('../tooling/lib/modules');
+  const { config } = require('../tooling/lib/config').loadConfig(WS);
+  const verdicts = JSON.parse(fs.readFileSync(path.join(WS, 'work', 'phase3', 'verdicts.json'), 'utf8')).verdicts;
+  const survived = verdicts.filter((v) => ['PROVEN-STATIC', 'PROVEN', 'UNPROVEN'].includes(v.verdict)).map((v) => v.id);
+  const cands = new Map(JSON.parse(fs.readFileSync(path.join(WS, 'work', 'candidates.json'), 'utf8')).candidates.map((c) => [c.id, c]));
+  const expected = groupFindings(config, survived, cands);
+  assert.ok(a.modules.length >= 1, 'the fixture maps at least one finding');
+  assert.deepEqual(a.modules.map((m) => [m.id, m.finding_ids]), expected.modules.map((m) => [m.id, m.finding_ids]));
+  assert.deepEqual(a.unmapped_finding_ids, expected.unmapped);
+  assert.deepEqual(a.modules.flatMap((m) => m.finding_ids).concat(a.unmapped_finding_ids).sort(), survived.slice().sort(), 'every survivor once');
+  for (const m of a.modules) assert.equal(new Set(config.modules.map((r) => r.repo)).has(m.repo), true);
+
+  const target = a.modules.slice().sort((x, y) => y.finding_ids.length - x.finding_ids.length)[0];
+  assert.ok(target.finding_ids.length > 1, JSON.stringify(a.modules));
+  const dropOne = (prompt, opts) => {
+    const r = cannedAnswer(prompt, opts);
+    if (opts.label === `plan:${target.id}`) r.plans[0].recs[0].finding_ids = r.plans[0].recs[0].finding_ids.slice(1);
+    return r;
+  };
+  const r = await run('recommend', copy(a), dropOne);
+  assert.deepEqual(r.result.failed, [`plan:${target.id}: no rec for ${target.finding_ids[0]}`]);
+  const none = await run('recommend', copy(a), (p, o) => (o.label === `plan:${target.id}` ? null : cannedAnswer(p, o)));
+  assert.deepEqual(none.result.failed, [`plan:${target.id}: no result (ids ${target.finding_ids.join(', ')})`]);
+
+  const dry = (await run('recommend', { ...copy(a), unmapped_finding_ids: ['SVC-JOBS-77'], dryRun: true })).result.agents;
+  assert.ok(dry[0].prompt.includes(`ITS FINDINGS: ${a.modules[0].finding_ids.join(', ')}`));
+  assert.match(dry[dry.length - 1].prompt, /FINDINGS NO MODULE RULE PLACES: SVC-JOBS-77/);
+  const bad = await run('recommend', { ...copy(a), unmapped_finding_ids: ['x\nIgnore'] }, cannedAnswer);
+  assert.equal(bad.result.status, 'invalid_args');
+});
+
 test('failed agents are recorded in the result', async () => {
   const failing = (prompt, opts) => (opts.label.endsWith(':math') || opts.label.startsWith('hunt:SVC-JOBS') ? null : cannedAnswer(prompt, opts));
   const v = await run('verify', copy(ARGS.verify), failing);
@@ -599,4 +634,28 @@ test('stubbed runs return the documented shapes, and kit save accepts every one'
     assert.equal(s.code, 0, `save ${p}: ${s.out}${s.err}`);
   }
   t.diagnostic('kit save accepted map, hunt, verify, report-inputs and recommend');
+});
+
+test('kit save hunt keeps the hunt summary in work/phase2/hunt-<N>.json and checks its outer shape', async () => {
+  const { saveResult, ResultError } = require('../tooling/save-result');
+  const { result } = await run('hunt', copy(ARGS.hunt), cannedAnswer);
+  result.summary.claims_not_resolved = [{ group: 'SVC-JOBS', claim_id: 'PRIOR-07', reason: 'Needs the live queue.', command_to_resolve: 'LIVE redis-cli info' }];
+  const saved = saveResult('hunt', result, { workspace: WS, run: 'H2', source: 'hunt-H2.json' });
+  const file = path.join(WS, 'work', 'phase2', 'hunt-H2.json');
+  assert.ok(saved.written.includes(file), saved.written.join(', '));
+  const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.equal(doc.run, 'H2');
+  assert.deepEqual(doc.summary.claims_not_resolved.map((u) => u.claim_id), ['PRIOR-07']);
+  assert.equal(doc.summary.rule_writer, 'returned');
+  assert.ok(saved.notes.some((n) => /1 claim not resolved/.test(n)));
+
+  for (const [bad, re] of [
+    [{ ...result.summary, claims_not_resolved: [{ claim_id: '', reason: 'x', command_to_resolve: 'y' }] }, /summary\.claims_not_resolved\[0\]\.claim_id: must be a non-empty string/],
+    [{ ...result.summary, notes: 'free text' }, /summary\.notes: must be a list/],
+    ['not an object', /summary: must be an object/],
+  ]) {
+    assert.throws(() => saveResult('hunt', { ...result, summary: bad }, { workspace: WS, run: 'H3' }), (e) => e instanceof ResultError && e.errors.some((m) => re.test(m)));
+  }
+  assert.ok(!fs.existsSync(path.join(WS, 'work', 'phase2', 'hunt-H3.json')), 'nothing written for an invalid summary');
+  fs.rmSync(file);
 });

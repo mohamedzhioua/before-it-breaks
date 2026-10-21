@@ -16,10 +16,14 @@
  *                  phase1/<repo>-map.md below a provenance line (repo, short
  *                  pin, audit date, source file). The repo must be in the
  *                  config.
- *   hunt           { candidates: [CANDIDATE...] } or a bare array, checked
- *                  with shapes.validateCandidates and the config. Merged into
- *                  candidates.json by id: a known id is replaced in place,
- *                  a new id is appended.
+ *   hunt           { candidates: [CANDIDATE...], summary? } or a bare array,
+ *                  checked with shapes.validateCandidates and the config.
+ *                  Merged into candidates.json by id: a known id is replaced
+ *                  in place, a new id is appended. The workflow's summary
+ *                  (hunters, claims_not_resolved, notes, the rule writer's
+ *                  output) goes to phase2/hunt-<N>.json, after a check of its
+ *                  outer shape (see checkHuntSummary); `kit build log` reads
+ *                  it for unsettled claims and hunter notes.
  *   verify         RUN_OUTPUT, checked with shapes.validateRunOutput and the
  *                  config. Written to phase3/votes-<N>.json (N from --run,
  *                  default 1).
@@ -122,9 +126,37 @@ function planMap(result, ctx) {
   });
 }
 
+// Outer shape of the hunt workflow's summary; the fields kit build log reads
+// must have their documented types, other fields are kept as they are.
+function checkHuntSummary(sum) {
+  const errs = [];
+  if (!isObj(sum)) return ['summary: must be an object'];
+  const list = (k) => {
+    if (sum[k] === undefined) return [];
+    if (!Array.isArray(sum[k])) { errs.push(`summary.${k}: must be a list`); return []; }
+    return sum[k];
+  };
+  list('claims_not_resolved').forEach((u, i) => {
+    const at = `summary.claims_not_resolved[${i}]`;
+    if (!isObj(u)) { errs.push(`${at}: must be an object`); return; }
+    for (const k of ['claim_id', 'reason', 'command_to_resolve']) if (typeof u[k] !== 'string' || !u[k].trim()) errs.push(`${at}.${k}: must be a non-empty string`);
+    if (u.group !== undefined && typeof u.group !== 'string') errs.push(`${at}.group: must be a string`);
+  });
+  list('notes').forEach((n, i) => {
+    if (!isObj(n) || typeof n.notes !== 'string' || (n.group !== undefined && typeof n.group !== 'string')) errs.push(`summary.notes[${i}]: must be { group, notes } with string values`);
+  });
+  list('hunters').forEach((h, i) => { if (!isObj(h)) errs.push(`summary.hunters[${i}]: must be an object`); });
+  list('hunters_failed').forEach((h, i) => { if (typeof h !== 'string') errs.push(`summary.hunters_failed[${i}]: must be a string`); });
+  if (sum.rule_writer !== undefined && typeof sum.rule_writer !== 'string') errs.push('summary.rule_writer: must be a string');
+  if (sum.rules !== undefined && sum.rules !== null && !isObj(sum.rules)) errs.push('summary.rules: must be an object or null');
+  return errs;
+}
+
 function planHunt(result, ctx) {
   const incoming = Array.isArray(result) ? result : isObj(result) ? result.candidates : undefined;
+  const summary = isObj(result) ? result.summary : undefined;
   const errs = validateCandidates(Array.isArray(incoming) ? { candidates: incoming } : incoming, ctx.config);
+  if (summary !== undefined) errs.push(...checkHuntSummary(summary));
   if (errs.length) throw new ResultError(errs);
   const file = path.join(ctx.paths.work, 'candidates.json');
   let doc = { candidates: [] };
@@ -143,7 +175,13 @@ function planHunt(result, ctx) {
   const after = validateCandidates({ candidates: merged }, ctx.config);
   if (after.length) throw new ResultError(after.map((m) => `after merging into candidates.json: ${m}`));
   ctx.notes.push(`candidates: ${added} added, ${replaced} replaced, ${merged.length} in total`);
-  return [{ file, text: json({ ...doc, candidates: merged }) }];
+  const writes = [{ file, text: json({ ...doc, candidates: merged }) }];
+  if (summary !== undefined) {
+    const unresolved = Array.isArray(summary.claims_not_resolved) ? summary.claims_not_resolved.length : 0;
+    ctx.notes.push(`hunt summary: ${unresolved} claim${unresolved === 1 ? '' : 's'} not resolved, saved as phase2/hunt-${ctx.run}.json`);
+    writes.push({ file: path.join(ctx.paths.work, 'phase2', `hunt-${ctx.run}.json`), text: json({ run: ctx.run, source: ctx.source, failed: isObj(result) && Array.isArray(result.failed) ? result.failed : [], summary }) });
+  } else ctx.notes.push('no hunt summary in the result: phase2/hunt-<N>.json not written');
+  return writes;
 }
 
 function planVerify(result, ctx) {
@@ -276,7 +314,7 @@ function main(argv, io) {
   }
 }
 
-module.exports = { main, saveResult, ResultError, PHASES };
+module.exports = { main, saveResult, checkHuntSummary, ResultError, PHASES };
 
 if (require.main === module) {
   process.exitCode = main(process.argv.slice(2));

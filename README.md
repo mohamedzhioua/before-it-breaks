@@ -57,7 +57,7 @@ PROVEN-STATIC means: the code was re-read at the recorded commit, a script re-ra
 
 ## How it works
 
-Seven steps, numbered 0 to 6. Each one starts only when the gate before it is met, and the gate that needs a person is recorded with who confirmed it and when.
+Seven steps, numbered 0 to 6. The lead checks each gate before the next step; person gates rely on the skills, not on code, and are recorded with who confirmed them and when.
 
 | # | Step | What happens | Gate before it |
 |---|---|---|---|
@@ -101,7 +101,7 @@ node before-it-breaks/kit.js install-agents ../audits/notes-growth
 node before-it-breaks/kit.js doctor ../audits/notes-growth
 ```
 
-`install-agents` copies the agent definitions into the workspace's `.claude/agents/`; then set `"agents": { "namespace": "" }` in its `audit.config.json`. Every step after that is in [Run an audit](docs/run-an-audit.md); `node kit.js help` lists all commands.
+`install-agents` copies the agent definitions into the workspace's `.claude/agents/`; then set `"agents": { "namespace": "" }` in its `audit.config.json` and run `node before-it-breaks/kit.js init ../audits/notes-growth --refresh-prompts`. Without the plugin the workflows are not registered, so each agent phase runs by dispatching its agents one at a time (see "Without the Workflow tool" in [run-phase](skills/run-phase/SKILL.md)). `init` writes one default module rule per repo (check it), and `doctor` warns when `kit.root` is stale (run `--refresh-prompts` after a plugin update). `check secrets` applies home-path and email rules to the published files only and secret patterns to everything; `check mermaid` needs `--modules <dir>`; `build report` and `build recommendations` take `--strict`, which exits 1 on `check:` warnings; hunt summaries are saved to `work/phase2/hunt-<N>.json`. `kit args recommend` needs `kit synthesize` to have run first; it starts one planner per module that holds surviving findings, and finding ids that map to no module go to the cross-cutting agent. `doctor` has a required "method files" line (lens and skeptic briefs exist). Every step after that is in [Run an audit](docs/run-an-audit.md); `node kit.js help` lists all commands.
 
 ## Requirements
 

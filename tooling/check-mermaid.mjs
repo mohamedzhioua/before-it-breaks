@@ -5,7 +5,7 @@
 //   node tooling/check-mermaid.mjs [<workspace>] --modules <dir>
 //                                  [--mermaid-version <v>] [<root>...]
 //
-//   --modules <dir>   a folder, OUTSIDE the kit and the audited repos, in
+//   --modules <dir>   required: a folder, OUTSIDE the kit and the audited repos, in
 //                     which mermaid and jsdom are installed. They are
 //                     third-party code and never a kit dependency. Once:
 //                       mkdir <dir> && cd <dir> && npm init -y
@@ -35,6 +35,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 // Check this against your docs host before relying on it (see --mermaid-version).
 export const DEFAULT_MERMAID_VERSION = '11.4.1';
 const USAGE = 'usage: node tooling/check-mermaid.mjs [<workspace>] --modules <dir> [--mermaid-version <v>|any] [<root>...]\n'
+  + '  --modules <dir> is required: the folder where mermaid and jsdom are installed, outside the kit and the repos\n'
   + `  default --mermaid-version: ${DEFAULT_MERMAID_VERSION} (assumed GitHub version; check what your host renders)`;
 const require = createRequire(import.meta.url);
 
@@ -86,7 +87,7 @@ export async function main(argv, io) {
     else roots.push(a);
   }
   if (!modules) {
-    io.err('check-mermaid: mermaid is not available. Install mermaid and jsdom in a folder outside the kit and the repos, then pass it with --modules <dir>.');
+    io.err('check-mermaid: mermaid is not available: --modules <dir> is required. Install mermaid and jsdom in a folder outside the kit and the repos, then pass it with --modules <dir>.');
     io.err(USAGE);
     return 2;
   }

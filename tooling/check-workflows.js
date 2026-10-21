@@ -27,7 +27,9 @@
  *     Object.assign(meta, ...), delete meta.x): meta must stay the literal.
  * With --workspace, also: every lens in the workspace config has a lens
  * file, method/lenses/<lens>.md in the kit for a bundled lens, or
- * <ws>/method/lenses/<lens>.md for a custom lens.
+ * <ws>/method/lenses/<lens>.md for a custom lens; and every skeptic lens
+ * (verify.skeptic_lenses) has its brief, method/skeptics/<name>.md in the
+ * kit or in the workspace. validate and doctor run the same check.
  *
  * Exit codes: 0 all checks pass, 1 a check failed, 2 usage, no workflow
  * files found, or an unreadable workspace config.
@@ -35,13 +37,13 @@
  * Exports: main(argv, io), checkWorkflow(file, text) -> string[],
  *   splitWorkflow(text) -> { meta, metaText, body } (throws WorkflowError),
  *   parseLiteral(text) -> value (throws WorkflowError), maskCode(text),
- *   checkLensFiles(wsDir) -> string[]
+ *   checkLensFiles(wsDir, loaded?) -> string[]
  */
 
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { loadConfig, ConfigError, BUNDLED_LENSES, KIT_ROOT } = require('./lib/config');
+const { loadConfig, ConfigError, BUNDLED_LENSES, BUNDLED_SKEPTICS, KIT_ROOT } = require('./lib/config');
 
 class CliError extends Error {}
 class WorkflowError extends Error {}
@@ -378,15 +380,25 @@ function checkWorkflow(file, text) {
 
 // ---------- lens files of a workspace ----------
 
-function checkLensFiles(wsDir) {
-  const { config, paths } = loadConfig(wsDir);
+// Every configured lens and skeptic lens needs its method file: bundled
+// ones in <kit>/method/lenses|skeptics/, others in
+// <workspace>/method/lenses|skeptics/<name>.md. loaded: an already loaded
+// { config, paths } (validate and doctor pass theirs), else wsDir is loaded.
+function checkLensFiles(wsDir, loaded) {
+  const { config, paths } = loaded || loadConfig(wsDir);
   const kit = paths.kit || KIT_ROOT;
   const errs = [];
-  for (const lens of config.lenses || []) {
-    const bundled = BUNDLED_LENSES.includes(lens);
-    const file = bundled ? path.join(kit, 'method', 'lenses', `${lens}.md`) : path.join(paths.workspace, 'method', 'lenses', `${lens}.md`);
-    if (!fs.existsSync(file)) {
-      errs.push(`lens "${lens}": no lens file at ${file}${bundled ? ' (a bundled lens: the kit is incomplete)' : ' (a custom lens: write its checklist there)'}`);
+  const sets = [
+    ['lens', 'lens file', 'lenses', config.lenses || [], BUNDLED_LENSES, 'write its checklist there'],
+    ['skeptic lens', 'skeptic brief', 'skeptics', (config.verify && config.verify.skeptic_lenses) || [], BUNDLED_SKEPTICS, 'write its brief there'],
+  ];
+  for (const [what, file, dir, names, bundledList, todo] of sets) {
+    for (const name of names) {
+      const bundled = bundledList.includes(name);
+      const at = bundled ? path.join(kit, 'method', dir, `${name}.md`) : path.join(paths.workspace, 'method', dir, `${name}.md`);
+      if (!fs.existsSync(at)) {
+        errs.push(`${what} "${name}": no ${file} at ${at}${bundled ? ` (a bundled ${what}: the kit is incomplete)` : ` (a custom ${what}: ${todo})`}`);
+      }
     }
   }
   return errs;

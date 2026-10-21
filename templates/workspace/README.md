@@ -67,9 +67,9 @@ _Filled after Phase 0 from `{{config.outputs.work_dir}}/phase0-baseline.md`: rep
 ## Keeping it true
 
 - `.claude/settings.json` denies the session git commands that change a repo (commit, push, checkout, reset, stash, also after `git -C <dir>`), package installs, and edits or writes inside the audited repos. These rules reduce accidents; they are not a security boundary. A read-only git search for one of those words as a bare argument is blocked too: quote the word (`git log -S 'push'`).
-- After editing `audit.config.json`, render the prompts again: `{{kit_cmd}} init "{{workspace}}" --refresh-prompts`.
+- After editing `audit.config.json`, render the prompts again: `kit init . --refresh-prompts` (here `kit` means `node <kit folder>/kit.js`, run from this folder).
 
-- Do not edit generated files by hand. Change the data in `{{config.outputs.work_dir}}/` and rebuild with `{{kit_cmd}} build <log|report|recommendations|...> "{{workspace}}"`.
+- Do not edit generated files by hand. Change the data in `{{config.outputs.work_dir}}/` and rebuild with `kit build <log|report|recommendations|...> .`.
 - To change a verdict, add an override with a reason and the approver's name to `{{config.outputs.work_dir}}/phase3/master-overrides.json`, run `synthesize` again, then rebuild. Overrides may remove, merge, re-scope or hold a finding; they never add one.
 - Put finding ids in every ticket and merge request that fixes one.
 
@@ -80,4 +80,4 @@ _Filled after Phase 0 from `{{config.outputs.work_dir}}/phase0-baseline.md`: rep
 - **Diagrams** are Mermaid flowcharts and sequence diagrams with C4-style names, at context and container level only.
 - **Decisions** are short MADR-style records with status `proposed`: the audit proposes, the team decides.
 
-Outlines for the system docs and the presentation material are in `{{kit_root}}/templates/`.
+Outlines for the system docs and the presentation material are in the kit's `templates/` folder.

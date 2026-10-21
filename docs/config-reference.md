@@ -61,7 +61,7 @@ A minimal config, with everything else from the defaults and the preset:
 | Field | Type | Required | Default | Example (demo config) | Meaning |
 |---|---|---|---|---|---|
 | `kit` | object |  |  |  | Where the kit itself lives. Written by `kit init` inside a workspace; leave it out elsewhere and the kit uses its own folder. |
-| `kit.root` | string |  |  |  | Absolute path of the kit checkout or plugin folder. |
+| `kit.root` | string |  |  |  | Absolute path of the kit checkout or plugin folder, as a record only: the tools always use the kit that is running, `doctor` warns when the two differ, and `init <ws> --refresh-prompts` re-renders the prompts and updates `kit.root`. |
 
 ### `repos`
 
@@ -119,7 +119,7 @@ A minimal config, with everything else from the defaults and the preset:
 
 | Field | Type | Required | Default | Example (demo config) | Meaning |
 |---|---|---|---|---|---|
-| `custom_lenses` | array of string |  |  |  | Lenses you wrote yourself, e.g. "search-index". Listing one here lets `lenses` use it; you must also provide its lens file. |
+| `custom_lenses` | array of string |  |  |  | Lenses you wrote yourself, e.g. "search-index". Listing one here lets `lenses` use it; you must also provide its lens file at `<ws>/method/lenses/<name>.md` (a custom skeptic lens in `verify.skeptic_lenses` goes at `<ws>/method/skeptics/<key>.md`). `validate` and `doctor` report any of these files that is missing. |
 
 ### `groups`
 
@@ -144,7 +144,7 @@ A minimal config, with everything else from the defaults and the preset:
 
 | Field | Type | Required | Default | Example (demo config) | Meaning |
 |---|---|---|---|---|---|
-| `modules` | array of object |  | `[]` | `[{"repo":"notes-api","pattern":"^src/modules/([^/]+)","id":"svc.$1 ...` | How file paths map to named modules in the architecture view. The first rule whose pattern matches a path wins. |
+| `modules` | array of object |  | `[]` | `[{"repo":"notes-api","pattern":"^src/modules/([^/]+)","id":"svc.$1 ...` | How file paths map to named modules in the architecture view. The first rule whose pattern matches a path wins. `init` writes one starting rule per repo: backend and other repos `^src/([^/]+)/` → `<repo>.$1`; frontend `^src/(?:pages|features|components)/([^/]+)/`; infra and context-only repos none. |
 | `modules[].repo` | string | yes |  | `"notes-api"` | Repo the rule applies to. |
 | `modules[].pattern` | string | yes |  | `"^src/modules/([^/]+)"` | JavaScript regular expression matched against repo-relative paths; capture groups can be used as $1, $2 in `id` and `label`. |
 | `modules[].id` | string | yes |  | `"svc.$1"` | Module id, e.g. "svc.$1". |
@@ -292,5 +292,5 @@ A minimal config, with everything else from the defaults and the preset:
 | Field | Type | Required | Default | Example (demo config) | Meaning |
 |---|---|---|---|---|---|
 | `read_only` | object |  |  |  | Commands the audit session must never run. `kit init` turns them into deny rules in the workspace's .claude/settings.json. |
-| `read_only.deny_bash` | array of string | yes | `[8 entries]` (see the file) |  | Command prefixes to deny. Your entries are added to the kit's default list; the defaults cannot be removed. |
+| `read_only.deny_bash` | array of string | yes | `[28 entries]` (see the file) |  | Command prefixes to deny: git writes (push, commit, checkout, switch, reset, restore, stash, clean, rm, mv, merge, rebase, pull, apply, am, cherry-pick, revert) and package installs (`npm install`/`i`/`ci`, `pnpm add`/`install`/`i`, `yarn add`/`install` and bare `yarn` (it installs), `bun add`/`install`). Your entries are added to the kit's default list; the defaults cannot be removed. |
 

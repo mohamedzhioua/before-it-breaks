@@ -10,9 +10,11 @@
  *   src/modules/notes/notes.repository.ts  find() on a workspace with no limit
  *   src/modules/imports/import.service.ts  awaited remote call inside a loop,
  *                                          and an offset-pagination loop
- *   src/clients/search.client.ts           axios call without a timeout
+ *   src/clients/search.client.ts           axios client created without a
+ *                                          timeout (axios.create, line 2)
  *   src/jobs/notify.queue.ts               queue job that keeps failed jobs
- * The single commit uses a fixed author, committer and date, so the commit
+ * Each one is a shape a bundled Semgrep rule matches (tests/semgrep.test.js
+ * checks that exactly those rules fire). The single commit uses a fixed author, committer and date, so the commit
  * id is the same on every machine and run.
  */
 
@@ -46,21 +48,21 @@ const FILES = {
     "import { NoteModel } from '../notes/note.model';",
     '',
     'export class ImportService {',
-    '  constructor(private readonly users: UsersClient) {}',
+    '  constructor(private readonly usersClient: UsersClient) {}',
     '',
     '  async importRows(rows: { userId: string; body: string }[]) {',
     '    for (const row of rows) {',
-    '      const owner = await this.users.fetchProfile(row.userId);',
+    '      const owner = await this.usersClient.fetchProfile(row.userId);',
     '      await NoteModel.create({ ownerId: owner.id, body: row.body });',
     '    }',
     '  }',
     '',
     '  async reindexAll(workspaceId: string) {',
-    '    let page = 0;',
+    '    let offset = 0;',
     '    for (;;) {',
-    '      const batch = await NoteModel.find({ workspaceId }).skip(page * 500).limit(500);',
+    '      const batch = await NoteModel.find({ workspaceId }).skip(offset).limit(500);',
     '      if (batch.length === 0) break;',
-    '      page++;',
+    '      offset += 500;',
     '    }',
     '  }',
     '}',
@@ -68,9 +70,9 @@ const FILES = {
   ].join('\n'),
   'src/clients/search.client.ts': [
     "import axios from 'axios';",
-    '',
+    "const search = axios.create({ baseURL: 'https://search.internal.example' });",
     'export async function searchNotes(query: string) {',
-    "  const res = await axios.get('https://search.internal.example/notes', { params: { q: query } });",
+    "  const res = await search.get('/notes', { params: { q: query } });",
     '  return res.data;',
     '}',
     '',

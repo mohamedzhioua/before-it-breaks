@@ -3,7 +3,7 @@
  * build-report.js - the audit report: every finding that survived
  * verification, in plain words, with its citations and verdict.
  *
- * Usage: node tooling/build-report.js [<workspace>]
+ * Usage: node tooling/build-report.js [<workspace>] [--strict]
  *
  * Reads (under the work folder): phase3/final-verdicts.json (from
  * `kit build log`), candidates.json, pins.json and, when present,
@@ -17,7 +17,16 @@
  * tiers.js), and an index. A finding without report inputs is still listed,
  * with its title and "not drafted yet"; their ids are printed on stdout.
  *
- * Exit codes: 0 written, 2 usage, config or input error.
+ * Size check: when a report input and the verified candidate disagree on
+ * whether the finding is size-driven (a breaking size or "any size" on one
+ * side, "not size-driven" on the other), or a report input's threshold text
+ * says "any size" next to a "not size-driven" basis, a `check:` line is
+ * printed and the conflict is listed under "Notes for the audit team". The
+ * tier still follows the report input. --strict makes any `check:` line
+ * exit 1 (the page is still written).
+ *
+ * Exit codes: 0 written, 1 written but --strict and at least one `check:`
+ * line, 2 usage, config or input error.
  */
 
 const path = require('path');
@@ -25,7 +34,46 @@ const T = require('./tiers');
 
 const GENERATOR = 'tooling/build-report.js';
 
-function build(ws, io) {
+// How a finding scales: "n/s" (not size-driven), "any" (fails at any size),
+// "size" (a breaking size), "grows" (no hard break), or null (unclear).
+function candidateKind(c) {
+  if (!c) return null;
+  if (c.breaks_at_basis === T.NOT_SIZE_DRIVEN) return 'n/s';
+  if (c.breaks_at === null || c.breaks_at === undefined) return 'grows';
+  const v = String(c.breaks_at).trim();
+  if (/any size/i.test(v) || /^0+$/.test(v)) return 'any';
+  return /[0-9]/.test(v) ? 'size' : null;
+}
+
+function inputKind(x) {
+  if (x.breaks_at_basis === T.NOT_SIZE_DRIVEN) return 'n/s';
+  if (x.breaks_at === null || x.breaks_at === undefined) return 'grows';
+  return x.breaks_at === 0 ? 'any' : 'size';
+}
+
+const KIND_TEXT = { 'n/s': 'not size-driven', any: 'breaks at any size', size: 'a breaking size', grows: 'no hard break' };
+
+// Report inputs that disagree with the verified candidate (or with their own
+// threshold text) on whether the finding is size-driven.
+function sizeConflicts(findings, inputs, cands, config) {
+  const out = [];
+  for (const f of findings) {
+    const x = inputs.get(f.id);
+    if (!x) continue;
+    const c = cands.get(f.id);
+    const ri = inputKind(x);
+    const ck = candidateKind(c);
+    if (ck && ck !== ri && (ck === 'n/s' || ri === 'n/s') && ck !== 'grows' && ri !== 'grows') {
+      const was = c.breaks_at === null ? 'null' : `"${T.one(c.breaks_at)}"`;
+      out.push(`${f.id}: the report input says ${KIND_TEXT[ri]} (${T.breaksText(x)}, tier ${T.tierOf(x, config)}) but the verified candidate says ${KIND_TEXT[ck]} (breaks_at ${was}, basis "${T.one(c.breaks_at_basis)}"); the tier follows the report input`);
+    } else if (ri === 'n/s' && /\bany size\b/i.test(x.threshold || '')) {
+      out.push(`${f.id}: the report input threshold says "any size" (tier T0) but its basis is not size-driven (tier n/s); the tier follows the basis`);
+    }
+  }
+  return out;
+}
+
+function build(ws, io, strict) {
   const { config, paths, pins } = T.loadWorkspace(ws);
   const doc = T.readFinal(paths);
   const cands = T.readCandidates(paths);
@@ -37,6 +85,7 @@ function build(ws, io) {
   const open = T.openIds(doc, io);
   const others = doc.findings.filter((f) => !f.in_report && f.verdict !== 'NEEDS-REVIEW');
   const missing = findings.filter((f) => !inputs.has(f.id)).map((f) => f.id);
+  const conflicts = sizeConflicts(findings, inputs, cands, config);
   const inp = (f) => inputs.get(f.id) || null;
   const areaOf = (f) => (inp(f) ? inp(f).area : 'not classified yet');
   const row = (list) => levels.map((l) => list.filter((f) => f.severity === l).length);
@@ -132,17 +181,24 @@ function build(ws, io) {
     '| Candidate | Verdict | Why |', '|---|---|---|',
     ...others.map((f) => `| ${f.id} | ${f.verdict}${f.merged_into ? ` (into ${f.merged_into})` : ''} | ${T.cell(f.override ? f.override.reason : f.why)} |`), '');
 
+  if (conflicts.length) {
+    L.push('## Notes for the audit team', '', 'Housekeeping for the people running the audit, not for readers of the report. Each line is a report input whose size reading disagrees with the verified candidate or with itself; check the finding and correct the report input.', '',
+      ...conflicts.map((p) => `- ${T.one(p)}`), '');
+  }
+
   T.writeFile(file, L.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s*$/, '\n'));
   const counts = levels.map((l, i) => `${l} ${row(findings)[i]}`).join(', ');
   io.out(`findings ${findings.length} (${counts}); not drafted: ${missing.join(', ') || 'none'}`);
+  for (const p of conflicts) io.out(`check: ${p}`);
   io.out(`wrote ${file}`);
-  return 0;
+  return T.strictExit(strict, conflicts.length, io);
 }
 
 function main(argv, io) {
-  return T.runCli(argv, io, { name: 'build-report', usage: 'usage: node tooling/build-report.js [<workspace>]' }, (ws, opts, out) => build(ws, out));
+  return T.runCli(argv, io, { name: 'build-report', usage: 'usage: node tooling/build-report.js [<workspace>] [--strict]', flags: { '--strict': 'strict' } },
+    (ws, opts, out) => build(ws, out, opts.strict === true));
 }
 
-module.exports = { main };
+module.exports = { main, sizeConflicts };
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2));

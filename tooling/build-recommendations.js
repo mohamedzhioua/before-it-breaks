@@ -3,7 +3,7 @@
  * build-recommendations.js - what to change, module by module, in which
  * order, and the target design.
  *
- * Usage: node tooling/build-recommendations.js [<workspace>]
+ * Usage: node tooling/build-recommendations.js [<workspace>] [--strict]
  *
  * Reads (under the work folder): phase3/final-verdicts.json, candidates.json
  * (locations), phase5/report-inputs.json, and when present:
@@ -28,33 +28,21 @@
  * roadmap entries that name unknown findings, modules or sections.
  * The dependency graph is a Mermaid flowchart.
  *
- * Exit codes: 0 written, 2 usage, config or input error.
+ * Each coverage problem is also printed as a `check:` line. With --strict
+ * they fail the run: the pages are still written, and the exit code is 1.
+ *
+ * Exit codes: 0 written, 1 written but --strict and at least one `check:`
+ * line, 2 usage, config or input error.
  */
 
 const fs = require('fs');
 const path = require('path');
 const { validateModulePlan, validateCrossCutting } = require('./lib/shapes');
 const T = require('./tiers');
+const { compileModules, moduleOf, modulesOfCandidate } = require('./lib/modules');
 
 const GENERATOR = 'tooling/build-recommendations.js';
 const PHASES = ['now', 'next', 'later'];
-
-function compileModules(config) {
-  return (config.modules || []).map((m) => ({ ...m, re: new RegExp(m.pattern) }));
-}
-
-function substitute(template, match) {
-  return template.replace(/\$(\d)/g, (_, n) => (match[Number(n)] === undefined ? '' : match[Number(n)]));
-}
-
-function moduleOf(loc, rules) {
-  for (const r of rules) {
-    if (r.repo !== loc.repo) continue;
-    const m = r.re.exec(loc.path);
-    if (m) return { id: substitute(r.id, m), label: substitute(r.label, m), repo: r.repo, layer: r.layer || '', doc: r.doc || '' };
-  }
-  return null;
-}
 
 const anchorOf = (id) => `mod-${id.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
 const sectionAnchor = (id) => `dr-${id.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
@@ -91,12 +79,7 @@ function analyse(ctx) {
   const modules = new Map();
   const unmapped = [];
   const findings = reported.map((f) => {
-    const c = cands.get(f.id);
-    const mods = [];
-    for (const loc of c ? c.locations : []) {
-      const m = moduleOf(loc, rules);
-      if (m && !mods.some((x) => x.id === m.id)) mods.push(m);
-    }
+    const mods = modulesOfCandidate(cands.get(f.id), rules);
     const x = { f, in: inputs.get(f.id) || null, primary: mods[0] || null, modules: mods };
     if (!x.primary) unmapped.push(x);
     for (const m of mods) {
@@ -296,7 +279,7 @@ function render(ctx, a, plans, cross, diagrams, problems) {
   return { file, target, page: tidy(L), targetPage: tidy(T2) };
 }
 
-function build(ws, io) {
+function build(ws, io, strict) {
   const { config, paths } = T.loadWorkspace(ws);
   const doc = T.readFinal(paths);
   const cands = T.readCandidates(paths);
@@ -344,11 +327,12 @@ function build(ws, io) {
   for (const p of problems) io.out(`check: ${p}`);
   io.out(`wrote ${out.file}`);
   io.out(`wrote ${out.target}`);
-  return 0;
+  return T.strictExit(strict, problems.length, io);
 }
 
 function main(argv, io) {
-  return T.runCli(argv, io, { name: 'build-recommendations', usage: 'usage: node tooling/build-recommendations.js [<workspace>]' }, (ws, opts, out) => build(ws, out));
+  return T.runCli(argv, io, { name: 'build-recommendations', usage: 'usage: node tooling/build-recommendations.js [<workspace>] [--strict]', flags: { '--strict': 'strict' } },
+    (ws, opts, out) => build(ws, out, opts.strict === true));
 }
 
 module.exports = { main, moduleOf, compileModules };

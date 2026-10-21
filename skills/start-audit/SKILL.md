@@ -57,7 +57,7 @@ Then open `<workspace>/audit.config.json` and fill in what `init` could not know
 node "${CLAUDE_PLUGIN_ROOT}/kit.js" validate <workspace>
 ```
 
-Fix every error it lists, and act on every WARNING (a value still holding init's default). After any edit of the config, render the prompts again so they carry the new values:
+`scale.unit_short` (the short unit used in headings) defaults to the first word of the unit; set it if that reads badly. Fix every error it lists, and act on every WARNING (a value still holding init's default). After any edit of the config, render the prompts again so they carry the new values:
 
 ```
 node "${CLAUDE_PLUGIN_ROOT}/kit.js" init <workspace> --refresh-prompts

@@ -29,17 +29,17 @@ The workspace is the current folder unless the user names another; call it `<ws>
 | overrides | lead + person | see section 7 | `work/phase3/master-overrides.json` |
 | build log | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build log <ws>` | `03-verification-log.md` |
 | report-inputs | agents | workflow `report-inputs` | `work/phase5/report-inputs.json` |
-| build report | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build report <ws>` | `02-audit-report.md` |
-| recommend | agents | workflow `recommend` (**experimental**) | `work/phase6/recs/`, `cross-cutting.json` |
-| build recommendations | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build recommendations <ws>`, then, if wanted, `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build issues <ws>` and `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build explorer <ws>` (both read `work/phase6/finding-modules.json`, which `build recommendations` writes) | `05-recommendations.md`, `work/phase6/issues.{csv,md}`, `work/explorer-data.json` |
+| build report | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build report <ws> --strict` (exit 1 means a `check:` warning: show it to the user and fix the data, or run again without `--strict` once they accept it) | `02-audit-report.md` |
+| recommend | agents | workflow `recommend` (**experimental**); `kit args recommend` needs `synthesize` first and plans one module per planner for modules with surviving findings (unmapped ids go to the cross-cutting agent) | `work/phase6/recs/`, `cross-cutting.json` |
+| build recommendations | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build recommendations <ws> --strict` (same rule for exit 1), then, if wanted, `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build issues <ws>` and `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build explorer <ws>` (both read `work/phase6/finding-modules.json`, which `build recommendations` writes) | `05-recommendations.md`, `work/phase6/issues.{csv,md}`, `work/explorer-data.json` |
 | measure (optional) | lead + person | **designed, not yet proven**: `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build measurements <ws>` lists the read-only live checks; run only those the user has given access for, never load on production, and ask before anything that touches a shared environment | `04-measurements.md`, `work/phase4/` |
 | check secrets | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" check secrets <ws>`; keep the record file it writes | its record file |
 | check unchanged | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" check unchanged <ws>` | — |
 | check links | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" check links <ws>` | — |
 
-A script step: run it, show the user its summary lines, record it (section 5) and update the HANDOFF (section 6). `node "${CLAUDE_PLUGIN_ROOT}/kit.js" help` lists every command, and each command prints its options with `--help`. Before the evidence step, tell the user that the evidence runner is an allowlist, **not a sandbox**, and show them the dry-run list first.
+A script step: run it, show the user its summary lines, record it (section 5) and update the HANDOFF (section 6). `node "${CLAUDE_PLUGIN_ROOT}/kit.js" help` lists every command, and each command prints its options with `--help`. Before the evidence step, tell the user that the evidence runner is an allowlist, **not a sandbox**, and show them the dry-run list first. The read-only `evidence --dry-run` **is** the gate check: run it, show the list, get the user's OK and record it, then run the real evidence step.
 
-The executive summary `01-executive-summary.md` is written **by a person**, from the kit's summary template, once the report is built. Do not generate it; you may help the person check it against the report.
+A **person** writes `01-executive-summary.md`, starting from the kit's summary template, once the report is built. Do not generate it; you may help the person check it against the report.
 
 ## 2. Get the args (agent phases)
 

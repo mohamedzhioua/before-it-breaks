@@ -13,11 +13,11 @@ This kit is **not** a security audit tool. This page is about using it safely.
 ## Safe use
 
 - Point the kit only at code you have permission to read.
-- Keep agents read-only. `init` writes deny rules into the workspace's `.claude/settings.json` (no writes to the repos, no commits, checkouts, resets or installs). They are an extra layer, not a promise.
+- Keep agents read-only. `init` writes deny rules into the workspace's `.claude/settings.json` covering pushes, commits, `checkout`/`switch`/`restore`/`reset`/`clean`, `rm`/`mv`, `stash`, history rewrites (`merge`, `rebase`, `pull`, `apply`, `am`, `cherry-pick`, `revert`) and package installs (npm, pnpm, yarn, bun). They also deny Edit and Write inside each audited repo. They are an extra layer, not a promise. Known limit: a rule like `Bash(git * <sub>)` also blocks an unquoted search such as `git grep checkout`; quote the word (`git grep 'checkout'`).
 - Review the evidence commands before they run: `kit evidence <ws> --dry-run` lists what would run and what is refused.
 - For repos you do not trust, run the whole audit inside a container or VM with the repos mounted read-only.
 - Never put secrets in the config; name environment variables instead. Command text in a receipt is masked in place with `evidence.secret_patterns`; when a secret, email or home-path pattern matches a command's output, that command's whole output is withheld from the receipt.
-- Keep workspaces private. The workspace `.gitignore` ignores everything by default; run `kit check secrets <ws>` and keep its record before sharing anything.
+- Keep workspaces private. The workspace `.gitignore` ignores everything by default; run `kit check secrets <ws>` and keep its record before sharing anything. Its home-path and email rules apply to the published set only (the 01–05 outputs, the docs folder, receipts, verdicts, final verdicts and claim verdicts, issues, explorer data and rules results); secret and token patterns apply to every workspace file. The record lists `published[]`, `patterns.{all,published}` and, per hit, `hits[].set`.
 - Ask before any check touches a shared environment, and never run load against production.
 
 ## In scope for reports

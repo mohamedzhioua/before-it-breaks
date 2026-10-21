@@ -14,17 +14,19 @@
  * time limit):
  *   1. node --check on every .js / .mjs file git tracks or would add
  *      (untracked files that are not ignored count too)
- *   2. node --test tests/*.test.js
- *   3. node tooling/check-workflows.js
- *   4. node tooling/check-plugin.js
- *   5. node tooling/validate-config.js examples/demo-config
- *   6. node tooling/validate-config.js examples/novu-v3.19.0 --example
- *   7. node tooling/check-links.js . README.md docs examples
- *   8. node tooling/check-clean.js .  (the built-in generic checks; with
+ *   2. node --test tests/*.test.js (all but e2e.test.js)
+ *   3. node --test tests/e2e.test.js: a whole audit on the fixture repo,
+ *      whose builders run with --strict (a `check:` warning fails them)
+ *   4. node tooling/check-workflows.js
+ *   5. node tooling/check-plugin.js
+ *   6. node tooling/validate-config.js examples/demo-config
+ *   7. node tooling/validate-config.js examples/novu-v3.19.0 --example
+ *   8. node tooling/check-links.js . README.md docs examples
+ *   9. node tooling/check-clean.js .  (the built-in generic checks; with
  *      the BIB_DENYLIST environment variable set to a private denylist
  *      file, that file is passed as --denylist)
- *   9. bash rules/semgrep/run-tests.sh   (SKIP when semgrep is not on PATH)
- *  10. claude plugin validate . --strict (SKIP when claude is not on PATH)
+ *  10. bash rules/semgrep/run-tests.sh   (SKIP when semgrep is not on PATH)
+ *  11. claude plugin validate . --strict (SKIP when claude is not on PATH)
  *
  * Exit codes: 0 every step that ran passed, 1 at least one step failed,
  * 2 usage error.
@@ -62,8 +64,10 @@ function sourceFiles() {
   return { files: r.stdout.split('\0').filter((f) => /\.(js|mjs)$/.test(f) && fs.existsSync(path.join(ROOT, f))).sort() };
 }
 
+const E2E = path.join('tests', 'e2e.test.js');
+
 function testFiles() {
-  return fs.readdirSync(path.join(ROOT, 'tests')).filter((f) => f.endsWith('.test.js')).sort().map((f) => path.join('tests', f));
+  return fs.readdirSync(path.join(ROOT, 'tests')).filter((f) => f.endsWith('.test.js')).sort().map((f) => path.join('tests', f)).filter((f) => f !== E2E);
 }
 
 // Runs one command; returns { ok, code, output, ms }.
@@ -103,6 +107,7 @@ function steps() {
       },
     },
     { name: 'node --test', fn: () => run(NODE, ['--test', ...testFiles()], 15 * MIN) },
+    { name: 'e2e (builders --strict)', fn: () => run(NODE, ['--test', E2E], 5 * MIN) },
     { name: 'check-workflows', fn: () => run(NODE, ['tooling/check-workflows.js'], 2 * MIN) },
     { name: 'check-plugin', fn: () => run(NODE, ['tooling/check-plugin.js'], 2 * MIN) },
     { name: 'validate demo-config', fn: () => run(NODE, ['tooling/validate-config.js', 'examples/demo-config'], 2 * MIN) },

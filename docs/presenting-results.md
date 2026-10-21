@@ -38,7 +38,7 @@ Each host renders with its own bundled Mermaid version, and an editor preview ma
 - **Change marking:** three `classDef` classes, `changed`, `new` and `removed` (dashed), with light fills and dark text so both light and dark themes stay readable; explain them in a line of Markdown above the block, not in a node.
 - **Outside diagrams:** relative links only; anchors must match the host's heading slugs (`kit check links <ws> --host github|gitlab` checks them); emoji in tables are fine; alert boxes and `<details>` sparingly; no inline styles or host-only include syntax.
 
-`kit check mermaid <ws> --modules <dir>` parses every block with a Mermaid version you install in a folder outside the kit and the repos; it catches syntax errors, not layout problems.
+`kit check mermaid <ws> --modules <dir>` parses every block with a Mermaid version you install in a folder outside the kit and the repos; it catches syntax errors, not layout problems. Its default Mermaid version is an assumption: set `--mermaid-version` to the version your host renders.
 
 ## Sharing with the team
 

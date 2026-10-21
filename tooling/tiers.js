@@ -32,7 +32,8 @@
  *   anchor); pageTop(opts), legend(), trustLine(measured, total, link),
  *   kitDocUrl(page); workspace helpers loadWorkspace(ws), readCandidates,
  *   readFinal, readInputs, sortFindings, countBy, readJson, readOptional,
- *   problems, writeFile, byStr; runCli(argv, io, spec, fn); BuildError,
+ *   problems, writeFile, byStr; runCli(argv, io, spec, fn), strictExit(strict,
+ *   warnings, io); BuildError,
  *   REPORTED, NOT_SIZE_DRIVEN, VERDICT_MEANING; main(argv) prints the
  *   tier ladder of a workspace.
  */
@@ -308,8 +309,9 @@ function countBy(list, fn) {
   return out;
 }
 
-// Runs a builder: parses [<workspace>] plus the given value options, maps
-// errors to exit codes (BuildError/ConfigError -> 2, a returned number
+// Runs a builder: parses [<workspace>] plus the given value options
+// (spec.options: flag -> key) and boolean flags (spec.flags: flag -> key),
+// maps errors to exit codes (BuildError/ConfigError -> 2, a returned number
 // otherwise). fn(ws, opts, io) returns an exit code.
 function runCli(argv, io, spec, fn) {
   io = io || { out: (s) => process.stdout.write(s + '\n'), err: (s) => process.stderr.write(s + '\n') };
@@ -319,7 +321,9 @@ function runCli(argv, io, spec, fn) {
     for (let i = 0; i < argv.length; i++) {
       const a = argv[i];
       if (a === '--help' || a === '-h') { io.out(spec.usage); return 0; }
-      if (spec.options && Object.prototype.hasOwnProperty.call(spec.options, a)) {
+      if (spec.flags && Object.prototype.hasOwnProperty.call(spec.flags, a)) {
+        opts[spec.flags[a]] = true;
+      } else if (spec.options && Object.prototype.hasOwnProperty.call(spec.options, a)) {
         const v = argv[++i];
         if (v === undefined) throw new BuildError(`${a} needs a value`);
         opts[spec.options[a]] = v;
@@ -340,7 +344,16 @@ function runCli(argv, io, spec, fn) {
   }
 }
 
+// Exit code of a builder that printed `check:` lines: 1 under --strict when
+// there was at least one, else 0.
+function strictExit(strict, warnings, io) {
+  if (!strict || !warnings) return 0;
+  io.out(`--strict: ${warnings} check warning${warnings === 1 ? '' : 's'}, exit 1`);
+  return 1;
+}
+
 module.exports = {
+  strictExit,
   NOT_SIZE_DRIVEN,
   REPORTED,
   VERDICT_MEANING,

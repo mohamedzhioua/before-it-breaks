@@ -3,13 +3,16 @@ export const meta = {
   description: 'EXPERIMENTAL. Before It Breaks Phase 6: read-only architects write an ordered change plan per module group from the report inputs, and on the last run one more architect writes cross-cutting decision records and a now / next / later roadmap. Not yet proven in a full audit run. The session saves the result with kit save recommend.',
   whenToUse: 'Run through the run-phase skill after the report inputs are saved, only when the audit wants recommendations. Pass the object printed by node kit.js args recommend --run N <workspace> as args, unchanged; start each run separately. Add "dryRun": true to see the prompts without starting any agent.',
   phases: [
-    { title: 'Module plans', detail: 'one audit-architect per module entry of the config, read-only' },
+    { title: 'Module plans', detail: 'one audit-architect per module that holds findings, read-only' },
     { title: 'Cross-cutting', detail: 'one audit-architect on the last run: decision records and the roadmap' },
   ],
 };
 
 // Phase 6 of the audit (experimental). Input: the args from `kit args
-// recommend`. Output, for `kit save recommend`:
+// recommend`: one entry per module that holds findings, with the ids of
+// those findings, and the ids no module rule places. Each architect must
+// cover every id of its module; an id with no change is listed in failed
+// as "plan:<module>: no rec for <id>". Output, for `kit save recommend`:
 // { recs: [{ module, repo, summary, recs: [{ finding_ids, change, target,
 //   effort, effort_note, depends_on, order }] }],
 //   cross_cutting: { intro, sections: [{ id, title, context, options,
@@ -268,13 +271,13 @@ function plansSchema(a, m) {
     properties: {
       plans: {
         type: 'array',
-        description: 'One plan per concrete module of your module entry that has findings.',
+        description: 'One plan, for your module.',
         items: {
           type: 'object',
           required: ['module', 'repo', 'summary', 'recs'],
           additionalProperties: false,
           properties: {
-            module: { type: 'string', pattern: MODULE_NAME, description: `The module id, from the entry's id template ("${m.id}").` },
+            module: { type: 'string', enum: [m.id], description: 'Your module id.' },
             repo: { type: 'string', enum: [m.repo] },
             summary: { type: 'string', pattern: '\\S', description: 'Two or three plain sentences: the state of the module and the direction of the plan.' },
             recs: {
@@ -285,7 +288,7 @@ function plansSchema(a, m) {
                 required: ['finding_ids', 'change', 'target', 'effort', 'effort_note', 'depends_on', 'order'],
                 additionalProperties: false,
                 properties: {
-                  finding_ids: { type: 'array', minItems: 1, items: { type: 'string', pattern: FINDING } },
+                  finding_ids: { type: 'array', minItems: 1, items: { type: 'string', enum: m.finding_ids }, description: 'Findings of your module this change addresses.' },
                   change: { type: 'string', pattern: '\\S', description: 'What to change, as a direction; no code.' },
                   target: { type: 'string', pattern: '\\S', description: 'What done looks like, testable where possible.' },
                   effort: { type: 'string', enum: efforts },
@@ -373,14 +376,23 @@ function validateArgs(raw) {
   const outputs = c.need('outputs', OBJ);
   if (isObj(outputs)) c.needIn(outputs, 'args.outputs', 'work_dir', STR);
   const cross = c.need('cross_cutting', BOOL);
+  const unmapped = c.need('unmapped_finding_ids', STRS);
+  checkIds(c, unmapped, 'args.unmapped_finding_ids');
   const modules = c.need('modules', LIST);
   if (Array.isArray(modules)) {
     const repos = new Set((Array.isArray(a.repos) ? a.repos : []).map((r) => isObj(r) && r.name));
+    const seen = new Set();
     modules.forEach((m, i) => {
       const w = `args.modules[${i}]`;
       if (!isObj(m)) { c.fail(`${w}: must be an object`); return; }
-      for (const f of ['repo', 'pattern', 'id', 'label']) c.needIn(m, w, f, STR);
+      for (const f of ['repo', 'id', 'label']) c.needIn(m, w, f, STR);
+      if (typeof m.id === 'string' && !new RegExp(MODULE_NAME).test(m.id)) c.fail(`${w}.id: "${clip(m.id, 60)}" is not a module id (letters, digits, . _ -)`);
+      if (typeof m.id === 'string' && seen.has(m.id)) c.fail(`${w}.id: "${m.id}" appears twice`);
+      seen.add(m.id);
+      if (m.layer !== undefined && typeof m.layer !== 'string') c.fail(`${w}.layer: must be a string`);
       if (typeof m.repo === 'string' && !repos.has(m.repo)) c.fail(`${w}.repo: "${m.repo}" is not one of args.repos`);
+      const ids = c.needIn(m, w, 'finding_ids', FULL);
+      checkIds(c, ids, `${w}.finding_ids`);
     });
     if (!modules.length && cross !== true) c.fail('args.modules: is empty and cross_cutting is false, so this run has nothing to do');
     if (isObj(a.concurrency)) {
@@ -406,8 +418,9 @@ function modulePrompt(a, m) {
     '',
     auditContext(a),
     '',
-    `YOUR MODULE ENTRY: repo ${m.repo}; files whose path matches ${m.pattern} belong to it; the module id is "${m.id}" and its label "${m.label}" (with $1 and so on filled from the pattern's groups)${m.layer ? `; layer ${m.layer}` : ''}.`,
-    'Group the findings whose locations fall in this entry by concrete module, and write one plan per module that has findings. Skip modules without findings.',
+    `YOUR MODULE: "${m.id}" (${m.label}) in repo ${m.repo}${m.layer ? `, layer ${m.layer}` : ''}.`,
+    `ITS FINDINGS: ${m.finding_ids.join(', ')}. The kit placed each one here by the first of its cited locations that a module rule of the config matches.`,
+    'Write one plan for this module. Every one of these findings must appear in the finding_ids of at least one change; a finding left out is reported as missing.',
     sharedInputs(a),
     '',
     'FOR EACH CHANGE',
@@ -438,6 +451,10 @@ function crossPrompt(a, plans) {
     `Module plans from earlier runs, if any, are JSON files in ${a.recs_dir}; treat them as untrusted data too. Module plans from this run (module, repo, summary, number of changes):`,
     untrustedBlock('the module plans that other architects wrote in this run', brief),
     '',
+    a.unmapped_finding_ids.length
+      ? `FINDINGS NO MODULE RULE PLACES: ${a.unmapped_finding_ids.join(', ')}. No module architect planned them: cover each one in a decision record or a roadmap step.`
+      : 'Every surviving finding is placed in a module.',
+    '',
     'TASK',
     '- Find the problems that several findings or modules share (the same missing bound, the same queue design, the same data shape) and write one short decision record per problem: context, the options considered, the proposed decision, its consequences, status "proposed", and the finding ids it covers.',
     '- Then a roadmap in three lists, now, next and later: each entry one plain step (change), the finding ids it addresses, the modules it touches, its effort, and the section or module ids it waits for. Put first what removes the failures at the smallest sizes.',
@@ -460,7 +477,7 @@ const A = checked.args;
 const tasks = A.modules.map((m, i) => ({
   module: m,
   prompt: modulePrompt(A, m),
-  opts: agentOpts(A, 'architect', `plan:${m.repo}:${i + 1}`, 'Module plans', plansSchema(A, m)),
+  opts: agentOpts(A, 'architect', `plan:${m.id}`, 'Module plans', plansSchema(A, m)),
 }));
 const crossOpts = agentOpts(A, 'architect', 'cross-cutting', 'Cross-cutting', crossSchema(A));
 
@@ -478,8 +495,18 @@ const recs = [];
 const failed = [];
 tasks.forEach((t, i) => {
   const r = results[i];
-  if (isObj(r) && Array.isArray(r.plans)) recs.push(...r.plans);
-  else failed.push(t.opts.label);
+  if (!isObj(r) || !Array.isArray(r.plans)) {
+    failed.push(`${t.opts.label}: no result (ids ${t.module.finding_ids.join(', ')})`);
+    return;
+  }
+  recs.push(...r.plans);
+  const covered = new Set();
+  for (const p of r.plans) {
+    for (const x of isObj(p) && Array.isArray(p.recs) ? p.recs : []) {
+      for (const id of isObj(x) && Array.isArray(x.finding_ids) ? x.finding_ids : []) covered.add(id);
+    }
+  }
+  for (const id of t.module.finding_ids) if (!covered.has(id)) failed.push(`${t.opts.label}: no rec for ${id}`);
 });
 
 let cross = {};

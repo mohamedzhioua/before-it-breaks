@@ -370,6 +370,40 @@ function stubModules(dir) {
   put('node_modules/jsdom/index.js', 'class JSDOM { constructor() { this.window = {}; } }\nmodule.exports = { JSDOM };\n');
 }
 
+test('--strict turns check: warnings into exit 1 and still writes the pages', (t) => {
+  const ws = workspace(t, 'strict');
+  assert.equal(kit(['build', 'log', ws]).code, 0);
+  const loose = kit(['build', 'recommendations', ws]);
+  assert.equal(loose.code, 0, loose.out + loose.err);
+  const checks = loose.out.split('\n').filter((l) => l.startsWith('check: '));
+  assert.equal(checks.length, 3, loose.out);
+  fs.rmSync(path.join(ws, '05-recommendations.md'));
+  const strict = kit(['build', 'recommendations', ws, '--strict']);
+  assert.equal(strict.code, 1, strict.out + strict.err);
+  assert.match(strict.out, /--strict: 3 check warnings, exit 1/);
+  assert.ok(fs.existsSync(path.join(ws, '05-recommendations.md')), 'the page is still written');
+  assert.equal(kit(['build', 'report', ws, '--strict']).code, 0, 'the fixture report inputs agree with their candidates');
+  assert.match(kit(['build', 'report', ws, '--help']).out, /--strict/);
+});
+
+test('build report names report inputs whose size reading disagrees with the candidate', () => {
+  const { sizeConflicts } = require('../tooling/build-report');
+  const { config } = loadConfig(path.join(DATA, 'audit.config.json'));
+  const f = (id) => ({ id });
+  const cand = (breaksAt, basis) => ({ breaks_at: breaksAt, breaks_at_basis: basis });
+  const inp = (breaksAt, basis, threshold) => ({ breaks_at: breaksAt, breaks_at_basis: basis, threshold: threshold || '' });
+  const cands = new Map([['A-01', cand('40000', 'per-tenant items')], ['B-01', cand(null, 'not size-driven')], ['C-01', cand('any size', 'per-tenant items')],
+    ['D-01', cand(null, 'not size-driven')], ['E-01', cand('40000', 'per-tenant items')], ['F-01', cand(null, 'per-tenant items')]]);
+  const inputs = new Map([['A-01', inp(null, 'not size-driven')], ['B-01', inp(0, 'per-tenant items')], ['C-01', inp(null, 'not size-driven')],
+    ['D-01', inp(null, 'not size-driven', 'Fails at any size.')], ['E-01', inp(40000, 'per-tenant items')], ['F-01', inp(null, 'not size-driven')]]);
+  const out = sizeConflicts(['A-01', 'B-01', 'C-01', 'D-01', 'E-01', 'F-01'].map(f), inputs, cands, config);
+  assert.equal(out.length, 4, out.join('\n'));
+  assert.match(out[0], /^A-01: the report input says not size-driven \(not size-driven, tier n\/s\) but the verified candidate says a breaking size \(breaks_at "40000"/);
+  assert.match(out[1], /^B-01: the report input says breaks at any size \(any size, tier T0\) but the verified candidate says not size-driven \(breaks_at null/);
+  assert.match(out[2], /^C-01: .*not size-driven .* but the verified candidate says breaks at any size/);
+  assert.match(out[3], /^D-01: the report input threshold says "any size" \(tier T0\) but its basis is not size-driven \(tier n\/s\)/);
+});
+
 test('check-mermaid needs --modules, says so, and parses every block', (t) => {
   const MJS = path.join(ROOT, 'tooling', 'check-mermaid.mjs');
   const ws = workspace(t, 'mermaid');
@@ -377,6 +411,8 @@ test('check-mermaid needs --modules, says so, and parses every block', (t) => {
   let r = node([MJS, ws]);
   assert.equal(r.code, 2);
   assert.match(r.err, /mermaid is not available/);
+  assert.match(r.err, /--modules <dir> is required/);
+  assert.match(node([MJS, '--help']).out, /--modules <dir> is required/);
   const empty = tmp(t, 'mods-empty');
   r = node([MJS, ws, '--modules', empty]);
   assert.equal(r.code, 2);

@@ -31,13 +31,19 @@
  *                 copy no rules.
  *   --refresh-prompts
  *                 for an existing workspace: render MASTER-PROMPT.md and
- *                 LAUNCHER-PROMPT.md again from the current audit.config.json.
- *                 Writes those two files and nothing else.
+ *                 LAUNCHER-PROMPT.md again from the current audit.config.json
+ *                 and the running kit. Writes those two files and, when
+ *                 kit.root names another folder than the running kit (the kit
+ *                 moved, e.g. after a plugin update), sets kit.root in
+ *                 audit.config.json to the running kit; nothing else.
  *
  * Writes (spec layout; output names from config.outputs):
- *   audit.config.json        preset, size, audit, kit.root, repos, scale,
- *                            lenses and starting hunt groups (one per repo
- *                            and lens; scope = the whole repo, to narrow)
+ *   audit.config.json        preset, size, audit, kit.root (a record of the
+ *                            kit init ran from; the tools always use the
+ *                            running kit), repos, scale, lenses, starting
+ *                            hunt groups (one per repo and lens; scope = the
+ *                            whole repo, to narrow) and one starting module
+ *                            rule per repo (defaultModules; none for infra)
  *   README.md, HANDOFF.md, 01-executive-summary.md (outline for a person),
  *   MASTER-PROMPT.md, LAUNCHER-PROMPT.md   rendered from templates/ and
  *                            prompts/: every {{placeholder}} is filled from
@@ -61,12 +67,13 @@
  * target.
  *
  * Exports: main, render, denyRules(prefixes), fileDenyRules(repoDirs),
- *   startingGroups, launchLine(config, repoDirs), placeholderWarnings(config)
+ *   startingGroups, defaultModules(repos), launchLine(config, repoDirs),
+ *   placeholderWarnings(config)
  */
 
 const fs = require('fs');
 const path = require('path');
-const { loadConfig, validateConfig, withDefaults, ConfigError, KIT_ROOT, SCHEMA_FILE } = require('./lib/config');
+const { loadConfig, validateConfig, withDefaults, ConfigError, kitRootMoved, KIT_ROOT, SCHEMA_FILE } = require('./lib/config');
 
 class CliError extends Error {}
 
@@ -234,6 +241,25 @@ function startingGroups(repos, lenses) {
   return groups;
 }
 
+// One starting modules rule per repo, by role, so recommend has modules to
+// plan for: a backend (or other) repo groups files by the first folder under
+// src/, a front-end repo by the folder under src/pages, src/features or
+// src/components; an infra repo gets none. Module ids are <repo>.<folder>.
+const MODULE_RULES = {
+  backend: '^src/([^/]+)/',
+  other: '^src/([^/]+)/',
+  frontend: '^src/(?:pages|features|components)/([^/]+)/',
+};
+
+function defaultModules(repos) {
+  return repos.filter((r) => !r.context_only && MODULE_RULES[r.role]).map((r) => ({
+    repo: r.name,
+    pattern: MODULE_RULES[r.role],
+    id: `${r.name}.$1`,
+    label: '$1',
+  }));
+}
+
 function today() {
   const d = new Date();
   const z = (n) => String(n).padStart(2, '0');
@@ -274,6 +300,7 @@ function buildConfig(opts, ws) {
     lenses,
     out_of_scope: ['security'],
     groups: startingGroups(repos, lenses),
+    modules: defaultModules(repos),
   };
   if (!opts.rules) cfg.rules = { enabled: false };
   return { cfg, defaults: placeholders.concat(defaults) };
@@ -546,6 +573,7 @@ function run(opts, io) {
   io.out('Check in audit.config.json before you go on:');
   io.out('  - each repo\'s role: every repo was set to "backend" (use frontend, infra or other where that fits; infra repos are often context_only)');
   io.out('  - the hunt groups: each covers a whole repo; narrow scope and focus, or split them');
+  io.out(`  - the module rules (modules, one per repo; the recommendations file each finding under the module its path matches): ${merged.modules.length ? merged.modules.map((m) => `${m.repo}: ${m.pattern} -> ${m.id}`).join('; ') : 'none'} (fit each pattern to the repo layout; for a front-end repo use ^src/(?:pages|features|components)/([^/]+)/)`);
   if (defaults.length) io.out(`  - these defaults: ${defaults.join(', ')} (validate and doctor warn while question, unit or target keep them)`);
   io.out('  - out_of_scope, known_limits, library_assumptions and publish.tracker');
   io.out(`  After editing, render the prompts again: ${kitCmd} init "${posix(ws)}" --refresh-prompts`);
@@ -573,6 +601,13 @@ function refresh(opts, io) {
   const texts = renderAll(list, ctx);
   for (const [to, text] of texts) fs.writeFileSync(path.join(ws, to), text);
   io.out(`Rendered again from audit.config.json: ${texts.map(([to]) => to).join(', ')}`);
+  const moved = kitRootMoved(config, paths);
+  if (moved) {
+    const raw = JSON.parse(fs.readFileSync(paths.configFile, 'utf8').replace(/^\uFEFF/, ''));
+    raw.kit = { ...(raw.kit || {}), root: KIT_ROOT };
+    fs.writeFileSync(paths.configFile, JSON.stringify(raw, null, 2) + '\n');
+    io.out(`kit.root updated in audit.config.json: ${posix(moved)} -> ${posix(KIT_ROOT)} (the running kit)`);
+  }
   for (const w of placeholderWarnings(config)) io.out(`WARNING ${w}`);
   return 0;
 }
@@ -597,7 +632,7 @@ function main(argv, io) {
   }
 }
 
-module.exports = { main, render, denyRules, fileDenyRules, startingGroups, launchLine, placeholderWarnings };
+module.exports = { main, render, denyRules, fileDenyRules, startingGroups, defaultModules, launchLine, placeholderWarnings };
 
 if (require.main === module) {
   process.exitCode = main(process.argv.slice(2));

@@ -375,8 +375,34 @@ test('a misspelled lens fails; a custom lens is accepted only via custom_lenses'
   expectInvalid(custom, /lenses\[5\]: "search-index" is not a bundled lens/);
   custom.custom_lenses = ['search-index'];
   custom.groups.push({ key: 'SVC-SEARCH', repo: 'notes-api', lens: 'search-index', scope: 'src/search/' });
-  const r = run([workspace(custom)]);
+  const ws = workspace(custom);
+  // A custom lens also needs its lens file in the workspace.
+  let r = run([ws]);
+  assert.equal(r.code, 1, r.out + r.err);
+  assert.match(r.out, /lens "search-index": no lens file at .*method[\\/]lenses[\\/]search-index\.md \(a custom lens/);
+  fs.mkdirSync(path.join(ws, 'method', 'lenses'), { recursive: true });
+  fs.writeFileSync(path.join(ws, 'method', 'lenses', 'search-index.md'), '# Search index lens\n');
+  r = run([ws]);
   assert.equal(r.code, 0, r.out + r.err);
+});
+
+test('validate and doctor fail when a configured skeptic lens has no brief', () => {
+  const cfg = demo();
+  cfg.verify = { skeptic_lenses: ['reach', 'mech', 'math', 'cost'], survive_votes: 2, batch_size: 30 };
+  const ws = workspace(cfg, 'skeptic');
+  let r = run([ws]);
+  assert.equal(r.code, 1, r.out + r.err);
+  assert.match(r.out, /1 error/);
+  assert.match(r.out, /skeptic lens "cost": no skeptic brief at .*method[\\/]skeptics[\\/]cost\.md \(a custom skeptic lens/);
+  const doctor = spawnSync(process.execPath, [path.join(__dirname, '..', 'tooling', 'doctor.js'), ws, '--no-optional'], { encoding: 'utf8', timeout: 60000 });
+  assert.equal(doctor.status, 1, doctor.stdout + doctor.stderr);
+  assert.match(doctor.stdout, /FAIL method files: skeptic lens "cost"/);
+  fs.mkdirSync(path.join(ws, 'method', 'skeptics'), { recursive: true });
+  fs.writeFileSync(path.join(ws, 'method', 'skeptics', 'cost.md'), '# Cost skeptic\n');
+  r = run([ws]);
+  assert.equal(r.code, 0, r.out + r.err);
+  const again = spawnSync(process.execPath, [path.join(__dirname, '..', 'tooling', 'doctor.js'), ws, '--no-optional'], { encoding: 'utf8', timeout: 60000 });
+  assert.match(again.stdout, /ok {3}method files: every lens and skeptic lens has its file/);
 });
 
 test('Git Bash style paths are rejected on Windows only', () => {

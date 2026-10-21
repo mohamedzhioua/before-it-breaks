@@ -24,10 +24,10 @@ This table is also what `run-phase` checks before it starts a step: the gate of 
 |---|---|---|
 | pin | `work/pins.json` | `doctor` shows every required line `ok` (every repo at its pin, clean tree) |
 | map | `work/phase1/<repo>-map.md` for every repo that is not `context_only` | the person who knows the system has skimmed the maps (HANDOFF) |
-| hunt | `work/candidates.json`, with every hunt run saved (one run-log entry per run) | the user has reviewed the `evidence --dry-run` list of what would run and what is refused (HANDOFF) |
+| hunt | `work/candidates.json`, with every hunt run saved (one run-log entry per run) | run the read-only `evidence --dry-run` (that run is the gate check), show the user the list of what would run and what is refused, and get their OK (HANDOFF) before the real evidence step |
 | evidence | `work/phase3/receipts/_index.json` | the user has seen the ran / skipped summary |
 | batches | `work/phase3/runs.json` | — |
-| verify | `work/phase3/votes-<N>.json` for every run in `runs.json` | every candidate has three skeptic votes and one verifier check (`synthesize` lists the incomplete ones) |
+| verify | `work/phase3/votes-<N>.json` for every run in `runs.json` | every candidate has a vote from every configured skeptic lens and one verifier check (`synthesize` lists the incomplete ones) |
 | synthesize | `work/phase3/verdicts.json` | — |
 | overrides | an overrides review entry in the HANDOFF: who approved the list in `work/phase3/master-overrides.json` (an empty list is fine) and when. The file alone does not mean the step is done | every override has a reason and an `approved_by`, the approver's OK is in the HANDOFF, and `synthesize` ran again after the last change |
 | build log | `03-verification-log.md` | — |
@@ -36,7 +36,7 @@ This table is also what `run-phase` checks before it starts a step: the gate of 
 | recommend (experimental) | `work/phase6/cross-cutting.json` and `work/phase6/recs/` | — |
 | build recommendations | `05-recommendations.md` (and, if built after it, `work/phase6/issues.csv` and `work/explorer-data.json`) | — |
 | measure (optional; designed, not yet proven) | `04-measurements.md` and results under `work/phase4/` | access agreed with the user, never production load |
-| closing checks | the `check secrets` record, `check unchanged` and `check links` all passing | the executive summary `01-executive-summary.md` is written by a person |
+| closing checks | the `check secrets` record, `check unchanged` and `check links` all passing | a person writes `01-executive-summary.md` (the kit never generates it) |
 
 Count files and entries with short commands (for example the number of candidates or verdicts) instead of reading large JSON into the conversation.
 

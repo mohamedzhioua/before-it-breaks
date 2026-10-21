@@ -84,6 +84,48 @@ test('the written config validates and names the repo after its folder', (t) => 
   assert.ok(cfg.groups.length >= 3 && cfg.groups.every((g) => /^SVC-/.test(g.key)));
 });
 
+test('init writes one starting module rule per repo by role and lists it', (t) => {
+  const { ws, res } = setup(t, 'init-modules');
+  assert.equal(res.code, 0, res.out + res.err);
+  const cfg = JSON.parse(fs.readFileSync(path.join(ws, 'audit.config.json'), 'utf8'));
+  assert.deepEqual(cfg.modules, [{ repo: 'notes-service', pattern: '^src/([^/]+)/', id: 'notes-service.$1', label: '$1' }]);
+  assert.match(res.out, /module rules .*notes-service: \^src\/\(\[\^\/\]\+\)\/ -> notes-service\.\$1/);
+  const { defaultModules } = require('../tooling/init-workspace');
+  assert.deepEqual(defaultModules([
+    { name: 'notes-web', role: 'frontend' }, { name: 'notes-ops', role: 'infra' }, { name: 'notes-docs', role: 'other', context_only: true },
+  ]), [{ repo: 'notes-web', pattern: '^src/(?:pages|features|components)/([^/]+)/', id: 'notes-web.$1', label: '$1' }]);
+  const { moduleOf, compileModules } = require('../tooling/lib/modules');
+  assert.equal(moduleOf({ repo: 'notes-service', path: 'src/jobs/notify.queue.ts' }, compileModules(cfg)).id, 'notes-service.jobs');
+  assert.equal(moduleOf({ repo: 'notes-service', path: 'package.json' }, compileModules(cfg)), null);
+});
+
+test('the tools use the running kit; doctor warns when kit.root names another folder, and --refresh-prompts records the running kit', (t) => {
+  const { root, ws, res } = setup(t, 'init-kitroot');
+  assert.equal(res.code, 0, res.out + res.err);
+  assert.equal(kit(['pin', ws]).code, 0);
+  const file = path.join(ws, 'audit.config.json');
+  const cfg = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const old = path.join(root, 'old-kit');
+  fs.mkdirSync(old);
+  cfg.kit.root = old;
+  fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + '\n');
+
+  const a = JSON.parse(kit(['args', 'map', ws]).out);
+  assert.equal(path.resolve(a.kit_root), path.resolve(ROOT), 'args point at the running kit, not the recorded one');
+  assert.ok(a.checklists.startsWith(path.resolve(ROOT)));
+  const doctor = kit(['doctor', ws, '--no-optional']);
+  assert.equal(doctor.code, 0, doctor.out + doctor.err);
+  assert.match(doctor.out, /WARNING kit\.root in audit\.config\.json \(.*old-kit\) is not the running kit .*--refresh-prompts/);
+
+  const r = kit(['init', ws, '--refresh-prompts']);
+  assert.equal(r.code, 0, r.out + r.err);
+  assert.match(r.out, /kit\.root updated in audit\.config\.json/);
+  assert.equal(path.resolve(JSON.parse(fs.readFileSync(file, 'utf8')).kit.root), path.resolve(ROOT));
+  assert.ok(fs.readFileSync(path.join(ws, 'MASTER-PROMPT.md'), 'utf8').includes(ROOT.split(path.sep).join('/')));
+  assert.doesNotMatch(kit(['doctor', ws, '--no-optional']).out, /WARNING kit\.root/);
+  assert.doesNotMatch(kit(['init', ws, '--refresh-prompts']).out, /kit\.root updated/, 'nothing to record the second time');
+});
+
 test('doctor fails only on pins before Phase 0, and passes after pin', (t) => {
   const { ws, res } = setup(t, 'init-doctor');
   assert.equal(res.code, 0, res.out + res.err);
@@ -124,12 +166,20 @@ test('.claude/settings.json denies writes by git, installs and edits in the repo
   assert.deepEqual(denyRules(['git reset ']), ['Bash(git reset)', 'Bash(git reset *)', 'Bash(git * reset)', 'Bash(git * reset *)']);
   const r = '/w/notes-service';
   for (const cmd of [`git -C ${r} push`, `git -C ${r} push origin main`, `git -C ${r} commit -m x`, `git -C ${r} checkout main`,
-    `git -C ${r} reset --hard`, 'git push', 'git stash', 'npm install left-pad']) {
+    `git -C ${r} reset --hard`, 'git push', 'git stash', 'npm install left-pad',
+    `git -C ${r} switch main`, `git -C ${r} restore src/a.ts`, `git -C ${r} clean -fdx`, `git -C ${r} rm src/a.ts`, `git -C ${r} mv a b`,
+    'git switch -c x', 'git restore .', 'git clean -fd', 'git rm -r src', 'git mv a b',
+    'npm i left-pad', 'npm ci', 'pnpm add left-pad', 'pnpm install', 'yarn install', 'yarn', 'yarn add left-pad']) {
     assert.ok(denies(deny, cmd), `should deny: ${cmd}`);
+  }
+  for (const sub of ['switch', 'restore', 'clean', 'rm', 'mv']) {
+    assert.ok(deny.includes(`Bash(git * ${sub})`) && deny.includes(`Bash(git * ${sub} *)`), `git * ${sub} forms`);
   }
   for (const cmd of [`git -C ${r} show abc123:src/jobs/notify.queue.ts`, `git -C ${r} log --oneline -5`,
     `git -C ${r} grep -n 'commit' -- src`, `git -C ${r} show abc123:src/checkout/reset.ts`, `git -C ${r} ls-files src`,
-    `git -C ${r} log -S 'push' -- src`, `git -C ${r} blame -L 1,9 abc123 -- src/main.ts`]) {
+    `git -C ${r} log -S 'push' -- src`, `git -C ${r} blame -L 1,9 abc123 -- src/main.ts`,
+    `git -C ${r} grep -n 'restore' abc123 -- src`, `git -C ${r} log --grep 'clean up' --oneline`, `git -C ${r} grep -n "rm -rf" abc123`,
+    `git -C ${r} show abc123:src/switch/mv.ts`, `git -C ${r} log -S 'switch' -- src/rm`, 'npm ls axios', 'npm view axios version']) {
     assert.ok(!denies(deny, cmd), `should allow: ${cmd}`);
   }
 });

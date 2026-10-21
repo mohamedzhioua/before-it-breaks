@@ -10,6 +10,7 @@
  *   phase3/receipts/_index.json                           optional
  *   claims.json   [{ id, wording, source }] (or { claims: [...] })  optional
  *   run-log.json  (record-run.js)                         optional
+ *   phase2/hunt-*.json  hunt summaries saved by `kit save hunt`   optional
  * Writes:
  *   <outputs.log>                    the verification log page
  *   phase3/final-verdicts.json       one entry per candidate, with its
@@ -20,8 +21,15 @@
  * A claim takes the best verdict of the candidates that name it in their
  * source ("prior-claim:<id>"); a merged candidate counts with the verdict
  * of the finding it was merged into. A claim no candidate checked gets
- * NOT-CHECKED (never UNPROVEN: nothing was looked at). The output
- * depends only on the input files, so a rebuild is byte-identical.
+ * NOT-CHECKED (never UNPROVEN: nothing was looked at). A NOT-CHECKED claim
+ * that a hunter listed in claims_not_resolved (phase2/hunt-*.json) is shown
+ * as "NOT-CHECKED (hunter: unresolved)" with the hunter's reason and the
+ * check that would settle it, so "looked at, could not settle" stays apart
+ * from "no candidate tested it". Hunter notes that mention instructions,
+ * prompts or injection (text in a repo that tried to steer an agent) are
+ * listed under "Notes for the audit team", as are unresolved entries that
+ * name an unknown claim. The output depends only on the input files, so a
+ * rebuild is byte-identical.
  *
  * Exit codes: 0 written, 2 usage, config or input error.
  */
@@ -61,6 +69,26 @@ function readClaims(paths) {
   return list;
 }
 
+// Hunt summaries saved by kit save hunt, in file-name order.
+function readHuntSummaries(paths) {
+  const dir = path.join(paths.work, 'phase2');
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter((n) => /^hunt-[A-Za-z0-9_-]+\.json$/.test(n)).sort(T.byStr).map((name) => {
+    const doc = T.readJson(path.join(dir, name), `work/phase2/${name}`);
+    const sum = doc && typeof doc === 'object' ? doc.summary : null;
+    if (!sum || typeof sum !== 'object' || Array.isArray(sum)) throw new T.BuildError(`work/phase2/${name} has no "summary" object; save the hunt result again with kit save hunt`);
+    const list = (k) => (Array.isArray(sum[k]) ? sum[k].filter((x) => x && typeof x === 'object') : []);
+    return { name, unresolved: list('claims_not_resolved'), notes: list('notes') };
+  });
+}
+
+const STEERING = /\b(instruct\w*|inject\w*|prompts?|ignore (?:all|any|every|the|previous|prior)\b)/i;
+
+function clipped(s, n) {
+  const t = T.one(s);
+  return t.length > n ? `${t.slice(0, n)}...` : t;
+}
+
 function finalVerdicts(verdicts, cands, full) {
   return verdicts.map((v) => {
     const c = cands.get(v.id);
@@ -86,7 +114,7 @@ function finalVerdicts(verdicts, cands, full) {
   });
 }
 
-function claimVerdicts(claims, final) {
+function claimVerdicts(claims, final, unresolved) {
   const byId = new Map(final.map((f) => [f.id, f]));
   const effective = (f) => (f.verdict === 'MERGED' && byId.has(f.merged_into) ? byId.get(f.merged_into) : f);
   return claims.map((c) => {
@@ -99,12 +127,17 @@ function claimVerdicts(claims, final) {
       if (T.REPORTED.includes(verdict)) note = linked.map(effective).some((f) => f.corrected) ? 'holds, with corrections from the skeptics' : 'holds as worded';
       else note = '';
     }
+    const open = verdict === 'NOT-CHECKED' ? (unresolved || []).filter((u) => u.claim_id === c.id) : [];
+    if (open.length) {
+      note = `hunter: unresolved — ${open.map((u) => `${clipped(u.reason, 300)}; would settle it: ${clipped(u.command_to_resolve, 200)}`).join(' | ')}`;
+    }
     return {
       id: c.id,
       wording: c.wording,
       source: c.source || '',
       verdict,
       note,
+      ...(open.length ? { hunter_unresolved: open.map((u) => ({ group: u.group || '', reason: u.reason, command_to_resolve: u.command_to_resolve })) } : {}),
       candidates: linked.map((f) => ({ id: f.id, verdict: f.verdict, severity: f.severity, ...(f.merged_into ? { merged_into: f.merged_into } : {}) })),
     };
   });
@@ -146,7 +179,7 @@ function liveChecks(index, cands) {
 }
 
 function render(ctx) {
-  const { config, paths, pins, final, claims, verdictsDoc, cands, index, runLog } = ctx;
+  const { config, paths, pins, final, claims, verdictsDoc, cands, index, runLog, teamNotes } = ctx;
   const logFile = paths.outputs.log;
   const reported = final.filter((f) => f.in_report);
   const lenses = verdictsDoc.skeptic_lenses;
@@ -200,9 +233,9 @@ function render(ctx) {
   }
 
   if (claims) {
-    L.push('## Claims from earlier work', '', 'Each claim takes the best verdict of the candidates that checked it.', '',
+    L.push('## Claims from earlier work', '', 'Each claim takes the best verdict of the candidates that checked it. NOT-CHECKED means no candidate tested the claim; "NOT-CHECKED (hunter: unresolved)" means a hunter looked at it but the code alone could not settle it, and the note names the check that would.', '',
       '| Claim | Wording | Source | Verdict | Candidates | Note |', '|---|---|---|---|---|---|',
-      ...claims.map((c) => `| ${T.cell(c.id)} | ${T.cell(c.wording)} | ${T.cell(c.source)} | **${c.verdict}** | ${c.candidates.map((x) => `[${x.id}](#${x.id.toLowerCase()}) (${x.verdict})`).join(', ') || '-'} | ${T.cell(c.note)} |`), '');
+      ...claims.map((c) => `| ${T.cell(c.id)} | ${T.cell(c.wording)} | ${T.cell(c.source)} | **${c.verdict}**${c.hunter_unresolved ? ' (hunter: unresolved)' : ''} | ${c.candidates.map((x) => `[${x.id}](#${x.id.toLowerCase()}) (${x.verdict})`).join(', ') || '-'} | ${T.cell(c.note)} |`), '');
   }
 
   L.push('## Candidates', '',
@@ -243,7 +276,31 @@ function render(ctx) {
     const ver = v.verifier;
     L.push(ver ? `**Verifier:** ${ver.verdict}. Re-run: ${T.one(ver.rerun) || '-'}${ver.citation_drift ? `. Citation drift: ${T.one(ver.citation_drift)}` : ''}${ver.notes ? `. ${T.one(ver.notes)}` : ''}` : '**Verifier:** no check returned.', '');
   }
+  if (teamNotes.length) {
+    L.push('## Notes for the audit team', '', 'Housekeeping for the people running the audit, not for readers of the log. Hunter notes are agent-written text, quoted as written (masked); read the cited files yourself before acting on one.', '',
+      ...teamNotes.map((n) => `- ${n}`), '');
+  }
   return L.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s*$/, '\n');
+}
+
+// Lines for "Notes for the audit team": hunter notes that look like an
+// attempt to steer an agent, and unresolved entries for unknown claims.
+function notesForTeam(hunts, claimsIn) {
+  const out = [];
+  const known = new Set((claimsIn || []).map((c) => c.id));
+  for (const h of hunts) {
+    for (const n of h.notes) {
+      if (typeof n.notes === 'string' && STEERING.test(n.notes)) {
+        out.push(`Hunter ${T.code(clipped(n.group || '?', 60))} (work/phase2/${h.name}) reports text that may have tried to instruct it: ${T.code(clipped(n.notes, 400))}`);
+      }
+    }
+    for (const u of h.unresolved) {
+      if (typeof u.claim_id === 'string' && !known.has(u.claim_id)) {
+        out.push(`Hunter ${T.code(clipped(u.group || '?', 60))} (work/phase2/${h.name}) could not settle claim ${T.code(clipped(u.claim_id, 60))}, which is not in work/claims.json; would settle it: ${T.code(clipped(u.command_to_resolve, 200))}`);
+      }
+    }
+  }
+  return out;
 }
 
 function build(ws, io) {
@@ -256,12 +313,15 @@ function build(ws, io) {
   if (index) T.problems('work/phase3/receipts/_index.json', validateReceiptIndex(index));
   const runLog = T.readOptional(path.join(paths.work, 'run-log.json'), 'work/run-log.json', null);
   const claimsIn = readClaims(paths);
+  const hunts = readHuntSummaries(paths);
+  const unresolved = hunts.flatMap((h) => h.unresolved);
+  const teamNotes = notesForTeam(hunts, claimsIn);
 
   const final = finalVerdicts(vdoc.verdicts, cands, full);
   T.openIds({ findings: final }, io);
-  const claims = claimsIn ? claimVerdicts(claimsIn, final) : null;
+  const claims = claimsIn ? claimVerdicts(claimsIn, final, unresolved) : null;
   vdoc.byId = new Map(vdoc.verdicts.map((v) => [v.id, v]));
-  const md = render({ config, paths, pins, final, claims, verdictsDoc: vdoc, cands, index, runLog });
+  const md = render({ config, paths, pins, final, claims, verdictsDoc: vdoc, cands, index, runLog, teamNotes });
 
   T.writeFile(T.FINAL_FILE(paths), JSON.stringify({ date: config.audit.date, generated_by: GENERATOR, pins, findings: final }, null, 2) + '\n');
   const claimFile = path.join(paths.work, 'phase3', 'claim-verdicts.json');
@@ -269,7 +329,11 @@ function build(ws, io) {
   else if (fs.existsSync(claimFile)) fs.unlinkSync(claimFile);
   T.writeFile(paths.outputs.log, md);
   io.out(`candidates: ${tally(final, 'verdict', VERDICT_VALUES)}`);
-  if (claims) io.out(`claims: ${tally(claims, 'verdict', CLAIM_RANK)}`);
+  if (claims) {
+    const looked = claims.filter((c) => c.hunter_unresolved).length;
+    io.out(`claims: ${tally(claims, 'verdict', CLAIM_RANK)}${looked ? ` (${looked} NOT-CHECKED looked at by a hunter but unresolved)` : ''}`);
+  }
+  if (teamNotes.length) io.out(`notes for the audit team: ${teamNotes.length} (see the end of the log)`);
   io.out(`wrote ${paths.outputs.log}`);
   return 0;
 }
@@ -278,6 +342,6 @@ function main(argv, io) {
   return T.runCli(argv, io, { name: 'build-verification-log', usage: 'usage: node tooling/build-verification-log.js [<workspace>]' }, (ws, opts, out) => build(ws, out));
 }
 
-module.exports = { main, finalVerdicts, claimVerdicts };
+module.exports = { main, finalVerdicts, claimVerdicts, readHuntSummaries, notesForTeam };
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2));

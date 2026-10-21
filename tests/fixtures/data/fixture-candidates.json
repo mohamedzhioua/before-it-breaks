@@ -114,7 +114,7 @@
       "evidence": [
         {
           "cmd": "sed -i 's/limit(500)/limit(50)/' {repo:notes-api}/src/modules/imports/import.service.ts",
-          "expect": "The skip(page * 500) call."
+          "expect": "The skip(offset) call."
         }
       ],
       "mitigations_searched": [

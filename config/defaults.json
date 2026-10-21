@@ -119,9 +119,6 @@
     }
   },
   "read_only": {
-    "deny_bash": [
-      "git push", "git commit", "git checkout", "git reset", "git stash",
-      "npm install", "pnpm install", "yarn add"
-    ]
+    "deny_bash": ["git push", "git commit", "git checkout", "git switch", "git reset", "git restore", "git stash", "git clean", "git rm", "git mv", "npm install", "npm i", "npm ci", "pnpm add", "pnpm install", "yarn add", "yarn install", "yarn", "git merge", "git rebase", "git pull", "git apply", "git am", "git cherry-pick", "git revert", "pnpm i", "bun add", "bun install"]
   }
 }
