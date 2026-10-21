@@ -290,7 +290,7 @@ test('pin, doctor, evidence, check-unchanged and scan-secrets on the fixture rep
   const doctor = kit(['doctor', ws]);
   assert.equal(doctor.code, 0, doctor.out + doctor.err);
   assert.match(doctor.out, /all required checks passed/);
-  assert.match(doctor.out, /claude --add-dir "/);
+  assert.match(doctor.out, /claude --model \S+ --effort \S+ --add-dir "/);
   assert.match(doctor.out, /\/hooks/);
 
   const dry = kit(['evidence', ws, '--dry-run']);

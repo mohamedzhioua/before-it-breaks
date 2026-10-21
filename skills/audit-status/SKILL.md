@@ -29,7 +29,7 @@ This table is also what `run-phase` checks before it starts a step: the gate of 
 | batches | `work/phase3/runs.json` | — |
 | verify | `work/phase3/votes-<N>.json` for every run in `runs.json` | every candidate has three skeptic votes and one verifier check (`synthesize` lists the incomplete ones) |
 | synthesize | `work/phase3/verdicts.json` | — |
-| overrides | `work/phase3/master-overrides.json` (an empty list is fine) | every override has a reason and an `approved_by`, the approver's OK is in the HANDOFF, and `synthesize` ran again after the last change |
+| overrides | an overrides review entry in the HANDOFF: who approved the list in `work/phase3/master-overrides.json` (an empty list is fine) and when. The file alone does not mean the step is done | every override has a reason and an `approved_by`, the approver's OK is in the HANDOFF, and `synthesize` ran again after the last change |
 | build log | `03-verification-log.md` | — |
 | report-inputs | `work/phase5/report-inputs.json` | — |
 | build report | `02-audit-report.md` | — |

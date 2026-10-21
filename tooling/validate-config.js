@@ -14,12 +14,14 @@
  * tooling/lib/config.js), so only what you wrote, or what the layers could
  * not fill, is reported.
  *
- * Output: `OK`, or a header line followed by one numbered error per line.
+ * Output: `OK` (followed by a WARNING line for each value kit init filled
+ * with a neutral default that is still unchanged), or a header line followed by one numbered error per line.
  * Exit codes: 0 valid, 1 invalid, 2 usage error or unreadable file.
  */
 
 const path = require('path');
 const { loadConfig, ConfigError } = require('./lib/config');
+const { placeholderWarnings } = require('./init-workspace');
 
 class CliError extends Error {}
 
@@ -51,8 +53,9 @@ function main(argv, io) {
       io.out('usage: node tooling/validate-config.js [<workspace-or-file>] [--example]');
       return 0;
     }
+    let loaded;
     try {
-      loadConfig(opts.target || '.', { example: opts.example });
+      loaded = loadConfig(opts.target || '.', { example: opts.example });
     } catch (e) {
       if (!(e instanceof ConfigError)) throw e;
       if (e.stage !== 'validate') throw new CliError(e.errors.join('; '));
@@ -61,6 +64,7 @@ function main(argv, io) {
       return 1;
     }
     io.out('OK');
+    for (const w of placeholderWarnings(loaded.config)) io.out(`WARNING ${w}`);
     return 0;
   } catch (e) {
     if (e instanceof CliError) {

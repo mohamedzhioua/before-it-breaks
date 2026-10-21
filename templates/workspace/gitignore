@@ -1,0 +1,12 @@
+# This workspace holds the results of one audit: maps of private code,
+# findings, evidence output, names of modules and people. All of it is
+# private by default, so git ignores every file here.
+#
+# If your team decides to keep the audit in a private repository, opt in
+# file by file: add a "!" line below for a top-level file you want tracked
+# (for example !README.md); for a file in a subfolder use
+# `git add -f <path>`. Run
+# `node <kit>/kit.js check secrets <workspace>` first and keep its record.
+# Never copy anything from here into the kit or another public repository.
+*
+!.gitignore

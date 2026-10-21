@@ -131,10 +131,13 @@ test('long single lines finish quickly (bounded patterns)', () => {
   const line = unit.repeat(300);
   assert.ok(line.length >= 60 * 1024, `line is ${line.length} chars`);
   write(root, 'notes/long.txt', line + '\n');
+  // Timed in-process, so process start-up does not count; a quadratic
+  // pattern takes far longer than the bound on a line this size.
+  const out = [];
   const t0 = Date.now();
-  const r = run(['.'], { cwd: root });
+  const code = tool.main([root], { out: (s) => out.push(s), err: () => {}, readStdin: () => Buffer.alloc(0) });
   const ms = Date.now() - t0;
-  assert.equal(r.code, 0, r.out);
+  assert.equal(code, 0, out.join('\n'));
   assert.ok(ms < 2000, `took ${ms} ms`);
 });
 

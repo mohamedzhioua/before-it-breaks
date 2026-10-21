@@ -21,7 +21,7 @@
  *   reported as unknown fields.
  *   Two values are then derived when left out: scale.tiers (10000 and
  *   100000 where they are below scale.target, then the target itself) and
- *   scale.unit_short (last word of scale.unit).
+ *   scale.unit_short (first word of scale.unit: the counted thing comes first, as in "notes in one workspace").
  *   The result is checked with validateConfig. On success
  *   { config, paths } is returned. `config` keeps repo paths exactly as
  *   written; absolute folders exist only in `paths` (see resolvePaths), so
@@ -484,7 +484,7 @@ function withDefaults(raw) {
       s.tiers = DEFAULT_TIERS.filter((t) => t < s.target).concat(s.target);
     }
     if (s.unit_short === undefined && typeof s.unit === 'string' && s.unit.trim()) {
-      s.unit_short = s.unit.trim().split(/\s+/).pop();
+      s.unit_short = s.unit.trim().split(/\s+/)[0];
     }
   }
   return merged;

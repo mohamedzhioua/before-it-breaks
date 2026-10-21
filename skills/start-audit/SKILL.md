@@ -43,19 +43,27 @@ If the answer to question 1 (or anything else the user asks for) is a **security
 
 ## 4. Create the workspace
 
-Run, with the user's answers (one `--repo` per repository folder):
+Run, with the user's answers: one `--repo` per repository folder, the audit question from question 1 (in the user's words), the unit and target from question 2, and a short audit name. Pass **every** flag: a value left out is filled with a neutral default that ends up in the prompts, and `validate` and `doctor` warn until it is replaced.
 
 ```
-node "${CLAUDE_PLUGIN_ROOT}/kit.js" init <workspace> --preset <preset> --size <size> --repo <folder> [--repo <folder> ...]
+node "${CLAUDE_PLUGIN_ROOT}/kit.js" init <workspace> --preset <preset> --size <size> --repo <folder> [--repo <folder> ...] --name "<audit name>" --question "<audit question>" --unit "<unit, e.g. notes in one workspace>" --target <whole number>
 ```
 
-Then open `<workspace>/audit.config.json` and fill in what `init` could not know: `audit.question`, `audit.date`, `scale` (unit, target, optional platform target and tiers), `out_of_scope`, `publish.tracker`, and each repo's `role`. Check it:
+Add `--no-rules` when the stack is not covered by the bundled rules (section 3). `init` refuses a folder that already holds an audit; it never changes an existing audit.
+
+Then open `<workspace>/audit.config.json` and fill in what `init` could not know: optional `scale.platform_target` and `scale.tiers`, `out_of_scope`, `publish.tracker`, and each repo's `role` (init sets every repo to `backend`). Check it:
 
 ```
 node "${CLAUDE_PLUGIN_ROOT}/kit.js" validate <workspace>
 ```
 
-Fix every error it lists before going on.
+Fix every error it lists, and act on every WARNING (a value still holding init's default). After any edit of the config, render the prompts again so they carry the new values:
+
+```
+node "${CLAUDE_PLUGIN_ROOT}/kit.js" init <workspace> --refresh-prompts
+```
+
+This rewrites only `MASTER-PROMPT.md` and `LAUNCHER-PROMPT.md`.
 
 **If `init` reports "not available in this version":** create the workspace folder yourself, copy `${CLAUDE_PLUGIN_ROOT}/examples/demo-config/audit.config.json` into it as `audit.config.json`, replace the invented demo values with the user's answers (repos, scale, question, date, groups) and run `validate` as above. Tell the user that the other files `init` would create (the folder layout, `.gitignore`, `.claude/settings.json` deny rules, `HANDOFF.md`) are missing and must be added by hand, or by `init` once their kit version has it.
 

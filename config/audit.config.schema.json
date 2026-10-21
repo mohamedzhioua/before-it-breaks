@@ -42,6 +42,11 @@
           "description": "Audit date as YYYY-MM-DD. Workflows cannot read the clock, so the date travels in through their arguments.",
           "type": "string",
           "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+        },
+        "placeholders": {
+          "description": "Written by `kit init`: the fields it filled with a neutral default because no answer was given. `validate` and `doctor` warn while one of them still holds init's default; remove an entry once you have set the real value.",
+          "type": "array",
+          "items": { "enum": ["audit.question", "scale.unit", "scale.target"] }
         }
       }
     },
@@ -75,7 +80,7 @@
           "pattern": "\\S"
         },
         "unit_short": {
-          "description": "One-word form used in tables, e.g. \"notes\". Defaults to the last word of `unit`.",
+          "description": "One-word form used in tables, e.g. \"notes\". Defaults to the first word of `unit`.",
           "type": "string",
           "pattern": "\\S"
         },

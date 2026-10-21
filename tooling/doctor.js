@@ -17,8 +17,10 @@
  *             runner itself starts no shell.)
  *   optional  bash when rules are off, semgrep (rules stage), claude (the
  *             Claude Code CLI). Skip semgrep and claude with --no-optional.
- * Then prints the line that starts Claude Code with read access to every
- * repo, and a reminder to check /hooks for Stop hooks from other plugins.
+ * Prints a WARNING (not a failure) for each value kit init filled with a
+ * neutral default that is still unchanged (audit.placeholders).
+ * Then prints the line that starts Claude Code (lead model and effort from
+ * the config) with read access to every repo, and a reminder to check /hooks for Stop hooks from other plugins.
  *
  * Exit codes: 0 every required check is ok, 1 a required check failed,
  * 2 usage error or workspace not found.
@@ -30,6 +32,7 @@ const { spawnSync } = require('child_process');
 const { loadConfig, ConfigError } = require('./lib/config');
 const { repoState, readPins } = require('./pin');
 const { compareToPins } = require('./check-unchanged');
+const { launchLine, placeholderWarnings } = require('./init-workspace');
 
 class CliError extends Error {}
 
@@ -137,13 +140,14 @@ function run(opts, io) {
 
   for (const c of checks) io.out(`${c.ok ? 'ok  ' : c.required ? 'FAIL' : '--  '} ${c.name}: ${c.detail}`);
   const failed = checks.filter((c) => c.required && !c.ok).length;
+  if (config) for (const w of placeholderWarnings(config)) io.out(`WARNING ${w}`);
 
   if (config) {
-    const dirs = config.repos.filter((r) => paths.repos[r.name]).map((r) => `--add-dir "${paths.repos[r.name]}"`);
+    const dirs = config.repos.filter((r) => paths.repos[r.name]).map((r) => paths.repos[r.name]);
     io.out('');
     io.out('Start Claude Code from the workspace with read access to the repos:');
     io.out(`  cd "${paths.workspace}"`);
-    io.out(`  claude ${dirs.join(' ')}`);
+    io.out(`  ${launchLine(config, dirs)}`);
     io.out('Then run /hooks and check that no other plugin adds a Stop hook: one that blocks stopping can stall long workflow runs.');
   }
   io.out('');

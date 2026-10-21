@@ -81,7 +81,7 @@ test('loadConfig fills tiers and unit_short when left out', () => {
   cfg.scale = { unit: 'users in one workspace', target: 50000 };
   const { config } = lib.loadConfig(workspace(cfg));
   assert.deepEqual(config.scale.tiers, [10000, 50000]);
-  assert.equal(config.scale.unit_short, 'workspace');
+  assert.equal(config.scale.unit_short, 'users');
 });
 
 test('loadConfig throws ConfigError with a string list', () => {
