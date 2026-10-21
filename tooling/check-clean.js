@@ -550,7 +550,7 @@ function main(argv, io) {
   }
 }
 
-module.exports = { main, parseDenylist, globToRegExp };
+module.exports = { main, parseDenylist, globToRegExp, BUILTINS };
 
 if (require.main === module) {
   process.exitCode = main(process.argv.slice(2));

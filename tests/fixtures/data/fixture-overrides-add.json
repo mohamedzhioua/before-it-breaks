@@ -1,0 +1,9 @@
+{
+  "overrides": [
+    {
+      "id": "SVC-JOBS-01",
+      "action": "add",
+      "reason": "Trying to add a finding that no hunter reported."
+    }
+  ]
+}

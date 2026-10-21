@@ -13,7 +13,10 @@
  *     3. the file itself
  *   Objects merge key by key; arrays and plain values replace (deepMerge),
  *   except evidence.secret_patterns and read_only.deny_bash: there your
- *   entries are added to the kit defaults, which can never be removed.
+ *   entries are added to the kit defaults, which can never be removed; and
+ *   severity_rubric and effort_scale, which the last layer that gives one
+ *   replaces whole (their key order is their rank, most severe or smallest
+ *   first, so they are never mixed with the defaults).
  *   Keys __proto__, constructor and prototype are never merged and are
  *   reported as unknown fields.
  *   Two values are then derived when left out: scale.tiers (10000 and
@@ -78,6 +81,8 @@ const BUNDLED_LENSES = ['performance', 'reliability', 'data', 'infra', 'frontend
 const FORBIDDEN_KEYS = ['__proto__', 'constructor', 'prototype'];
 // Safety lists where a config may only add entries to the kit defaults.
 const UNION_FIELDS = [['evidence', 'secret_patterns'], ['read_only', 'deny_bash']];
+// Scales whose key order is their rank: a layer that gives one replaces it whole.
+const REPLACE_FIELDS = ['severity_rubric', 'effort_scale'];
 // A Git Bash style path such as /c/work; Node on Windows reads it as C:/c/work.
 const MSYS_PATH = /^\/[a-zA-Z]\//;
 
@@ -449,13 +454,22 @@ function forbiddenKeyErrors(v, at, out) {
 // Layers defaults and the named preset under a raw config and fills the
 // derived scale values. Does not validate.
 function withDefaults(raw) {
-  let merged = readJson(DEFAULTS_FILE, 'config/defaults.json');
+  const layers = [readJson(DEFAULTS_FILE, 'config/defaults.json')];
+  let merged = layers[0];
   if (isPlainObject(raw) && typeof raw.preset === 'string' && /^[a-z-]+$/.test(raw.preset)) {
     const file = path.join(CONFIG_DIR, 'presets', `${raw.preset}.json`);
-    if (fs.existsSync(file)) merged = deepMerge(merged, readJson(file, `config/presets/${raw.preset}.json`));
+    if (fs.existsSync(file)) {
+      layers.push(readJson(file, `config/presets/${raw.preset}.json`));
+      merged = deepMerge(merged, layers[layers.length - 1]);
+    }
   }
   const base = merged;
   merged = deepMerge(merged, raw);
+  layers.push(raw);
+  for (const field of REPLACE_FIELDS) {
+    const last = layers.filter((l) => isPlainObject(l) && l[field] !== undefined).pop();
+    if (last) merged[field] = clone(last[field]);
+  }
   for (const [section, field] of UNION_FIELDS) {
     const kept = isPlainObject(base[section]) ? base[section][field] : undefined;
     const sec = merged[section];

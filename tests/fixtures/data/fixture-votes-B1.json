@@ -1,0 +1,613 @@
+{
+  "batches": [
+    "B1"
+  ],
+  "missing": [],
+  "results": [
+    {
+      "kind": "vote",
+      "batch": "B1",
+      "lens": "reach",
+      "votes": [
+        {
+          "id": "SVC-JOBS-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "reach skeptic: real after reading the cited code."
+        },
+        {
+          "id": "DATA-INDEX-01",
+          "vote": "OUT_OF_SCOPE",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "none",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "reach skeptic: out_of_scope after reading the cited code."
+        },
+        {
+          "id": "SVC-IMPORT-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "reach skeptic: real after reading the cited code."
+        },
+        {
+          "id": "SVC-IMPORT-02",
+          "vote": "REFUTED",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "FAIL",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 2,
+              "result": "FAIL",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "none",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "reach skeptic: refuted after reading the cited code."
+        },
+        {
+          "id": "DATA-INDEX-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "reach skeptic: real after reading the cited code."
+        },
+        {
+          "id": "OPS-RUNTIME-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "reach skeptic: real after reading the cited code."
+        },
+        {
+          "id": "SVC-JOBS-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "reach skeptic: real after reading the cited code."
+        },
+        {
+          "id": "SVC-IMPORT-03",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "reach skeptic: real after reading the cited code."
+        },
+        {
+          "id": "DATA-INDEX-03",
+          "vote": "PARTIAL",
+          "gates": [
+            {
+              "gate": 1,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 2,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "critical",
+          "corrected_threshold": "Breaks later than claimed: about twice the stated size.",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "reach skeptic: partial after reading the cited code."
+        }
+      ]
+    },
+    {
+      "kind": "vote",
+      "batch": "B1",
+      "lens": "mech",
+      "votes": [
+        {
+          "id": "SVC-JOBS-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "mech skeptic: real after reading the cited code."
+        },
+        {
+          "id": "DATA-INDEX-01",
+          "vote": "OUT_OF_SCOPE",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "none",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "mech skeptic: out_of_scope after reading the cited code."
+        },
+        {
+          "id": "SVC-IMPORT-01",
+          "vote": "PARTIAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "Breaks later than claimed: about twice the stated size.",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "mech skeptic: partial after reading the cited code."
+        },
+        {
+          "id": "SVC-IMPORT-02",
+          "vote": "REFUTED",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "FAIL",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 5,
+              "result": "FAIL",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "none",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "mech skeptic: refuted after reading the cited code."
+        },
+        {
+          "id": "DATA-INDEX-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "mech skeptic: real after reading the cited code."
+        },
+        {
+          "id": "OPS-RUNTIME-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "mech skeptic: real after reading the cited code."
+        },
+        {
+          "id": "SVC-JOBS-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "mech skeptic: real after reading the cited code."
+        },
+        {
+          "id": "SVC-IMPORT-03",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "SVC-IMPORT-01",
+          "key_citations": [],
+          "reason": "mech skeptic: real after reading the cited code."
+        },
+        {
+          "id": "DATA-INDEX-03",
+          "vote": "PARTIAL",
+          "gates": [
+            {
+              "gate": 3,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            },
+            {
+              "gate": 5,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "Breaks later than claimed: about twice the stated size.",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "mech skeptic: partial after reading the cited code."
+        }
+      ]
+    },
+    {
+      "kind": "vote",
+      "batch": "B1",
+      "lens": "math",
+      "votes": [
+        {
+          "id": "SVC-JOBS-01",
+          "vote": "PARTIAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "Breaks later than claimed: about twice the stated size.",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "math skeptic: partial after reading the cited code."
+        },
+        {
+          "id": "DATA-INDEX-01",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "math skeptic: real after reading the cited code."
+        },
+        {
+          "id": "SVC-IMPORT-01",
+          "vote": "REFUTED",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "FAIL",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "none",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "math skeptic: refuted after reading the cited code."
+        },
+        {
+          "id": "SVC-IMPORT-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "math skeptic: real after reading the cited code."
+        },
+        {
+          "id": "DATA-INDEX-02",
+          "vote": "REFUTED",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "FAIL",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "none",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "math skeptic: refuted after reading the cited code."
+        },
+        {
+          "id": "SVC-JOBS-02",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "math skeptic: real after reading the cited code."
+        },
+        {
+          "id": "SVC-IMPORT-03",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "medium",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "math skeptic: real after reading the cited code."
+        },
+        {
+          "id": "DATA-INDEX-03",
+          "vote": "REAL",
+          "gates": [
+            {
+              "gate": 4,
+              "result": "PASS",
+              "reason": "Checked at the pinned commit."
+            }
+          ],
+          "severity": "high",
+          "corrected_threshold": "",
+          "duplicate_of": "",
+          "key_citations": [],
+          "reason": "math skeptic: real after reading the cited code."
+        }
+      ]
+    },
+    {
+      "kind": "verify",
+      "batch": "B1",
+      "checks": [
+        {
+          "id": "SVC-JOBS-01",
+          "receipt": "000000000000",
+          "verdict": "CONFIRMED",
+          "rerun": "Re-ran command 1: MATCH",
+          "citation_drift": "",
+          "notes": "Receipt read."
+        },
+        {
+          "id": "DATA-INDEX-01",
+          "receipt": "000000000000",
+          "verdict": "UNVERIFIABLE",
+          "rerun": "Re-ran command 1: MATCH",
+          "citation_drift": "",
+          "notes": "Receipt read."
+        },
+        {
+          "id": "SVC-IMPORT-01",
+          "receipt": "000000000000",
+          "verdict": "UNVERIFIABLE",
+          "rerun": "Re-ran command 1: MATCH",
+          "citation_drift": "",
+          "notes": "Receipt read."
+        },
+        {
+          "id": "SVC-IMPORT-02",
+          "receipt": "000000000000",
+          "verdict": "CONFIRMED",
+          "rerun": "Re-ran command 1: MATCH",
+          "citation_drift": "",
+          "notes": "Receipt read."
+        },
+        {
+          "id": "DATA-INDEX-02",
+          "receipt": "000000000000",
+          "verdict": "REFUTED",
+          "rerun": "Re-ran command 1: MATCH",
+          "citation_drift": "",
+          "notes": "Receipt read."
+        },
+        {
+          "id": "OPS-RUNTIME-01",
+          "receipt": "000000000000",
+          "verdict": "CONFIRMED",
+          "rerun": "Re-ran command 1: MATCH",
+          "citation_drift": "",
+          "notes": "Receipt read."
+        },
+        {
+          "id": "SVC-JOBS-02",
+          "receipt": "000000000000",
+          "verdict": "CONFIRMED",
+          "rerun": "Re-ran command 1: MATCH",
+          "citation_drift": "",
+          "notes": "Receipt read."
+        },
+        {
+          "id": "SVC-IMPORT-03",
+          "receipt": "000000000000",
+          "verdict": "CONFIRMED",
+          "rerun": "Re-ran command 1: MATCH",
+          "citation_drift": "",
+          "notes": "Receipt read."
+        },
+        {
+          "id": "DATA-INDEX-03",
+          "receipt": "000000000000",
+          "verdict": "CONFIRMED",
+          "rerun": "Re-ran command 1: MATCH",
+          "citation_drift": "",
+          "notes": "Receipt read."
+        }
+      ]
+    }
+  ]
+}

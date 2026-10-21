@@ -68,8 +68,8 @@
     "timeout_ms": 60000,
     "max_lines": 200,
     "allowed_heads": [
-      "git", "grep", "rg", "cat", "head", "tail", "sed", "awk", "wc",
-      "sort", "uniq", "cut", "tr", "ls", "jq", "semgrep"
+      "git", "grep", "rg", "cat", "head", "tail", "sed", "wc",
+      "sort", "uniq", "cut", "tr", "ls"
     ],
     "git_read_subcommands": [
       "show", "log", "grep", "ls-files", "ls-tree", "rev-parse", "blame", "diff", "cat-file"

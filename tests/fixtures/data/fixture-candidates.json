@@ -1,0 +1,283 @@
+{
+  "candidates": [
+    {
+      "id": "SVC-JOBS-01",
+      "repo": "notes-api",
+      "group": "SVC-JOBS",
+      "lens": "reliability",
+      "title": "Failed digest jobs are kept forever and block re-scheduling",
+      "claim": "A failed digest job keeps its fixed job id, so later digests for that user are silently dropped.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/jobs/notify.queue.ts",
+          "line": 8
+        }
+      ],
+      "mechanism": "notifyQueue.add with a jobId built from the user id and removeOnFail: false.",
+      "arithmetic": "n/a: not size-driven",
+      "breaks_at": "unknown",
+      "severity_guess": "high",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} grep -n removeOnFail {pin:notes-api} -- src/jobs",
+          "expect": "One line showing removeOnFail: false next to a fixed jobId."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or cursor near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "queue add() with a fixed jobId and removeOnFail false",
+      "notes": ""
+    },
+    {
+      "id": "DATA-INDEX-01",
+      "repo": "notes-api",
+      "group": "DATA-INDEX",
+      "lens": "data",
+      "title": "Workspace note list has no index on workspaceId",
+      "claim": "Listing the notes of a large workspace scans the whole notes collection.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/modules/notes/notes.repository.ts",
+          "line": 6
+        }
+      ],
+      "mechanism": "See the cited lines.",
+      "arithmetic": "n/a: not size-driven",
+      "breaks_at": "unknown",
+      "severity_guess": "medium",
+      "evidence": [
+        {
+          "cmd": "mongosh --quiet --eval \"db.notes.find({ workspaceId: 'w1' }).explain('executionStats')\"",
+          "expect": "A COLLSCAN stage in the winning plan."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or cursor near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "SVC-IMPORT-01",
+      "repo": "notes-api",
+      "group": "SVC-IMPORT",
+      "lens": "performance",
+      "title": "Import makes one remote call per row",
+      "claim": "Importing 100 000 rows makes 100 000 sequential calls to the users service.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/modules/imports/import.service.ts",
+          "line": 9
+        }
+      ],
+      "mechanism": "See the cited lines.",
+      "arithmetic": "100000 rows x 20 ms = 2000 s per import",
+      "breaks_at": "100000 rows per file",
+      "severity_guess": "high",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} show {pin:notes-api}:src/modules/imports/import.service.ts | awk '{ system(\"echo \" $0) }'",
+          "expect": "The awaited fetchProfile call inside the for loop."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or cursor near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "SVC-IMPORT-02",
+      "repo": "notes-api",
+      "group": "SVC-IMPORT",
+      "lens": "performance",
+      "title": "Reindex pages with skip()",
+      "claim": "Offset pagination makes each page slower as the workspace grows.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/modules/imports/import.service.ts",
+          "line": 17
+        }
+      ],
+      "mechanism": "See the cited lines.",
+      "arithmetic": "n/a: not size-driven",
+      "breaks_at": "unknown",
+      "severity_guess": "medium",
+      "evidence": [
+        {
+          "cmd": "sed -i 's/limit(500)/limit(50)/' {repo:notes-api}/src/modules/imports/import.service.ts",
+          "expect": "The skip(page * 500) call."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or cursor near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "DATA-INDEX-02",
+      "repo": "notes-api",
+      "group": "DATA-INDEX",
+      "lens": "data",
+      "title": "Note creation in the import loop has no bulk write",
+      "claim": "Each imported row is a separate insert.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/modules/imports/import.service.ts",
+          "line": 10
+        }
+      ],
+      "mechanism": "See the cited lines.",
+      "arithmetic": "n/a: not size-driven",
+      "breaks_at": "unknown",
+      "severity_guess": "medium",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} ls-tree -r --name-only {pin:notes-api} | sort -o files.txt",
+          "expect": "The import service file is listed."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or cursor near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "OPS-RUNTIME-01",
+      "repo": "notes-api",
+      "group": "OPS-RUNTIME",
+      "lens": "infra",
+      "title": "Queue has no connection limits configured",
+      "claim": "The queue client opens connections with default settings.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/jobs/notify.queue.ts",
+          "line": 3
+        }
+      ],
+      "mechanism": "See the cited lines.",
+      "arithmetic": "n/a: not size-driven",
+      "breaks_at": "unknown",
+      "severity_guess": "medium",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} log -1 --output=log.txt {pin:notes-api}",
+          "expect": "The commit that added the queue."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or cursor near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "SVC-JOBS-02",
+      "repo": "notes-api",
+      "group": "SVC-JOBS",
+      "lens": "reliability",
+      "title": "Completed digest jobs are removed but failures are not retried",
+      "claim": "A failed digest is never retried, so the user misses it.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/jobs/notify.queue.ts",
+          "line": 8
+        }
+      ],
+      "mechanism": "See the cited lines.",
+      "arithmetic": "n/a: not size-driven",
+      "breaks_at": "unknown",
+      "severity_guess": "medium",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} show {pin:notes-api}:src/jobs/notify.queue.ts > queue-copy.ts",
+          "expect": "No attempts option on add()."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or cursor near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "SVC-IMPORT-03",
+      "repo": "notes-api",
+      "group": "SVC-IMPORT",
+      "lens": "performance",
+      "title": "Owner lookup repeats for the same user",
+      "claim": "Rows from one user each fetch the same profile again.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/modules/imports/import.service.ts",
+          "line": 9
+        }
+      ],
+      "mechanism": "See the cited lines.",
+      "arithmetic": "n/a: not size-driven",
+      "breaks_at": "unknown",
+      "severity_guess": "medium",
+      "evidence": [
+        {
+          "cmd": "git -C {repo:notes-api} show {pin:notes-api}:package.json | tee package-copy.json",
+          "expect": "No cache around fetchProfile."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or cursor near the call: none found."
+      ],
+      "source": "prior-claim:P-2",
+      "rule_pattern_hint": "",
+      "notes": ""
+    },
+    {
+      "id": "DATA-INDEX-03",
+      "repo": "notes-api",
+      "group": "DATA-INDEX",
+      "lens": "data",
+      "title": "Whole workspace loaded into memory",
+      "claim": "find() returns every note of a workspace as one array.",
+      "locations": [
+        {
+          "repo": "notes-api",
+          "path": "src/modules/notes/notes.repository.ts",
+          "line": 6
+        }
+      ],
+      "mechanism": "See the cited lines.",
+      "arithmetic": "n/a: not size-driven",
+      "breaks_at": "500000 notes in one workspace",
+      "severity_guess": "critical",
+      "evidence": [
+        {
+          "cmd": "find {repo:notes-api}/src -name \"*.ts\" -newer package.json",
+          "expect": "The find() call has no limit."
+        }
+      ],
+      "mitigations_searched": [
+        "Looked for a limit or cursor near the call: none found."
+      ],
+      "source": "new",
+      "rule_pattern_hint": "",
+      "notes": ""
+    }
+  ]
+}

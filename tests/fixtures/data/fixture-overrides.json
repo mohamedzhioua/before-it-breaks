@@ -1,0 +1,30 @@
+{
+  "overrides": [
+    {
+      "id": "OPS-RUNTIME-01",
+      "action": "remove",
+      "reason": "The queue settings live in the hosting console, outside the code read.",
+      "approved_by": "Notes platform tech lead"
+    },
+    {
+      "id": "SVC-JOBS-02",
+      "action": "hold",
+      "reason": "Waiting for the queue dashboard output before reporting.",
+      "approved_by": "Notes platform tech lead"
+    },
+    {
+      "id": "SVC-IMPORT-03",
+      "action": "merge",
+      "into": "SVC-IMPORT-01",
+      "reason": "Same loop and the same fix as SVC-IMPORT-01.",
+      "approved_by": "Notes platform tech lead"
+    },
+    {
+      "id": "DATA-INDEX-03",
+      "action": "re-scope",
+      "title": "Workspace note list loads every note at once",
+      "reason": "The skeptics narrowed it to the list endpoint.",
+      "approved_by": "Notes platform tech lead"
+    }
+  ]
+}
