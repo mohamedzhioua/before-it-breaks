@@ -1,0 +1,21 @@
+# Decision guide: answer these questions, get your set-up
+
+For anyone deciding whether and how to run an audit, engineer or not. Answer the nine questions below; each answer maps to a setting in `audit.config.json` ([config reference](config-reference.md)). The `start-audit` skill asks the same questions in one message and fills the settings in for you.
+
+| # | Question | Your answer → the setting |
+|---|---|---|
+| 1 | **What should the audit answer?** | "Will it hold when we grow a lot?" → `preset: scalability` (lenses performance, reliability, data, infra). · "Why does it fail, run twice or lose work?" → `preset: reliability` (reliability, data, infra; skeptics at a higher effort). · "Why is it slow today?" → `preset: performance` (performance, data, frontend; measuring afterwards is strongly advised). · "Is it secure?" or "Is the code clean?" → **not this kit**: use a security audit or a code-quality review. |
+| 2 | **Which size matters, and how big should it get?** | `scale.unit` in full words ("notes in one workspace", "rows in one import file", "recipients of one notification"), `scale.target` (the size one customer should reach), optionally `scale.platform_target` (all customers together) and `scale.tiers` (the sizes findings are graded at; left out, the kit uses 10 000 and 100 000 where they are below the target, then the target). |
+| 3 | **What is it built with?** | Node.js/TypeScript with MongoDB or Redis → all bundled rules (`rules.enabled: true`). · Node.js/TypeScript with another database → keep the rules on; the generic ones (loops, timeouts, pagination, front-end fetching) still apply and the lenses cover SQL. · Another language → the bundled rules will not match it. Either keep `rules.enabled: true` and bring your own rule sets (the rule writer then writes rules for your stack, test-first, during the hunt), or switch rules off (`init --no-rules` or `rules.enabled: false`) and run the method with no rule pass. The rule writer runs only while rules are enabled. |
+| 4 | **How big is the code?** | Pick a `size` from [`config/sizes.json`](../config/sizes.json): `lite` (up to about 30k lines, one or two repos, three or four hunt groups, one verify run) · `standard` (up to about 150k lines, five to eight groups, one or two runs) · `full` (up to about 300k lines, ten to twelve groups, two runs). Larger: split by service, one workspace per service. The size is planning guidance; it changes no other field. |
+| 5 | **Which access can you offer?** | Code alone (the default) → the best verdict is PROVEN-STATIC: breaking sizes are calculated. · Plus a replica with a read-only database user → index lists, sizes and query plans. · Plus pasted cache or queue stats → memory and backlog checks. · Plus staging with an agreed load window → load tests, the only route to PROVEN. **Never production load.** See `measure.access` and [measuring](measuring.md). |
+| 6 | **What is the budget?** | Cut **scope, not checks**: fewer repos, fewer or narrower `groups`, a smaller `size`. Never fewer than three skeptics and one verifier per candidate (`verify.skeptic_lenses` needs at least three). Time and usage grow with the number of groups and candidates; plan several sessions for a large audit. |
+| 7 | **Who will take part?** | Someone at ease with a terminal and Claude Code runs it. Someone familiar with the system is needed to answer the agents' questions, skim the maps and approve every override (their name goes in `approved_by`). Readers: managers (summary, slides), engineers (report, issues). |
+| 8 | **Was there an earlier audit whose claims need re-checking?** | Yes → list its claims in `work/claims.json` (`id`, `wording`, `source`) and name them in the hunt groups' `claims`. Every claim gets a verdict in the verification log; one nobody tested is marked NOT-CHECKED. |
+| 9 | **Where do you track work?** | GitLab → `publish.tracker: gitlab` (a CSV import). · GitHub or any other tracker → `github` (a Markdown checklist). · None → `none` (the roadmap in the recommendations only). |
+
+## Then
+
+- Out-of-scope topics (always at least `security`) go in `out_of_scope`.
+- Hard platform limits the agents may rely on ("the proxy closes idle connections after 90 s") go in `known_limits`; library behaviour to check goes in `library_assumptions`.
+- Next: [Run an audit](run-an-audit.md).

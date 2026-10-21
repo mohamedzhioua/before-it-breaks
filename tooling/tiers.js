@@ -49,7 +49,7 @@ const REPORTED = ['PROVEN', 'PROVEN-STATIC', 'UNPROVEN'];
 const VERDICT_MEANING = {
   PROVEN: 'measured on a running system.',
   'PROVEN-STATIC': 'the cited code was re-read at the pinned commit, a verifier re-ran the evidence, and the skeptics failed to knock it down. Not measured.',
-  UNPROVEN: 'the code fact is confirmed, but whether it bites depends on runtime settings that were not checked.',
+  UNPROVEN: 'the skeptics accept the mechanism, but the evidence could not be re-run here (for example, it needs a live system).',
   REFUTED: 'the skeptics or the evidence showed that it does not hold.',
   'OUT-OF-SCOPE': 'real or not, it lies outside the question of this audit.',
   'NEEDS-REVIEW': 'the voting rules could not settle it; a person has to decide.',
