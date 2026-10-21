@@ -1,0 +1,90 @@
+rules:
+  - id: scale-http-call-without-timeout
+    languages: [typescript]
+    severity: WARNING
+    message: >-
+      A NestJS HttpService call has no timeout and no abort signal, an axios instance is
+      created without a default timeout, or a NestJS module sets up HttpModule without one.
+      Neither axios nor HttpService gives up by default, so when the other side hangs, the
+      request, queue worker or concurrency slot that made the call stays busy until the
+      socket dies. Under load those stuck callers pile up until no capacity is left. Set a
+      default (`HttpModule.register({ timeout })`, `axios.create({ timeout })`) and override
+      it per call where a slower answer is expected. Direct `axios.get(...)` and `fetch(...)`
+      calls are not checked by this rule (see the README).
+    pattern-either:
+      # Case A: an HttpService method called with only its URL (and body)
+      - patterns:
+          - pattern-either:
+              - patterns:
+                  - pattern: $C.$M($U)
+                  - metavariable-regex:
+                      metavariable: $M
+                      regex: ^(get|post|put|patch|delete|head)$
+              - patterns:
+                  - pattern: $C.$M($U, $D)
+                  - metavariable-regex:
+                      metavariable: $M
+                      regex: ^(post|put|patch)$
+          - metavariable-regex:
+              metavariable: $C
+              regex: ^(.*\.)?httpService$
+      # Case B: an inline options object that sets neither timeout nor signal.
+      #         Options held in a variable, returned by a call or spread first are skipped.
+      - patterns:
+          - pattern-either:
+              - patterns:
+                  - pattern: $C.request($CFG)
+              - patterns:
+                  - pattern: $C.$M($U, $CFG)
+                  - metavariable-regex:
+                      metavariable: $M
+                      regex: ^(get|delete|head)$
+              - patterns:
+                  - pattern: $C.$M($U, $D, $CFG)
+                  - metavariable-regex:
+                      metavariable: $M
+                      regex: ^(post|put|patch)$
+          - metavariable-regex:
+              metavariable: $C
+              regex: ^(.*\.)?httpService$
+          - metavariable-regex:
+              metavariable: $CFG
+              regex: ^\{(?!\s*\.\.\.)
+          - pattern-not: |
+              $C.$M(..., {..., timeout: $T, ...})
+          - pattern-not: |
+              $C.$M(..., {..., signal: $SIG, ...})
+      # Case C: axios.create(...) with no timeout in its options
+      - patterns:
+          - pattern-either:
+              - pattern: axios.create()
+              - pattern: axios.create($CFG)
+          - pattern-not: |
+              axios.create({..., timeout: $T, ...})
+      # Case D: a NestJS module that imports HttpModule bare, or registers it with an
+      # inline options object that has no timeout. registerAsync is not judged.
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  @Module({..., imports: [..., HttpModule, ...], ...})
+                  class $CLS {}
+              - patterns:
+                  - pattern: |
+                      @Module({..., imports: [..., HttpModule.register($OPT), ...], ...})
+                      class $CLS {}
+                  - metavariable-regex:
+                      metavariable: $OPT
+                      regex: ^\{(?!\s*\.\.\.)
+                  - pattern-not: |
+                      @Module({..., imports: [..., HttpModule.register({..., timeout: $T, ...}), ...], ...})
+                      class $CLS {}
+          - focus-metavariable: $CLS
+    metadata:
+      category: reliability
+      kit-lens: reliability
+      stack: [typescript, node, nestjs, axios]
+      confidence: HIGH
+      references:
+        - rules/semgrep/README.md#scale-http-call-without-timeout
+    paths:
+      exclude: ["*.spec.ts", "*.spec.tsx", "*.test.ts", "*.test.tsx", "*.e2e-spec.ts"]

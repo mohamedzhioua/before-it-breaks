@@ -1,0 +1,38 @@
+rules:
+  - id: scale-redis-scan-leading-wildcard
+    languages: [typescript]
+    severity: WARNING
+    message: >-
+      Redis SCAN is used to find keys by pattern, here with a MATCH that begins with `*`.
+      SCAN applies MATCH only after it has fetched each batch of keys, so every complete scan
+      walks the entire keyspace of the database, whatever the pattern: `notes:*` costs the
+      same as `*:notes`. The cost of each lookup grows with the total number of keys in the
+      instance (including keys that belong to other features), not with the handful that
+      match. This rule flags the most visible form of a lookup that is costly in every form.
+      Maintain an index set or hash on write (add the key when you create it, remove it when
+      you delete it) and read that directly, or move these keys to their own logical
+      database or instance so the scan walks only them.
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: $R.scan($C, 'MATCH', $P, ...)
+              - pattern: $R.scan($C, "MATCH", $P, ...)
+              - pattern: $R.scan($C, 'match', $P, ...)
+          - metavariable-regex:
+              metavariable: $P
+              regex: ^[`'"]\*
+      - patterns:
+          - pattern: |
+              $R.scanStream({..., match: $P, ...})
+          - metavariable-regex:
+              metavariable: $P
+              regex: ^[`'"]\*
+    metadata:
+      category: performance
+      kit-lens: performance
+      stack: [typescript, node, redis]
+      confidence: HIGH
+      references:
+        - rules/semgrep/README.md#scale-redis-scan-leading-wildcard
+    paths:
+      exclude: ["*.spec.ts", "*.spec.tsx", "*.test.ts", "*.test.tsx", "*.e2e-spec.ts"]

@@ -1,0 +1,33 @@
+rules:
+  - id: scale-mongo-unanchored-case-insensitive-regex
+    languages: [typescript]
+    severity: INFO
+    message: >-
+      A MongoDB search uses a case-insensitive regular expression that does not start with
+      `^`, or runs $regexMatch over a value converted with $toString. An index can only help
+      a regex that is anchored at the start and case-sensitive, so this query reads every
+      document in the scanned range: its cost grows with the collection, not with the number
+      of matches, and a search box backed by it gets slower every week the data grows. Use a
+      text or search index, store a normalised lower-case copy and match it with an anchored
+      prefix, or at least narrow the query by tenant and add a limit.
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  {..., $regex: $K, $options: 'i', ...}
+              - pattern: |
+                  {..., $regex: new RegExp($K, 'i'), ...}
+          - metavariable-regex:
+              metavariable: $K
+              regex: ^(?![`'"]\^)
+      - pattern: |
+          {..., $regexMatch: {..., input: {$toString: $X}, ...}, ...}
+    metadata:
+      category: performance
+      kit-lens: data
+      stack: [typescript, mongodb]
+      confidence: MEDIUM
+      references:
+        - rules/semgrep/README.md#scale-mongo-unanchored-case-insensitive-regex
+    paths:
+      exclude: ["*.spec.ts", "*.spec.tsx", "*.test.ts", "*.test.tsx", "*.e2e-spec.ts"]

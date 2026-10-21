@@ -1,0 +1,56 @@
+rules:
+  - id: scale-await-remote-call-in-loop
+    languages: [typescript]
+    severity: WARNING
+    message: >-
+      A remote call is awaited once per item inside a loop. The loop runs one network round
+      trip after another, so its total time is roughly the item count times the average
+      round trip (the sum of every call), all of it spent inside the caller (an HTTP request
+      or a single job) with no checkpoint to resume from and no control over concurrency.
+      Send one batch request, or move the items onto a queue and process them with bounded
+      concurrency.
+    patterns:
+      - pattern-either:
+          - pattern-inside: |
+              for (const $X of $ARR) { ... }
+          - pattern-inside: |
+              for (let $X of $ARR) { ... }
+          - pattern-inside: |
+              for (...) { ... }
+          - pattern-inside: |
+              while ($COND) { ... }
+      # Remote-call set shared with scale-unbounded-promise-all-remote and
+      # scale-swallowed-remote-error-then-bulk-write. Extend it in all three.
+      - pattern-either:
+          - pattern: await fetch(...)
+          - pattern: await got(...)
+          - pattern: await axios.$AM(...)
+          - pattern: await $A.eventEmitter.emitAsync(...)
+          - patterns:
+              - pattern-either:
+                  - pattern: await $A.$CLIENT.$CM(...)
+                  - pattern: await $CLIENT.$CM(...)
+              - metavariable-regex:
+                  metavariable: $CLIENT
+                  regex: (?i).*(client|gateway|sdk)$
+          # Any HttpService call inside the awaited expression, e.g.
+          # firstValueFrom(this.httpService.get(url).pipe(...)).
+          - patterns:
+              - pattern: await $HCALL
+              - metavariable-pattern:
+                  metavariable: $HCALL
+                  pattern: $A.httpService.$HM(...)
+              - pattern-not: await Promise.$PALL(...)
+      - pattern-not-inside: |
+          $P.map(async ($Y) => { ... })
+      - pattern-not-inside: |
+          $P.map(async function ($Y) { ... })
+    metadata:
+      category: performance
+      kit-lens: performance
+      stack: [typescript, node]
+      confidence: MEDIUM
+      references:
+        - rules/semgrep/README.md#scale-await-remote-call-in-loop
+    paths:
+      exclude: ["*.spec.ts", "*.spec.tsx", "*.test.ts", "*.test.tsx", "*.e2e-spec.ts"]

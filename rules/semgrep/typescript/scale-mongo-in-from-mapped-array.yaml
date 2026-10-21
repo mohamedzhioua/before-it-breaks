@@ -1,0 +1,38 @@
+rules:
+  - id: scale-mongo-in-from-mapped-array
+    languages: [typescript]
+    severity: INFO
+    message: >-
+      A MongoDB `$in` list is built by mapping over another result set. If that source has
+      no upper bound, the query document grows with the data: a MongoDB command must fit in
+      16 MiB (16,777,216 bytes), and each ObjectId inside a BSON array costs about 20 bytes
+      (12 for the id, a type byte and the array index as a string key), so the query fails
+      at a little over 800,000 ids. Long before that, the process holds both the source rows
+      and the id list in memory. Cap the source, split the ids into fixed-size chunks, or
+      let the database do the join ($lookup, or a filter on the shared field).
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $M.$FIND({..., $F: {$in: $A.map(...)}, ...}, ...)
+          - patterns:
+              - pattern-either:
+                  - pattern-inside: |
+                      const $IDS = $A.map(...);
+                      ...
+                  - pattern-inside: |
+                      let $IDS = $A.map(...);
+                      ...
+              - pattern: |
+                  $M.$FIND({..., $F: {$in: $IDS}, ...}, ...)
+      - metavariable-regex:
+          metavariable: $FIND
+          regex: ^(find|findMany|findOne|countDocuments|updateMany|deleteMany|aggregate)$
+    metadata:
+      category: performance
+      kit-lens: data
+      stack: [typescript, mongodb]
+      confidence: LOW
+      references:
+        - rules/semgrep/README.md#scale-mongo-in-from-mapped-array
+    paths:
+      exclude: ["*.spec.ts", "*.spec.tsx", "*.test.ts", "*.test.tsx", "*.e2e-spec.ts"]

@@ -1,0 +1,31 @@
+rules:
+  - id: scale-sync-emit-in-loop
+    languages: [typescript]
+    severity: WARNING
+    message: >-
+      An event is emitted once per item inside a loop with a fire-and-forget emit(). The
+      emitter does not wait for async listeners, so a list of N items starts N listener chains
+      at the same moment with nothing holding them back. A failure in any of them goes
+      unnoticed, work in flight is lost if the process restarts, and the database or
+      downstream service takes the whole burst at once. Put the items on a durable queue,
+      or emit a single event that carries the batch and let one consumer page through it.
+    patterns:
+      - pattern-either:
+          - pattern-inside: |
+              for (const $X of $ARR) { ... }
+          - pattern-inside: |
+              for (let $X of $ARR) { ... }
+          - pattern-inside: |
+              for (...) { ... }
+          - pattern-inside: |
+              $ARR.forEach(...)
+      - pattern: $A.eventEmitter.emit(...)
+    metadata:
+      category: reliability
+      kit-lens: reliability
+      stack: [typescript, node, nestjs]
+      confidence: MEDIUM
+      references:
+        - rules/semgrep/README.md#scale-sync-emit-in-loop
+    paths:
+      exclude: ["*.spec.ts", "*.spec.tsx", "*.test.ts", "*.test.tsx", "*.e2e-spec.ts"]

@@ -1,0 +1,35 @@
+rules:
+  - id: scale-front-large-fixed-page-fetch
+    languages: [typescript]
+    severity: INFO
+    message: >-
+      Front-end code asks for a large fixed page (`size`, `limit` or `pageSize` of 200 or
+      more) and, typically, filters, sorts or pages the result in the browser. Two things
+      go wrong as the data grows. Rows past the fixed window never reach the screen, so the
+      list looks complete while silently missing items. And every view downloads, parses
+      and renders the whole window even when the user looks at twenty rows. Move filtering,
+      sorting and paging to the server and request only the rows the view shows.
+    patterns:
+      - pattern-either:
+          - pattern: |
+              {..., size: $N, ...}
+          - pattern: |
+              {..., limit: $N, ...}
+          - pattern: |
+              {..., pageSize: $N, ...}
+      # Threshold: change 200 here (and in the README) to tune the rule.
+      - metavariable-comparison:
+          metavariable: $N
+          comparison: $N >= 200
+    metadata:
+      category: performance
+      kit-lens: frontend
+      stack: [typescript, react]
+      confidence: LOW
+      references:
+        - rules/semgrep/README.md#scale-front-large-fixed-page-fetch
+    # Point the scan at the front-end folder from your audit config; this rule
+    # does not know which folder that is.
+    paths:
+      include: ["*.tsx", "*.ts"]
+      exclude: ["*.spec.ts", "*.spec.tsx", "*.test.ts", "*.test.tsx"]

@@ -1,0 +1,31 @@
+rules:
+  - id: scale-mongo-group-null-push
+    languages: [typescript]
+    severity: WARNING
+    message: >-
+      An aggregation stage `$group` uses `_id: null` and `$push`es a field, which gathers
+      every matching row into one array inside one output document. A MongoDB document is
+      capped at 16 MiB, so the pipeline works while the data is small and then fails outright
+      once the pushed values add up past that size; before that, the server builds the whole
+      array in memory and the application receives it in one piece. Return the rows with a
+      cursor and process them as a stream, page through them, or group by a real key so each
+      output document stays small.
+    patterns:
+      - pattern: |
+          {$group: $G}
+      - metavariable-pattern:
+          metavariable: $G
+          patterns:
+            - pattern: |
+                {..., _id: null, ...}
+            - pattern: |
+                {..., $F: {$push: $V}, ...}
+    metadata:
+      category: performance
+      kit-lens: data
+      stack: [typescript, mongodb]
+      confidence: HIGH
+      references:
+        - rules/semgrep/README.md#scale-mongo-group-null-push
+    paths:
+      exclude: ["*.spec.ts", "*.spec.tsx", "*.test.ts", "*.test.tsx", "*.e2e-spec.ts"]

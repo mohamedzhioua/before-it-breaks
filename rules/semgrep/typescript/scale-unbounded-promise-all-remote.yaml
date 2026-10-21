@@ -1,0 +1,45 @@
+rules:
+  - id: scale-unbounded-promise-all-remote
+    languages: [typescript]
+    severity: WARNING
+    message: >-
+      Promise.all or Promise.allSettled runs over `array.map(...)`, or `array.forEach(...)`
+      runs, and the callback makes a remote call. Every element starts its call at the same
+      moment, so the number of open connections equals the array length: a list of 10,000
+      items opens 10,000 requests at once. That drains connection pools and sockets, trips
+      the other side's rate limit (HTTP 429), and turns one large input into an outage for
+      everyone else. With forEach it is worse: nothing waits for the calls, so their errors
+      are lost too. Use a mapper with a fixed concurrency limit, process the list in
+      fixed-size chunks, or call a batch endpoint.
+    patterns:
+      - pattern-either:
+          - pattern: Promise.all($ARR.map($F))
+          - pattern: Promise.allSettled($ARR.map($F))
+          - pattern: $ARR.forEach($F)
+      # Remote-call set shared with scale-await-remote-call-in-loop and
+      # scale-swallowed-remote-error-then-bulk-write. Extend it in all three.
+      - metavariable-pattern:
+          metavariable: $F
+          pattern-either:
+            - pattern: fetch(...)
+            - pattern: got(...)
+            - pattern: axios.$AM(...)
+            # Any HttpService call, bare or wrapped (firstValueFrom, lastValueFrom, pipe).
+            - pattern: $A.httpService.$HM(...)
+            - pattern: $A.eventEmitter.emitAsync(...)
+            - patterns:
+                - pattern-either:
+                    - pattern: $A.$CLIENT.$CM(...)
+                    - pattern: $CLIENT.$CM(...)
+                - metavariable-regex:
+                    metavariable: $CLIENT
+                    regex: (?i).*(client|gateway|sdk)$
+    metadata:
+      category: performance
+      kit-lens: performance
+      stack: [typescript, node]
+      confidence: MEDIUM
+      references:
+        - rules/semgrep/README.md#scale-unbounded-promise-all-remote
+    paths:
+      exclude: ["*.spec.ts", "*.spec.tsx", "*.test.ts", "*.test.tsx", "*.e2e-spec.ts"]

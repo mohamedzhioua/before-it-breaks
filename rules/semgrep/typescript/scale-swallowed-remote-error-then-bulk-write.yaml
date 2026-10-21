@@ -1,0 +1,56 @@
+rules:
+  - id: scale-swallowed-remote-error-then-bulk-write
+    languages: [typescript]
+    severity: WARNING
+    message: >-
+      A loop makes a remote call per item inside try/catch, the catch does not rethrow, and
+      after the loop a bulk write (updateMany, deleteMany or bulkWrite) runs anyway. Every
+      item whose remote call failed is still marked done in the local database, so the two
+      systems drift apart and nothing records which items need a retry. The bigger the batch,
+      the more certain it is that some calls fail. Collect the ids that succeeded and write
+      only those, or record each failure (an outbox or a failed-items list) for a retry.
+    patterns:
+      - pattern-inside: |
+          for (...) {
+            ...
+            try {
+              ...
+              await $CALL;
+              ...
+            } catch ($E) {
+              ...
+            }
+            ...
+          }
+          ...
+      # Remote-call set shared with scale-await-remote-call-in-loop and
+      # scale-unbounded-promise-all-remote. Extend it in all three.
+      - metavariable-pattern:
+          metavariable: $CALL
+          pattern-either:
+            - pattern: fetch(...)
+            - pattern: got(...)
+            - pattern: axios.$AM(...)
+            # Any HttpService call, bare or wrapped (firstValueFrom, lastValueFrom, pipe).
+            - pattern: $A.httpService.$HM(...)
+            - pattern: $A.eventEmitter.emitAsync(...)
+            - patterns:
+                - pattern-either:
+                    - pattern: $A.$CLIENT.$CM(...)
+                    - pattern: $CLIENT.$CM(...)
+                - metavariable-regex:
+                    metavariable: $CLIENT
+                    regex: (?i).*(client|gateway|sdk)$
+      - pattern: $M.$BULK(...)
+      - metavariable-regex:
+          metavariable: $BULK
+          regex: ^(updateMany|deleteMany|bulkWrite)$
+    metadata:
+      category: reliability
+      kit-lens: reliability
+      stack: [typescript, node, mongodb]
+      confidence: MEDIUM
+      references:
+        - rules/semgrep/README.md#scale-swallowed-remote-error-then-bulk-write
+    paths:
+      exclude: ["*.spec.ts", "*.spec.tsx", "*.test.ts", "*.test.tsx", "*.e2e-spec.ts"]

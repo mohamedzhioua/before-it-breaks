@@ -1,0 +1,38 @@
+rules:
+  - id: scale-front-http-client-defaults
+    languages: [typescript]
+    severity: INFO
+    message: >-
+      A front-end HTTP or data-fetching default multiplies load on the back end. Either an
+      axios timeout is set above two minutes, or a react-query QueryClient is created with no
+      default `staleTime`. Load balancers and proxies often close idle requests after about
+      60 seconds (check yours), so a long browser timeout means the user waits, gives up or
+      retries while the server keeps working on the first request. With no `staleTime`, every
+      remount and window focus refetches, so expensive endpoints are hit again and again for
+      data that has not changed. Keep browser timeouts below the proxy limit, and set a
+      `staleTime` in `defaultOptions.queries` that suits the data.
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: axios.defaults.timeout = $N
+              - pattern: |
+                  axios.create({..., timeout: $N, ...})
+          # Threshold in milliseconds (two minutes).
+          - metavariable-comparison:
+              metavariable: $N
+              comparison: $N > 120000
+      - patterns:
+          - pattern: new QueryClient(...)
+          - pattern-not: |
+              new QueryClient({..., defaultOptions: {..., queries: {..., staleTime: $S, ...}, ...}, ...})
+    metadata:
+      category: performance
+      kit-lens: frontend
+      stack: [typescript, react, axios, react-query]
+      confidence: MEDIUM
+      references:
+        - rules/semgrep/README.md#scale-front-http-client-defaults
+    # Point the scan at the front-end folder from your audit config.
+    paths:
+      include: ["*.tsx", "*.ts"]
+      exclude: ["*.spec.ts", "*.spec.tsx", "*.test.ts", "*.test.tsx"]

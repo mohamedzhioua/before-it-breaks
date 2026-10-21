@@ -1,0 +1,34 @@
+rules:
+  - id: scale-offset-pagination-loop
+    languages: [typescript]
+    severity: WARNING
+    message: >-
+      A loop walks a collection page by page with a growing skip/offset counter. For every
+      page the database still reads and throws away all the rows before the offset, so
+      walking N rows in pages of size P reads about N*N/(2P) rows in total: ten times the data
+      costs a hundred times the work. Rows inserted or deleted during the walk also shift the
+      pages, so some rows are read twice and others never. Page with a keyset instead
+      (sort by _id and ask for _id greater than the last one seen) or use a driver cursor.
+    patterns:
+      - pattern-either:
+          - pattern-inside: |
+              while ($COND) { ... }
+          - pattern-inside: |
+              do { ... } while ($COND);
+          - pattern-inside: |
+              for (;;) { ... }
+      - pattern-either:
+          - pattern: $SKIP += $N
+          - pattern: $SKIP = $SKIP + $N
+      - metavariable-regex:
+          metavariable: $SKIP
+          regex: (?i).*(skip|offset).*
+    metadata:
+      category: performance
+      kit-lens: data
+      stack: [typescript, mongodb, sql]
+      confidence: HIGH
+      references:
+        - rules/semgrep/README.md#scale-offset-pagination-loop
+    paths:
+      exclude: ["*.spec.ts", "*.spec.tsx", "*.test.ts", "*.test.tsx", "*.e2e-spec.ts"]

@@ -1,0 +1,28 @@
+rules:
+  - id: scale-queue-keeps-failed-jobs-forever
+    languages: [typescript]
+    severity: INFO
+    message: >-
+      Job options set `removeOnFail: false`, so Bull or BullMQ keeps every failed job in
+      Redis with no end date, payload included. Redis holds its whole dataset in memory, so
+      failed jobs with large payloads (file contents, id lists, rendered documents) slowly
+      fill the instance, and a bad deploy that fails thousands of jobs fills it quickly. A
+      fixed jobId used for de-duplication also stays taken while the failed job remains, so
+      later adds with that id are silently ignored. Keep a bounded number or age instead,
+      for example `removeOnFail: { count: 1000 }` or `{ age: 7 * 24 * 3600 }`.
+    patterns:
+      - pattern: |
+          {..., removeOnFail: $V, ...}
+      - metavariable-pattern:
+          metavariable: $V
+          pattern: "false"
+      - focus-metavariable: $V
+    metadata:
+      category: reliability
+      kit-lens: reliability
+      stack: [typescript, node, redis, bull, bullmq]
+      confidence: HIGH
+      references:
+        - rules/semgrep/README.md#scale-queue-keeps-failed-jobs-forever
+    paths:
+      exclude: ["*.spec.ts", "*.spec.tsx", "*.test.ts", "*.test.tsx", "*.e2e-spec.ts"]

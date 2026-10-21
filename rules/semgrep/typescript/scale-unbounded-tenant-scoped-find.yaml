@@ -1,0 +1,50 @@
+rules:
+  - id: scale-unbounded-tenant-scoped-find
+    languages: [typescript]
+    severity: WARNING
+    message: >-
+      This query filters on a tenant key and sets no limit, cursor or page, so it returns
+      every document the tenant owns. Memory, response time and connection-pool hold time
+      therefore rise in step with the size of the largest tenant, and one big customer can
+      stall a process shared by all of them. Read the rows in keyset batches or through a
+      cursor, or ask the database for a count or an aggregate instead of whole documents.
+    patterns:
+      - pattern-either:
+          # Mongoose-style: find / findMany with the tenant key in the filter.
+          - patterns:
+              - pattern-either:
+                  - pattern: |
+                      $S.findMany({..., $KEY: $W, ...}, ...)
+                  - pattern: |
+                      $S.find({..., $KEY: $W, ...}, ...)
+              - pattern-not: |
+                  $S.findMany($F, $P, {..., limit: $L, ...})
+              - pattern-not: |
+                  $S.findMany($F, $P, {..., limit, ...})
+              - pattern-not: |
+                  $S.find($F, $P, {..., limit: $L, ...})
+              - pattern-not-inside: $S.find(...). ... .limit(...)
+              - pattern-not-inside: $S.find(...). ... .cursor(...)
+              # Receivers named *service* / *model* / *repo*, or a capitalised model name.
+              - metavariable-regex:
+                  metavariable: $S
+                  regex: ^(.*([Ss]ervice|SERVICE|[Mm]odel|MODEL|[Rr]epo|REPO).*|[A-Z][A-Za-z0-9_]*)$
+          # Prisma-style: findMany({ where: { <tenant key>: ... } }) without take.
+          - patterns:
+              - pattern: |
+                  $S.findMany({..., where: {..., $KEY: $W, ...}, ...})
+              - pattern-not: |
+                  $S.findMany({..., take: $T, ...})
+      # Tenant key names. Edit this list to match your schema (see the README).
+      - metavariable-regex:
+          metavariable: $KEY
+          regex: ^(tenant|tenantId|account|accountId|org|orgId|organization|organizationId|workspace|workspaceId|project|projectId|owner|ownerId)$
+    metadata:
+      category: performance
+      kit-lens: data
+      stack: [typescript, mongodb, mongoose]
+      confidence: MEDIUM
+      references:
+        - rules/semgrep/README.md#scale-unbounded-tenant-scoped-find
+    paths:
+      exclude: ["*.spec.ts", "*.spec.tsx", "*.test.ts", "*.test.tsx", "*.e2e-spec.ts"]

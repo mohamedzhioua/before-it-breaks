@@ -1,0 +1,39 @@
+rules:
+  - id: scale-mongoose-push-update-result-discarded
+    languages: [typescript]
+    severity: WARNING
+    message: >-
+      A findByIdAndUpdate or findOneAndUpdate call appends with `$push`, and the document it
+      returns is never used. Each call still ships the whole parent document back and Mongoose
+      builds a model object from it, so appending K items one call at a time transfers
+      roughly K*K/2 entries in total, and the parent keeps growing toward the 16 MiB MongoDB
+      document limit. Call updateOne (it returns only a count), and store per-item records
+      in their own collection rather than in an ever-growing array on the parent.
+    patterns:
+      - pattern-either:
+          - pattern: |
+              await $M.$FN($ID, {..., $push: $P, ...}, ...);
+          - pattern: |
+              $M.$FN($ID, {..., $push: $P, ...}, ...);
+      - metavariable-regex:
+          metavariable: $FN
+          regex: ^(findByIdAndUpdate|findOneAndUpdate)$
+      - pattern-not-inside: |
+          const $V = await $M.$FN(...);
+      - pattern-not-inside: |
+          let $V = await $M.$FN(...);
+      - pattern-not-inside: |
+          $V = await $M.$FN(...);
+      - pattern-not-inside: |
+          const $V = $M.$FN(...);
+      - pattern-not-inside: |
+          return $E;
+    metadata:
+      category: performance
+      kit-lens: data
+      stack: [typescript, mongodb, mongoose]
+      confidence: HIGH
+      references:
+        - rules/semgrep/README.md#scale-mongoose-push-update-result-discarded
+    paths:
+      exclude: ["*.spec.ts", "*.spec.tsx", "*.test.ts", "*.test.tsx", "*.e2e-spec.ts"]
