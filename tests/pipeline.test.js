@@ -97,6 +97,37 @@ test('fixture data matches the shapes', (t) => {
   assert.equal(shapes.citeLocation({ repo: 'notes-api', path: 'src/a.ts', line: 4 }, { 'notes-api': 'b'.repeat(40) }), `notes-api@${'b'.repeat(10)}:src/a.ts:4`);
 });
 
+test('a candidate fixed at the pin is refuted with "fixed at pin", even without votes', () => {
+  const { candidates, receipts } = unitInputs();
+  candidates.find((c) => c.id === 'SVC-JOBS-02').status = 'fixed';
+  assert.deepEqual(shapes.validateCandidates({ candidates }, demoConfig()), []);
+  const doc = synthesize(demoConfig(), candidates, [], receipts);
+  const v = doc.verdicts.find((x) => x.id === 'SVC-JOBS-02');
+  assert.equal(v.verdict, 'REFUTED');
+  assert.equal(v.why, 'fixed at pin');
+  assert.equal(v.status, 'fixed');
+  const file = { date: '2027-03-08', skeptic_lenses: ['reach', 'mech', 'math'], survive_votes: 2, missing_agents: [], unknown_ids: [], verdicts: doc.verdicts };
+  assert.deepEqual(shapes.validateVerdicts(file), [], 'status "fixed" is a valid verdict status');
+});
+
+test('kit batches leaves out fixed and not_found candidates and hides severity_guess from skeptics', (t) => {
+  const { ws } = setup(t, 'nohint');
+  const file = path.join(ws, 'work', 'candidates.json');
+  const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+  doc.candidates[0].status = 'fixed';
+  doc.candidates[1].status = 'not_found';
+  fs.writeFileSync(file, JSON.stringify(doc));
+  const b = kit(['batches', ws]);
+  assert.equal(b.code, 0, b.out + b.err);
+  assert.match(b.out, new RegExp(`not batched .*${doc.candidates[0].id}, ${doc.candidates[1].id}`));
+  const dir = path.join(ws, 'work', 'phase3', 'batches');
+  const batched = fs.readdirSync(dir).flatMap((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')).candidates);
+  assert.equal(batched.length, doc.candidates.length - 2);
+  assert.ok(!batched.some((c) => c.id === doc.candidates[0].id || c.id === doc.candidates[1].id));
+  assert.ok(batched.every((c) => !('severity_guess' in c)), 'no severity hint in batch files');
+  assert.ok(batched.every((c) => typeof c.mechanism === 'string'), 'the rest of the candidate is kept');
+});
+
 // ---------- batches and args ----------
 
 function manyCandidates(n) {

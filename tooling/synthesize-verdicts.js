@@ -20,10 +20,12 @@
  * lead). n = number of skeptic lenses (verify.skeptic_lenses), majority =
  * more than half of n, survive = REAL + PARTIAL votes, need =
  * verify.survive_votes:
+ *   candidate status "fixed" (true before, fixed at the pin) -> REFUTED
+ *   candidate status "not_found" (cited code gone)  -> REFUTED
+ *       (these two are not batched for voting, so they need no votes)
  *   fewer than n votes, or no verifier check      -> NEEDS-REVIEW (incomplete)
  *   OUT_OF_SCOPE votes >= majority                 -> OUT-OF-SCOPE
  *   REFUTED votes >= majority                      -> REFUTED
- *   candidate status "not_found" (cited code gone)  -> REFUTED
  *   survive >= need and verifier CONFIRMED         -> PROVEN-STATIC
  *   survive >= need and verifier UNVERIFIABLE      -> UNPROVEN
  *   anything else                                  -> NEEDS-REVIEW (split)
@@ -211,7 +213,13 @@ function synthesize(config, candidates, outputs, receipts) {
 
     let verdict;
     let why;
-    if (cast.length < lenses.length || !chk) {
+    if (c.status === 'fixed') {
+      verdict = 'REFUTED';
+      why = 'fixed at pin';
+    } else if (c.status === 'not_found') {
+      verdict = 'REFUTED';
+      why = 'the cited code does not exist at the pinned commit';
+    } else if (cast.length < lenses.length || !chk) {
       verdict = 'NEEDS-REVIEW';
       why = `incomplete: ${cast.length}/${lenses.length} votes, verifier ${chk ? 'present' : 'missing'}`;
     } else if (count('OUT_OF_SCOPE') >= majority) {
@@ -220,9 +228,6 @@ function synthesize(config, candidates, outputs, receipts) {
     } else if (count('REFUTED') >= majority) {
       verdict = 'REFUTED';
       why = 'most skeptics refuted it';
-    } else if (c.status === 'not_found') {
-      verdict = 'REFUTED';
-      why = 'the cited code does not exist at the pinned commit';
     } else if (survive >= need && ver === 'CONFIRMED') {
       verdict = 'PROVEN-STATIC';
       why = count('PARTIAL') >= majority ? 'survived the skeptics with corrections; evidence reproduced' : 'survived the skeptics; evidence reproduced';
