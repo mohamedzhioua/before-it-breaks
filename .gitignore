@@ -1,0 +1,8 @@
+.ai-os/
+workspaces/
+*.local.json
+.claude/settings.local.json
+examples/*/repos/
+node_modules/
+.DS_Store
+*.log
