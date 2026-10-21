@@ -1,0 +1,15 @@
+{
+  "name": "before-it-breaks",
+  "owner": { "name": "Zhioua Mohamed" },
+  "metadata": {
+    "description": "One plugin: the Before It Breaks audit kit for Claude Code."
+  },
+  "plugins": [
+    {
+      "name": "before-it-breaks",
+      "source": "./",
+      "description": "Evidence-first scalability, reliability and performance audits: map, hunt, verify with skeptics and a mechanical verifier, report and recommend.",
+      "category": "development"
+    }
+  ]
+}

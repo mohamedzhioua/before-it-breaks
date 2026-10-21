@@ -1,0 +1,10 @@
+{
+  "name": "before-it-breaks",
+  "version": "0.1.0",
+  "description": "A Claude Code kit for evidence-first audits of whether your software will hold up as it grows, with agents that hunt for problems and skeptics that must fail to disprove them before anything reaches the report.",
+  "author": { "name": "Zhioua Mohamed" },
+  "license": "MIT",
+  "homepage": "https://github.com/mohamedzhioua/before-it-breaks",
+  "repository": "https://github.com/mohamedzhioua/before-it-breaks",
+  "keywords": ["audit", "scalability", "reliability", "performance", "code-review", "agents", "evidence"]
+}
