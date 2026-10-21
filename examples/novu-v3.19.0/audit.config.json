@@ -1,0 +1,85 @@
+{
+  "$schema": "../../config/audit.config.schema.json",
+  "preset": "scalability",
+  "size": "standard",
+  "audit": {
+    "name": "Novu fan-out demo (planned, not run yet)",
+    "question": "Can one notification be sent to a million subscribers in one go, and what gives way first on the way there?",
+    "type": "scalability",
+    "date": "2026-10-21"
+  },
+  "repos": [
+    {
+      "name": "novu",
+      "url": "https://github.com/novuhq/novu",
+      "ref": "v3.19.0",
+      "pin": "TODO",
+      "role": "backend",
+      "include": ["apps/api/", "apps/worker/", "libs/dal/", "libs/application-generic/"],
+      "exclude": [
+        "enterprise/",
+        "apps/dashboard/",
+        "**/*.spec.ts",
+        "**/*.test.ts",
+        "**/e2e/"
+      ],
+      "context_only": false,
+      "known_gaps": [
+        "Deployment settings (instance counts, memory limits, queue worker counts) are not in the scoped folders, so sizes are calculated from code only.",
+        "The enterprise folders are out of scope; anything that depends on them is not examined."
+      ]
+    }
+  ],
+  "scale": {
+    "unit": "subscribers in one send",
+    "unit_short": "subscribers",
+    "target": 1000000,
+    "tiers": [10000, 100000, 1000000]
+  },
+  "known_limits": [
+    "MongoDB rejects any single document larger than 16 MiB",
+    "Redis runs commands one at a time on a single thread, so one slow command delays every other client of that instance",
+    "MongoDB makes a write to one document atomic; a change spread over several documents is not atomic unless it runs in a transaction"
+  ],
+  "library_assumptions": [
+    "Job queue: confirm in the Phase 1 map which queue library the worker uses and how it treats a job added again with an id that already exists",
+    "HTTP client: confirm whether outgoing provider calls have a request timeout set"
+  ],
+  "out_of_scope": [
+    "security (anything noticed is withheld and reported privately, see README)",
+    "the enterprise folders (enterprise/** and other separately licensed packages)",
+    "the web dashboard (apps/dashboard)",
+    "tests and test helpers"
+  ],
+  "lenses": ["performance", "reliability", "data", "infra"],
+  "groups": [
+    {
+      "key": "SVC-TRIGGER",
+      "repo": "novu",
+      "lens": "performance",
+      "scope": "apps/api/ request handling for triggering a notification, plus the shared use-cases in libs/application-generic/ that it calls",
+      "focus": "Work done per subscriber inside the request that starts a send; lists of subscribers loaded or looped over in one go."
+    },
+    {
+      "key": "WRK-QUEUE",
+      "repo": "novu",
+      "lens": "reliability",
+      "scope": "apps/worker/ and the queue code in libs/application-generic/",
+      "focus": "Retries, duplicate deliveries, jobs that never finish, and what happens to a large send when a worker restarts."
+    },
+    {
+      "key": "WRK-RUNTIME",
+      "repo": "novu",
+      "lens": "infra",
+      "scope": "apps/worker/ and apps/api/ start-up, health checks and shutdown handling",
+      "focus": "Connection pools, concurrency settings and what a rolling restart does to work in flight."
+    },
+    {
+      "key": "DATA-DAL",
+      "repo": "novu",
+      "lens": "data",
+      "scope": "libs/dal/ repositories, schemas and index definitions",
+      "focus": "Queries on subscribers, messages and jobs that no index serves; result sets with no limit; documents that grow with the number of subscribers."
+    }
+  ]
+}
