@@ -117,6 +117,9 @@ test('plain read-only pipelines are accepted and become argument lists', (t) => 
     "grep -rn --include='*/x.ts' -e x {repo:notes-api}/src",
     "grep -rn --include='*.e2e.ts' -e x {repo:notes-api}/src",
     "rg -n -g '.envrc' x {repo:notes-api}/src",
+    "git -C {repo:notes-api} grep -n 'retry' {pin:notes-api} -- '*.ts'",
+    "git -C {repo:notes-api} grep -n 'retry' {pin:notes-api} -- 'src/**/*.ts'",
+    "git -C {repo:notes-api} grep -n 'retry' {pin:notes-api} -- 'app/[id]'",
     'grep .env {repo:notes-api}/src/a.ts',
     // literal rev:path with brackets, safe include and exclude patterns
     "git -C {repo:notes-api} show '{pin:notes-api}:app/[id]/page.tsx'",
@@ -205,12 +208,19 @@ test('every refused class is refused with its reason (classified only)', (t) => 
     [`cat ${R}/.ENV`, /reads an \.env file/],
     [`cat ${R}/config/.env.production.local`, /reads an \.env file/],
     [`${G} show ${P}:.env.local.bak`, /reads an \.env file/],
-    // wildcards in git pathspecs, and include patterns that could match .env
-    [`${G} grep -n -e x ${P} -- '.en?'`, /wildcards .* git pathspecs/],
-    [`${G} grep -n -e x ${P} -- '*.env*'`, /wildcards .* git pathspecs/],
-    [`${G} grep -n -e x ${P} -- '.en[v]'`, /wildcards .* git pathspecs/],
-    [`${G} log -p ${P} -- 'config/*'`, /wildcards .* git pathspecs/],
-    [`${G} grep -n -e x ${P} -- ':(glob)**/.e*'`, /wildcards|pathspec magic/],
+    // .env followed by '-' or '_' is an .env name too
+    [`cat ${R}/.env-local`, /reads an \.env file/],
+    [`cat ${R}/config/.env_backup`, /reads an \.env file/],
+    [`${G} show ${P}:config/.env-local`, /reads an \.env file/],
+    [`rg -n -g '.env-*' x ${R}/src`, /reads an \.env file|could match an \.env file/],
+    // git pathspecs and include patterns that could match .env
+    [`${G} grep -n -e x ${P} -- '.env*'`, /could match an .env file|reads an .env file/],
+    [`${G} grep -n -e x ${P} -- '.env.st?ging'`, /could match an .env file|reads an .env file/],
+    [`${G} grep -n -e x ${P} -- '.en?'`, /this pathspec could match an .env file/],
+    [`${G} grep -n -e x ${P} -- '*.env*'`, /this pathspec could match an .env file/],
+    [`${G} grep -n -e x ${P} -- '.en[v]'`, /this pathspec could match an .env file/],
+    [`${G} log -p ${P} -- 'config/*'`, /this pathspec could match an .env file/],
+    [`${G} grep -n -e x ${P} -- ':(glob)**/.e*'`, /could match an .env file|pathspec magic/],
     [`grep -rn --include='.env*' -e x ${R}/src`, /could match an \.env file|reads an \.env file/],
     [`grep -rn --include='*' -e x ${R}/src`, /could match an \.env file|reads an \.env file/],
     [`grep -rn --include='config/.e?v' -e x ${R}/src`, /could match an \.env file|reads an \.env file/],
@@ -387,7 +397,8 @@ test('.env files and folders never reach a receipt through a folder search; user
     cand('SVC-JOBS-28', "rg -n --hidden -g '*.ts' ENVMARKER {repo:notes-api}/config"),
   ]);
   fs.mkdirSync(path.join(repo.path, 'config', '.env'), { recursive: true });
-  const files = { '.env': 'root', 'config/.env/x': 'in an .env folder', 'config/.ENV.local': 'upper', 'config/.env.staging': 'staging',
+  const files = { '.env': 'root', 'config/.env/x': 'in an .env folder', 'config/.ENV.local': 'upper', 'config/.env.staging': 'staging', 'config/.envrc': 'envrc',
+    'config/.env-local': 'dash', 'config/.env_backup': 'underscore',
     'config/app.txt': 'app.txt', 'config/app.ts': 'app.ts', 'config/data.json': 'data.json' };
   for (const [rel, v] of Object.entries(files)) fs.writeFileSync(path.join(repo.path, rel), `ENVMARKER ${v}\n`);
   git(repo.path, ['add', '-A']);
@@ -397,11 +408,12 @@ test('.env files and folders never reach a receipt through a folder search; user
   assert.equal(run.res.status, 0, run.res.stdout + run.res.stderr);
   const dir = path.join(ws, 'work', 'phase3', 'receipts');
   const receipt = (id) => fs.readFileSync(path.join(dir, `${id}.md`), 'utf8');
-  const hidden = /ENVMARKER (root|in an \.env folder|upper|staging)/;
+  const hidden = /ENVMARKER (root|in an \.env folder|upper|staging|dash|underscore)/;
   for (const id of ['SVC-JOBS-23', 'SVC-JOBS-24', 'SVC-JOBS-25']) {
     assert.match(receipt(id), /ENVMARKER app\.txt/, `${id} still searches`);
     assert.match(receipt(id), /ENVMARKER data\.json/, `${id} still searches`);
     assert.doesNotMatch(receipt(id), hidden, `${id} showed an .env file`);
+    assert.match(receipt(id), /ENVMARKER envrc/, `${id}: .envrc is another name and is searched`);
   }
   // Regression guard: the user's include still limits the search.
   assert.match(receipt('SVC-JOBS-26'), /ENVMARKER app\.ts/);
@@ -411,6 +423,7 @@ test('.env files and folders never reach a receipt through a folder search; user
   const rg = receipt('SVC-JOBS-27');
   if (/classification: ran/.test(rg)) {
     assert.match(rg, /ENVMARKER app\.txt/);
+    assert.match(rg, /ENVMARKER envrc/);
     assert.doesNotMatch(rg, hidden);
     assert.match(receipt('SVC-JOBS-28'), /ENVMARKER app\.ts/);
     assert.doesNotMatch(receipt('SVC-JOBS-28'), /app\.txt|data\.json/);
@@ -427,17 +440,17 @@ test('.env files and folders never reach a receipt through a folder search; user
   for (const c of greps) {
     const at = c.args.indexOf(GREP_ENV_EXCLUDE[0]);
     assert.ok(at > 0, JSON.stringify(c.args));
-    assert.deepEqual(c.args.slice(at, at + 2), GREP_ENV_EXCLUDE);
+    assert.deepEqual(c.args.slice(at, at + GREP_ENV_EXCLUDE.length), GREP_ENV_EXCLUDE);
     const userOpts = c.args.map((a, i) => (a.startsWith('-') && !GREP_ENV_EXCLUDE.includes(a) ? i : -1)).filter((i) => i >= 0);
     assert.ok(userOpts.every((i) => i < at), `kit excludes come last: ${JSON.stringify(c.args)}`);
     // ... and right before the first operand: only the path follows (the pattern is an -e value).
-    assert.deepEqual(c.args.slice(at + 2).map((x) => x.replace(/\\/g, '/').endsWith('/config')), [true], JSON.stringify(c.args));
+    assert.deepEqual(c.args.slice(at + GREP_ENV_EXCLUDE.length).map((x) => x.replace(/\\/g, '/').endsWith('/config')), [true], JSON.stringify(c.args));
   }
   const inc = greps.find((c) => c.args.includes('--include=*.ts'));
   assert.ok(inc && inc.args.indexOf('--include=*.ts') < inc.args.indexOf(GREP_ENV_EXCLUDE[0]));
   const gitGreps = named(/(^|[\\/])git(\.exe)?$/i).filter((c) => c.args.includes('grep'));
   assert.equal(gitGreps.length, 2);
-  for (const c of gitGreps) assert.deepEqual(c.args.slice(-2), GIT_ENV_EXCLUDE);
+  for (const c of gitGreps) assert.deepEqual(c.args.slice(-GIT_ENV_EXCLUDE.length), GIT_ENV_EXCLUDE);
   assert.ok(Array.isArray(RG_ENV_EXCLUDE) && RG_ENV_EXCLUDE[0].startsWith('--iglob=!'));
 });
 

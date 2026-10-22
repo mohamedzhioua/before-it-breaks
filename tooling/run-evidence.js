@@ -66,10 +66,12 @@
  *   - Program-specific: sed scripts may use only p d D n N P g G h H x l z
  *     = q Q { } s y and no s///w or s///e flag, and sed runs with --sandbox
  *     when the installed sed supports it (checked once per run; --dry-run
- *     says when it does not); .env files and folders (any case, any
- *     suffix, also as rev:path or glued to an option) are refused as file
- *     operands and option values (search patterns and sed scripts may name
- *     .env), git pathspecs after -- take no wildcards, grep --include and
+ *     says when it does not).
+ *   - A file or folder named .env, or .env followed by '.', '-' or '_' (any case), is never read or searched; other names such as .envrc are read normally and rely on the output detectors.
+ *     Such names are refused as file operands, rev:path and option values
+ *     (also glued to an option; search patterns and sed scripts may name
+ *     .env), git pathspecs after -- may hold wildcards unless they could
+ *     match an .env file (as rg -g), grep --include and
  *     rg -g patterns that name an .env file are refused, file patterns
  *     after the first path are refused, and grep and rg get .env excludes
  *     right before their first operand (git grep: exclude pathspecs);
@@ -600,14 +602,14 @@ const GIT_SEARCH_OPTS = ['e', 'S', 'G', 'grep'];
 const REV = /^[A-Za-z0-9._/@{}^~-]+$/;
 const COMMIT_REV = /^[0-9a-f]{7,40}(?:[~^][0-9]*)*$/;
 
-// An .env name, in any case and with any suffixes, as a whole word, after
+// An .env name (.env, or .env followed by ".", "-" or "_"; any case), after
 // "/", "\", ":" (git rev:path, e.g. HEAD:.env) or "=" (--include=.env.x),
 // and as a file or a folder (.env/x).
-const ENV_NAME = /(^|[/\\:=])\.env(\.[\w-]+)*(?=$|[/\\])/i;
+const ENV_NAME = /(^|[/\\:=])\.env([._-][^/\\]*)?(?=$|[/\\])/i;
 // The same in a glob or an option value, where the suffix may hold glob
 // characters (.env*, .env.st?ging, .env.[lp]*); .envrc is another name.
-const ENV_GLOB = /(^|[/\\:=])\.env([.*?[][\w.*?[\]!-]*)?(?=$|[/\\])/i;
-const ENV_SAMPLES = ['.env', '.ENV', '.Env', '.env.local', '.env.production.local', '.env.local.bak'];
+const ENV_GLOB = /(^|[/\\:=])\.env([._*?[-][^/\\]*)?(?=$|[/\\])/i;
+const ENV_SAMPLES = ['.env', '.ENV', '.Env', '.env.local', '.env.production.local', '.env.local.bak', '.env-local', '.env_backup'];
 
 // Brace alternatives of a glob, expanded ({a,b}c -> ac, bc); null when
 // there are too many to check.
@@ -690,7 +692,9 @@ function globCouldMatchEnv(glob) {
 // spec: a pathspec after "--" (git reads it as a glob); rev:path and -L
 // paths are literal.
 function gitPathProblem(p, roots, spec) {
-  if (spec && GLOB.test(p)) return `"${p}": wildcards (* ? [) are not allowed in git pathspecs (one could name an .env file); name a folder or a file`;
+  // Wildcards are fine unless the pattern names an .env file (the rule of rg
+  // -g); git applies the kit's exclude pathspecs whatever the order.
+  if (spec && GLOB.test(p) && globCouldMatchEnv(p)) return `"${p}": this pathspec could match an .env file; name the file types you need (for example *.ts)`;
   if (path.isAbsolute(p) || /^[A-Za-z]:/.test(p)) return pathProblem(p, roots);
   if (p.startsWith(':')) return `git pathspec magic "${p}" is not allowed`;
   if (p.startsWith('~')) return `"${p}": ~ is not allowed`;
@@ -890,16 +894,18 @@ function probeSed(dirs) {
 
 const SED_NO_SANDBOX = 'note: the installed sed does not support --sandbox; the kit\'s own sed script check is the only guard';
 
-// Added to every searching step so a folder read never shows an .env file
-// or anything in an .env folder. GNU grep's first file pattern decides what
+// Added to every searching step so a folder read never shows a file or
+// folder named .env or .env followed by '.', '-' or '_' (any case; .envrc
+// is another name)
+// or anything inside such a folder. GNU grep's first file pattern decides what
 // an unmatched file does and the last matching one wins; BSD grep stops
 // reading options at the first operand. So these go after the step's own
 // options and right before its first operand (the step may not give file
 // patterns after its paths, see filePatternLate). git grep gets exclude
 // pathspecs after "--".
-const GREP_ENV_EXCLUDE = ['--exclude=.[eE][nN][vV]*', '--exclude-dir=.[eE][nN][vV]*'];
-const RG_ENV_EXCLUDE = ['--iglob=!.env*'];
-const GIT_ENV_EXCLUDE = [':(exclude,icase,glob)**/.env*', ':(exclude,icase,glob)**/.env*/**'];
+const GREP_ENV_EXCLUDE = ['--exclude=.[eE][nN][vV]', '--exclude=.[eE][nN][vV].*', '--exclude=.[eE][nN][vV]-*', '--exclude=.[eE][nN][vV]_*', '--exclude-dir=.[eE][nN][vV]', '--exclude-dir=.[eE][nN][vV].*', '--exclude-dir=.[eE][nN][vV]-*', '--exclude-dir=.[eE][nN][vV]_*'];
+const RG_ENV_EXCLUDE = ['--iglob=!.env', '--iglob=!.env.*', '--iglob=!.env-*', '--iglob=!.env_*'];
+const GIT_ENV_EXCLUDE = [':(exclude,icase,glob)**/.env', ':(exclude,icase,glob)**/.env.*', ':(exclude,icase,glob)**/.env-*', ':(exclude,icase,glob)**/.env_*', ':(exclude,icase,glob)**/.env/**', ':(exclude,icase,glob)**/.env.*/**', ':(exclude,icase,glob)**/.env-*/**', ':(exclude,icase,glob)**/.env_*/**'];
 const FILE_PATTERN_OPTS = { grep: ['include', 'exclude', 'exclude-dir'], rg: ['g', 'glob', 'iglob'] };
 
 // How args are laid out, read with the same table as parseOptions (so an
