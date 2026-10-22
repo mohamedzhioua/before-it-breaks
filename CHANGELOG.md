@@ -39,7 +39,16 @@ First public version.
 - **Pilot**: a real-agent pilot on connect-mongo found and fixed five kit issues: the relaunch line (now starts with `--plugin-dir` when the kit is not an installed plugin), saving the Workflow tool's output file as it is, the steering-note excerpt, the corrected-size check in the report, and links to pages of skipped phases. `build measurements` is now a standard step after `build log`.
 - `examples/pilot-connect-mongo/`: an excerpt of that pilot (one High finding, its verification record and evidence receipt), real output; the finding text is not edited.
 - `tests/run-all.js` adds an end-to-end builder step with `--strict` and a Semgrep fixture test.
-- Lenses gain seven items with sums, mitigations, false positives and evidence commands (reliability: poison records, detached work, unsafe recovery or replay; performance: aggregate against per-item limits, cache stampede, key cardinality, superlinear regex or parsing); the arithmetic skeptic refutes a missing limit as `hardening:` when no breaking size at or below the target can be derived, and the mechanism and reach skeptics do the same for a defence-in-depth gap alone; each hunter may return the files it read as `reviewed`, kept per hunter in the hunt summary. Ideas from [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT).
+- Lenses gain seven items with sums, mitigations, false positives and evidence commands (reliability: poison records, detached work, unsafe recovery or replay; performance: aggregate against per-item limits, cache stampede, key cardinality, superlinear regex or parsing); the arithmetic skeptic refutes a missing limit as `hardening:` when no breaking size can be derived at all (a size above the target stays `beyond target:`, one only a measurement could give stays unknown), and the mechanism and reach skeptics do the same for a defence-in-depth gap alone; each hunter may return the files it read as `reviewed`, kept per hunter in the hunt summary. Ideas from [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT).
 - `SECURITY.md`, `CONTRIBUTING.md` (DCO sign-off, invented code only), `tests/run-all.js` and a CI workflow.
+- `tests/run-all.js` prints every failing test with its error block above the tail of a failed step; CI keeps the full output of failed steps as an artifact.
+
+### Fixed
+
+Found by the first CI runs on Windows and macOS:
+
+- The leak gate's `@except` and allow rules on a single file no longer miss when the path holds a Windows 8.3 short name; both the file and the git root are resolved to real paths first.
+- On Windows, a work-tree link is scanned as its target with forward slashes, as git records it, so a home path in a link target is caught.
+- A test now accepts the padded count that BSD `wc` prints on macOS.
 
 [0.1.0]: https://github.com/mohamedzhioua/before-it-breaks/releases/tag/v0.1.0

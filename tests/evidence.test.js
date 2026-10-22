@@ -617,7 +617,8 @@ test('the runner wires pipes, keeps 2>&1, and withholds output that matches a se
   assert.ok(!read('SVC-JOBS-12').includes('NOTESFIXTURE0002'));
   assert.match(read('SVC-JOBS-13'), /\[output withheld: email-address\]/);
   assert.match(read('SVC-JOBS-14'), /output \(1 line\):\n```\n[0-9a-f]{7,} Fixture Author add keys\n```/);
-  assert.match(read('SVC-JOBS-15'), /output \(1 line\):\n```\n1\n```/, 'the error line went down the pipe');
+  // BSD wc (macOS) pads the count with spaces; GNU wc does not.
+  assert.match(read('SVC-JOBS-15'), /output \(1 line\):\n```\n\s*1\n```/, 'the error line went down the pipe');
   assert.equal(one.out.split('\n').slice(0, 1)[0], read('SVC-JOBS-11').split('\n')[0], '--only gives the same receipt as a full run');
   // rg is allowed but may not be installed: then it is a readable skipped-error
   const rg = read('SVC-JOBS-16');
