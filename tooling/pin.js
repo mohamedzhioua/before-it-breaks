@@ -4,13 +4,14 @@
  * looks at the code.
  *
  * Usage:
- *   node tooling/pin.js [<workspace>] [--allow-dirty]
+ *   node tooling/pin.js [<workspace>] [--allow-dirty] [--trust-git-dir]
  *
  * For each repo in the config that has a path, records the HEAD commit (full
  * and 10-character short form), the branch, the commit date and the number
  * of uncommitted changes (`git status --porcelain --untracked-files=all`
- * lines, so every untracked file counts) plus a sha256 of those changes:
- * the status lines, `git diff HEAD --binary`, and the name and content of
+ * lines, so every untracked file counts; submodules are not looked into)
+ * plus a sha256 of those changes: the status lines, `git diff HEAD
+ * --binary`, and the name and content of
  * every untracked, not ignored file. Writes:
  *   <work>/pins.json            read by every later step
  *   <work>/phase0-baseline.md   the same facts as a table for people
@@ -21,8 +22,18 @@
  * files; check-unchanged then expects exactly the same uncommitted changes,
  * contents included.
  *
+ * Before git runs, every repo's .git folder is checked as text
+ * (lib/git-env.js gitDirCheck): a .git file, a bare layout, alternates,
+ * or config or attributes that can start a program or fetch are refused
+ * with the list of reasons. A folder with no usable .git is "not a git
+ * repository". --trust-git-dir pins anyway and records trust_git_dir: true
+ * for each refused repo in pins.json and the baseline. git always runs
+ * with the isolated environment of lib/git-env.js (global and system
+ * config ignored except core.autocrlf/core.eol, so a repo owned by another
+ * user fails as "dubious ownership"; no fetching).
+ *
  * Exit codes: 0 pinned, 1 a repo is dirty (nothing written), 2 usage,
- * config or git error.
+ * config or git error, or a .git folder refused.
  *
  * Exports (used by doctor.js, check-unchanged.js and others):
  *   repoState(dir) -> { sha, short, branch, commit_date, porcelain,
@@ -38,20 +49,19 @@ const crypto = require('crypto');
 const { spawnSync } = require('child_process');
 const { loadConfig, ConfigError } = require('./lib/config');
 const { validatePins } = require('./lib/shapes');
+const { GIT_PRE, gitEnv, systemCarry, gitDirCheck } = require('./lib/git-env');
 
 class CliError extends Error {}
 
-// git with a fixed, quiet environment; never takes optional locks, so
+// git with the kit's isolated environment (lib/git-env.js: no global or
+// system config except core.autocrlf/core.eol, GIT_PRE settings, no fetch)
+// that never takes optional locks, so
 // reading state does not touch the repo's index. attrTree: read attributes
 // from that tree (the empty tree) so the repo cannot name filter programs.
 function git(dir, args, raw, attrTree) {
-  const env = {
-    ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C',
-    // A repo's own .git/config must not start a program on `git status`.
-    GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.fsmonitor', GIT_CONFIG_VALUE_0: 'false',
-  };
+  const env = systemCarry(gitEnv());
   if (attrTree) env.GIT_ATTR_SOURCE = attrTree;
-  const res = spawnSync('git', ['-C', dir, ...args], {
+  const res = spawnSync('git', ['-C', dir, ...GIT_PRE, ...args], {
     encoding: raw ? 'buffer' : 'utf8',
     input: '',
     maxBuffer: 1024 * 1024 * 1024,
@@ -66,6 +76,9 @@ function git(dir, args, raw, attrTree) {
 function repoState(dir) {
   if (!fs.existsSync(dir)) throw new ConfigError(`folder not found: ${dir}`);
   const top = git(dir, ['rev-parse', '--show-toplevel']);
+  if (top.code !== 0 && /dubious ownership/i.test(top.err)) {
+    throw new ConfigError(`git refuses ${dir}: it belongs to another user (dubious ownership); clone or chown it; the kit ignores global git config here`);
+  }
   if (top.code !== 0) throw new ConfigError(`not a git repository: ${dir}`);
   const head = git(dir, ['rev-parse', 'HEAD']);
   if (head.code !== 0) throw new ConfigError(`no commit yet in ${dir}`);
@@ -73,12 +86,12 @@ function repoState(dir) {
   const empty = git(dir, ['hash-object', '-t', 'tree', '--stdin']).out.trim() || null;
   const branch = git(dir, ['rev-parse', '--abbrev-ref', 'HEAD']).out.trim();
   const date = git(dir, ['log', '-1', '--format=%cI', 'HEAD']).out.trim();
-  const status = git(dir, ['status', '--porcelain', '--untracked-files=all'], false, empty);
+  const status = git(dir, ['status', '--porcelain', '--untracked-files=all', '--ignore-submodules=all'], false, empty);
   if (status.code !== 0) throw new ConfigError(`git status failed in ${dir}: ${status.err}`);
   const lines = status.out.split('\n').filter((l) => l.trim() !== '');
   const hash = crypto.createHash('sha256').update(lines.join('\n'));
   if (lines.length) {
-    const diff = git(dir, ['diff', 'HEAD', '--binary', '--no-ext-diff', '--no-textconv'], true, empty);
+    const diff = git(dir, ['diff', 'HEAD', '--binary', '--no-ext-diff', '--no-textconv', '--ignore-submodules=all'], true, empty);
     if (diff.code !== 0) throw new ConfigError(`git diff failed in ${dir}: ${diff.err}`);
     hash.update('\0diff\0').update(diff.out);
     const others = git(dir, ['ls-files', '--others', '--exclude-standard', '-z']);
@@ -150,6 +163,12 @@ function baseline(config, pins) {
   } else {
     out.push('All repos were clean when pinned.');
   }
+  const trusted = pinnable(config).filter((r) => pins.repos[r.name].trust_git_dir).map((r) => r.name);
+  if (trusted.length) {
+    out.push('');
+    out.push(`**Git folder trusted (\`--trust-git-dir\`): ${trusted.join(', ')}.** The kit found settings in .git that can start`);
+    out.push('programs or point git elsewhere, and pinned anyway because it was told to trust them.');
+  }
   out.push('', 'Full commits are in `pins.json`.', '');
   return out.join('\n');
 }
@@ -159,6 +178,28 @@ function run(opts, io) {
   const repos = pinnable(config);
   if (!repos.length) throw new CliError('no repo with a path in the config; nothing to pin');
   const pins = { date: config.audit.date, allow_dirty: opts.allowDirty, repos: {} };
+  // The .git folders are checked before git runs on any of them.
+  const refused = [];
+  const trusted = new Set();
+  for (const r of repos) {
+    const dir = paths.repos[r.name];
+    if (!fs.existsSync(dir)) throw new ConfigError(`repo ${r.name}: folder not found: ${dir}`);
+    const { notRepo, problems } = gitDirCheck(dir);
+    if (notRepo) throw new ConfigError(`repo ${r.name}: not a git repository: ${dir}`);
+    if (!problems.length) continue;
+    if (opts.trustGitDir) trusted.add(r.name);
+    else refused.push([r.name, problems]);
+  }
+  if (refused.length) {
+    io.err('pin: refusing to run git on these repos; their .git folder can start programs or point git elsewhere:');
+    for (const [name, problems] of refused) {
+      io.err(`  ${name}:`);
+      for (const p of problems) io.err(`    - ${p}`);
+    }
+    io.err('Clone the repo again from a remote you trust, or pin anyway with --trust-git-dir (recorded). The kit still');
+    io.err('turns off signature checks, gpg, fsmonitor and fetching, but a filter or diff driver in .git/config can still run.');
+    return 2;
+  }
   const dirty = [];
   for (const r of repos) {
     let st;
@@ -168,7 +209,7 @@ function run(opts, io) {
       throw new ConfigError(`repo ${r.name}: ${e.message}`);
     }
     if (st.porcelain > 0) dirty.push(`${r.name}: ${st.porcelain} uncommitted change${st.porcelain === 1 ? '' : 's'}`);
-    pins.repos[r.name] = st;
+    pins.repos[r.name] = trusted.has(r.name) ? { ...st, trust_git_dir: true } : st;
   }
   if (dirty.length && !opts.allowDirty) {
     io.err('pin: refusing to pin repos with uncommitted changes:');
@@ -179,6 +220,7 @@ function run(opts, io) {
   fs.mkdirSync(paths.work, { recursive: true });
   fs.writeFileSync(pinsFile(paths), JSON.stringify(pins, null, 2) + '\n');
   fs.writeFileSync(path.join(paths.work, 'phase0-baseline.md'), baseline(config, pins));
+  for (const name of trusted) io.err(`pin: WARNING ${name}: .git folder refusal skipped (--trust-git-dir, recorded in pins.json)`);
   for (const r of repos) {
     const p = pins.repos[r.name];
     io.out(`${r.name} ${p.short} ${p.branch} ${p.commit_date} uncommitted=${p.porcelain}`);
@@ -188,9 +230,10 @@ function run(opts, io) {
 }
 
 function parseArgs(argv) {
-  const opts = { workspace: null, allowDirty: false, help: false };
+  const opts = { workspace: null, allowDirty: false, trustGitDir: false, help: false };
   for (const a of argv) {
     if (a === '--allow-dirty') opts.allowDirty = true;
+    else if (a === '--trust-git-dir') opts.trustGitDir = true;
     else if (a === '--help' || a === '-h') opts.help = true;
     else if (a.startsWith('-')) throw new CliError(`unknown option ${a}`);
     else if (opts.workspace !== null) throw new CliError(`only one workspace may be given (got ${opts.workspace} and ${a})`);
@@ -205,7 +248,7 @@ function main(argv, io) {
   try {
     const opts = parseArgs(argv);
     if (opts.help) {
-      io.out('usage: node tooling/pin.js [<workspace>] [--allow-dirty]');
+      io.out('usage: node tooling/pin.js [<workspace>] [--allow-dirty] [--trust-git-dir]');
       return 0;
     }
     return run(opts, io);

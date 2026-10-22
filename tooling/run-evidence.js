@@ -139,6 +139,7 @@ const { loadConfig, ConfigError } = require('./lib/config');
 const { validateCandidates } = require('./lib/shapes');
 const { readPins } = require('./pin');
 const { buildMasks, mask, detect } = require('./lib/mask');
+const { GIT_PRE, NO_FETCH, gitEnv, gitDirCheck } = require('./lib/git-env');
 
 class CliError extends Error {}
 
@@ -269,13 +270,22 @@ function inside(child, root) {
   return c === r || c.startsWith(r.endsWith(path.sep) ? r : r + path.sep);
 }
 
-// Nearest existing folder or file of p, resolved through symlinks.
+// Nearest existing folder or file of p, resolved through symlinks. Walks up
+// only while the name does not exist (ENOENT, ENOTDIR); null when a name
+// exists but cannot be resolved (a dangling or looping link, no access).
 function realNearest(p) {
   let cur = path.resolve(p);
   for (;;) {
     try {
       return fs.realpathSync.native(cur);
     } catch (e) {
+      if (e.code !== 'ENOENT' && e.code !== 'ENOTDIR') return null;
+      try {
+        fs.lstatSync(cur);
+        return null; // the name is there (a link) but leads nowhere
+      } catch (e2) {
+        if (e2.code !== 'ENOENT' && e2.code !== 'ENOTDIR') return null;
+      }
       const up = path.dirname(cur);
       if (up === cur) return cur;
       cur = up;
@@ -299,7 +309,9 @@ function pathProblem(p, roots) {
   if (!path.isAbsolute(p)) return `"${p}": paths must start with {repo:<name>}`;
   const root = roots.find((r) => inside(p, r.dir));
   if (!root) return `"${p}" is outside the repos`;
-  if (!inside(realNearest(p), root.real)) return `"${p}" leads outside repo ${root.name} through a symlink`;
+  const real = realNearest(p);
+  if (!real || !root.real) return `"${p}" cannot be resolved (a broken or looping link, or no access)`;
+  if (!inside(real, root.real)) return `"${p}" leads outside repo ${root.name} through a symlink`;
   return null;
 }
 
@@ -345,7 +357,7 @@ const TABLES = {
 
 const DIFF_OUT = flags('stat name-only name-status numstat shortstat patch no-patch no-color no-ext-diff no-textconv ignore-all-space ignore-space-change');
 const GIT = {
-  show: { short: flags('p s w'), long: { ...DIFF_OUT, unified: 'o', 'diff-filter': 'v', format: 'fmt', pretty: 'fmt', date: 'v', ...flags('oneline abbrev-commit') }, fixed: ['--no-ext-diff', '--no-textconv'] },
+  show: { short: flags('p s w'), long: { ...DIFF_OUT, unified: 'o', 'diff-filter': 'v', format: 'fmt', pretty: 'fmt', date: 'v', ...flags('oneline abbrev-commit') }, fixed: ['--no-ext-diff', '--no-textconv', '--ignore-submodules=all'] },
   log: {
     short: { n: 'n', S: 'v', G: 'v', L: 'v', ...flags('p s w i E F') },
     long: {
@@ -354,9 +366,9 @@ const GIT = {
       ...flags('oneline abbrev-commit follow reverse no-merges merges first-parent regexp-ignore-case extended-regexp fixed-strings'),
     },
     numeric: true,
-    fixed: ['--no-ext-diff', '--no-textconv'],
+    fixed: ['--no-ext-diff', '--no-textconv', '--ignore-submodules=all'],
   },
-  diff: { short: flags('p w'), long: { ...DIFF_OUT, unified: 'o', 'diff-filter': 'v' }, fixed: ['--no-ext-diff', '--no-textconv'], revs: 2 },
+  diff: { short: flags('p w'), long: { ...DIFF_OUT, unified: 'o', 'diff-filter': 'v' }, fixed: ['--no-ext-diff', '--no-textconv', '--ignore-submodules=all'], revs: 2 },
   grep: {
     short: { e: 'v', A: 'n', B: 'n', C: 'n', m: 'n', ...flags('n i E F G P w l L c v h H o I p W') },
     long: {
@@ -719,7 +731,7 @@ function childEnv(tmp, binDirs) {
   for (const k of Object.keys(process.env)) if (['SYSTEMROOT', 'WINDIR'].includes(k.toUpperCase())) env[k] = process.env[k];
   const sysRoot = process.env.SystemRoot || process.env.SYSTEMROOT;
   const sys = WIN && sysRoot ? [path.join(sysRoot, 'System32')] : [];
-  return Object.assign(env, {
+  return Object.assign(env, NO_FETCH, {
     PATH: [...binDirs, ...sys].join(path.delimiter),
     HOME: home, USERPROFILE: home, TMP: tmp, TEMP: tmp, TMPDIR: tmp,
     LC_ALL: 'C', LANG: 'C', NO_COLOR: '1', MSYS_NO_PATHCONV: '1',
@@ -728,7 +740,7 @@ function childEnv(tmp, binDirs) {
   }, WIN ? { MSYS: 'noglob', MSYS2_ARG_CONV_EXCL: '*' } : {});
 }
 
-const GIT_PRE = ['-c', 'core.attributesFile=', '-c', 'core.fsmonitor=false', '-c', 'log.showSignature=false', '-c', 'core.pager=cat', '-c', 'gpg.program='];
+// GIT_PRE (the -c settings before every git subcommand) is shared with pin.js.
 
 // Detectors and masks (buildMasks, mask, detect) live in lib/mask.js, shared
 // with the builders.
@@ -925,9 +937,8 @@ function loadCandidates(paths, config) {
 function emptyTrees(roots) {
   const out = {};
   for (const r of roots) {
-    const res = spawnSync('git', ['-C', r.dir, 'hash-object', '-t', 'tree', '--stdin'], {
-      input: '', encoding: 'utf8', timeout: 20000, windowsHide: true,
-      env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.fsmonitor', GIT_CONFIG_VALUE_0: 'false' },
+    const res = spawnSync('git', ['-C', r.dir, ...GIT_PRE, 'hash-object', '-t', 'tree', '--stdin'], {
+      input: '', encoding: 'utf8', timeout: 20000, windowsHide: true, env: gitEnv(),
     });
     if (res.status === 0) out[r.name] = res.stdout.trim();
   }
@@ -945,6 +956,18 @@ function run(opts, io) {
   };
   const roots = makeRoots(paths.repos);
   const base = { expand, roots };
+  // The .git check of kit pin, again, before git runs on any repo.
+  const refused = [];
+  for (const r of roots) {
+    if (pins.repos[r.name] && pins.repos[r.name].trust_git_dir) continue;
+    const chk = gitDirCheck(r.dir);
+    const why = chk.notRepo ? [`not a git repository (${chk.notRepo})`] : chk.problems;
+    if (why.length) refused.push(`${r.name}: ${why.join('; ')}`);
+  }
+  if (refused.length) {
+    const list = refused.map((m) => `  - ${m}`).join('\n');
+    throw new CliError(`refusing to run git on these repos; their .git folder can start programs or point git elsewhere:\n${list}\nClone the repo again from a remote you trust, or re-pin with --trust-git-dir (recorded).`);
+  }
 
   if (opts.dryRun) {
     const tally = { run: 0, 'skipped-live': 0, 'skipped-unsafe': 0 };

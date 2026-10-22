@@ -289,6 +289,7 @@ const PINS = {
           commit_date: str('Commit date, ISO 8601.'),
           porcelain: { type: 'integer', minimum: 0, description: 'Number of uncommitted changes.' },
           changes_sha256: str('sha256 of the uncommitted changes, contents included.', '^[0-9a-f]{64}$'),
+          trust_git_dir: { type: 'boolean', description: 'true when the .git folder check found problems and --trust-git-dir pinned anyway.' },
         },
       },
     },

@@ -6,10 +6,15 @@
  *   node tooling/doctor.js [<workspace>] [--no-optional]
  *
  * Prints one line per check, "ok" or "FAIL" (required) / "--" (optional):
- *   required  Node >= 20, git >= 2.40 (the evidence runner sets
+ *   required  Node >= 20, git >= 2.44 (the evidence runner sets
  *             GIT_ATTR_SOURCE so a repo's .gitattributes cannot name filter
- *             or diff programs; older git ignores it), the config is valid, every repo
- *             folder exists and is a git repo, pins exist (`kit pin`), and
+ *             or diff programs, and the kit sets GIT_NO_LAZY_FETCH so a
+ *             partial clone cannot fetch; older git ignores them), the
+ *             config is valid, every repo
+ *             folder exists and is a git repo whose .git folder passes the
+ *             check of `kit pin` (lib/git-env.js gitDirCheck, done before
+ *             git runs; skipped for a repo pinned with --trust-git-dir),
+ *             pins exist (`kit pin`), and
  *             every repo is still at its pin with a clean tree. bash too when
  *             rules.enabled: the rule tests (rules/semgrep/run-tests.sh) need
  *             it. It is found from evidence.shell: "auto" means Git Bash on
@@ -29,7 +34,7 @@
  * the config) with read access to every repo, and a reminder to check /hooks for Stop hooks from other plugins.
  *
  * Exit codes: 0 every required check is ok, 1 a required check failed,
- * 2 usage error or workspace not found.
+ * 2 usage error, workspace not found, or a repo's .git folder refused.
  */
 
 const fs = require('fs');
@@ -38,6 +43,7 @@ const { spawnSync } = require('child_process');
 const { loadConfig, ConfigError, kitRootMoved } = require('./lib/config');
 const { checkLensFiles } = require('./check-workflows');
 const { repoState, readPins } = require('./pin');
+const { gitDirCheck } = require('./lib/git-env');
 const { compareToPins } = require('./check-unchanged');
 const { launchLine, placeholderWarnings } = require('./init-workspace');
 
@@ -89,9 +95,9 @@ function run(opts, io) {
 
   add(true, atLeast(process.versions.node, [20, 0]), 'node >= 20', `node ${process.versions.node}`);
   const git = version('git', ['--version']);
-  const gitOk = atLeast(git, [2, 40]);
-  add(true, gitOk, 'git >= 2.40', !git ? 'git not found'
-    : gitOk ? git : `${git}: too old; 2.40 or later is needed so the evidence runner can stop a repo's .gitattributes from naming filter or diff programs (GIT_ATTR_SOURCE)`);
+  const gitOk = atLeast(git, [2, 44]);
+  add(true, gitOk, 'git >= 2.44', !git ? 'git not found'
+    : gitOk ? git : `${git}: too old; 2.44 or later is needed so the kit can stop a repo's .gitattributes from naming filter or diff programs (GIT_ATTR_SOURCE) and stop lazy fetches (GIT_NO_LAZY_FETCH)`);
 
   let config = null;
   let paths = null;
@@ -110,14 +116,40 @@ function run(opts, io) {
   const bash = sh.shell ? version(sh.shell, ['--version']) : null;
   add(!config || config.rules.enabled, Boolean(bash), 'bash (rule tests)', bash ? `${sh.shell}: ${bash}` : (sh.error || `${sh.shell} did not run`));
 
+  // The .git folder of each repo is checked as text before git runs on it;
+  // a repo pinned with --trust-git-dir (recorded in pins.json) is not.
+  let trustedPins = {};
+  if (config) {
+    try {
+      trustedPins = readPins(paths).repos;
+    } catch (e) {
+      if (!(e instanceof ConfigError)) throw e;
+    }
+  }
   let reposOk = false;
+  let refused = 0;
   if (config) {
     reposOk = true;
     for (const r of config.repos) {
       if (typeof r.path !== 'string') continue;
+      const dir = paths.repos[r.name];
+      const trusted = Boolean(trustedPins[r.name] && trustedPins[r.name].trust_git_dir);
+      const check = fs.existsSync(dir) ? gitDirCheck(dir) : { notRepo: null, problems: [] };
+      if (check.notRepo) {
+        reposOk = false;
+        add(true, false, `repo ${r.name}`, `not a git repository: ${dir}`);
+        continue;
+      }
+      const problems = trusted ? [] : check.problems;
+      if (problems.length) {
+        reposOk = false;
+        refused++;
+        add(true, false, `repo ${r.name}`, `.git folder refused (git not run): ${problems.join('; ')}; clone it again from a remote you trust, or pin it with --trust-git-dir`);
+        continue;
+      }
       try {
         repoState(paths.repos[r.name]);
-        add(true, true, `repo ${r.name}`, 'git repository found');
+        add(true, true, `repo ${r.name}`, trusted ? 'git repository found (.git folder trusted with --trust-git-dir)' : 'git repository found');
       } catch (e) {
         reposOk = false;
         add(true, false, `repo ${r.name}`, e.message);
@@ -165,7 +197,8 @@ function run(opts, io) {
   }
   io.out('');
   io.out(failed ? `${failed} required check${failed === 1 ? '' : 's'} failed` : 'all required checks passed');
-  return failed ? 1 : 0;
+  if (refused) io.out(`${refused} repo${refused === 1 ? '' : 's'} refused: .git folder check (exit 2)`);
+  return refused ? 2 : failed ? 1 : 0;
 }
 
 function main(argv, io) {

@@ -9,7 +9,9 @@
  * For every repo in the config that has a path: HEAD must equal the commit
  * in <work>/pins.json and `git status --porcelain` must be empty. A repo
  * pinned with --allow-dirty must show exactly the uncommitted changes it had
- * when pinned.
+ * when pinned. Before git runs, each repo's .git folder gets the check of
+ * kit pin (lib/git-env.js gitDirCheck); a refused folder is a failure,
+ * unless pins.json records trust_git_dir for that repo.
  *
  * Exit codes: 0 all unchanged, 1 a repo moved or changed, 2 usage, config or
  * missing pins.
@@ -19,6 +21,7 @@
 
 const { loadConfig, ConfigError } = require('./lib/config');
 const { repoState, readPins } = require('./pin');
+const { gitDirCheck } = require('./lib/git-env');
 
 class CliError extends Error {}
 
@@ -29,6 +32,17 @@ function compareToPins(config, paths, pins) {
     const pin = pins.repos[r.name];
     if (!pin) {
       out.push({ repo: r.name, ok: false, problem: 'not in pins.json (run `kit pin` again)' });
+      continue;
+    }
+    // The .git check of kit pin, again, before git runs (unless the repo
+    // was pinned with --trust-git-dir).
+    const chk = gitDirCheck(paths.repos[r.name]);
+    if (chk.notRepo) {
+      out.push({ repo: r.name, ok: false, problem: `not a git repository: ${paths.repos[r.name]}` });
+      continue;
+    }
+    if (chk.problems.length && !pin.trust_git_dir) {
+      out.push({ repo: r.name, ok: false, problem: `.git folder refused (git not run): ${chk.problems.join('; ')}` });
       continue;
     }
     let st;
