@@ -38,7 +38,8 @@ function shortTitle(change) {
   return t;
 }
 
-const csv = (v) => `"${String(v).replace(/"/g, '""')}"`;
+// A cell a spreadsheet could read as a formula gets a leading ' first.
+const csv = (v) => `"${String(v).replace(/^[=+\-@\t\r]/, (c) => `'${c}`).replace(/"/g, '""')}"`;
 
 function build(ws, opts, io) {
   const { config, paths } = T.loadWorkspace(ws);
@@ -74,20 +75,21 @@ function build(ws, opts, io) {
       const list = item.finding_ids.map((id) => byId.get(id) || { id, severity: 'none', verdict: '?', tier: null, plain: 'not a reported finding' })
         .sort((a, b) => rank(a.severity) - rank(b.severity) || T.byStr(a.id, b.id));
       const body = [
-        T.one(item.change),
+        T.prose(item.change),
         '',
-        `- **When:** ${ph} · **Effort:** ${item.effort}${effort[item.effort] ? ` (${T.one(effort[item.effort])})` : ''}`,
-        `- **Modules:** ${(item.modules || []).map((m) => `\`${m}\`${label.has(m) ? ` ${T.one(label.get(m))}` : ''}`).join(', ') || '-'}`,
-        `- **Waits for:** ${(item.depends_on || []).map((d) => T.one(sectionTitle.get(d) || label.get(d) || d)).join(', ') || '-'}`,
+        `- **When:** ${ph} · **Effort:** ${item.effort}${effort[item.effort] ? ` (${T.prose(effort[item.effort])})` : ''}`,
+        `- **Modules:** ${(item.modules || []).map((m) => `\`${m}\`${label.has(m) ? ` ${T.prose(label.get(m))}` : ''}`).join(', ') || '-'}`,
+        `- **Waits for:** ${(item.depends_on || []).map((d) => T.prose(sectionTitle.get(d) || label.get(d) || d)).join(', ') || '-'}`,
         '',
         `**Findings (${list.length}):**`,
-        ...list.map((f) => `- ${link(paths.outputs.report, f.id.toLowerCase(), f.id)} · ${T.cap(f.severity)}${f.verdict === 'PROVEN-STATIC' ? '' : ` (${f.verdict})`} · tier ${f.tier || '-'} · ${T.one(f.plain)}`),
+        ...list.map((f) => `- ${link(paths.outputs.report, f.id.toLowerCase(), f.id)} · ${T.cap(f.severity)}${f.verdict === 'PROVEN-STATIC' ? '' : ` (${f.verdict})`} · tier ${f.tier || '-'} · ${T.prose(f.plain)}`),
         '',
         `Source: ${link(paths.outputs.recommendations, 'roadmap', 'the roadmap')}. ${trust.replace(/\*\*/g, '')}`,
         '',
         'Name the finding ids in every change request for this issue.',
       ].join('\n');
-      issues.push({ title: `[${ph}] ${shortTitle(item.change)}`, body });
+      const short = shortTitle(item.change);
+      issues.push({ title: `[${ph}] ${tracker === 'markdown' ? T.prose(short) : short}`, body });
     }
   }
 
@@ -96,7 +98,7 @@ function build(ws, opts, io) {
     text = [['title', 'description'], ...issues.map((i) => [i.title, i.body])].map((r) => r.map(csv).join(',')).join('\r\n') + '\r\n';
   } else {
     const L = [T.pageTop({
-      title: `Issues: ${T.one(config.audit.name)}`,
+      title: `Issues: ${T.prose(config.audit.name)}`,
       generator: 'tooling/build-issues.js',
       measured,
       open,
@@ -117,6 +119,6 @@ function main(argv, io) {
   return T.runCli(argv, io, { name: 'build-issues', usage: USAGE, options: { '--tracker': 'tracker', '--base-url': 'baseUrl' } }, build);
 }
 
-module.exports = { main };
+module.exports = { main, csv };
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2));

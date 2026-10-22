@@ -65,7 +65,7 @@ function build(ws, io) {
   const L = [];
 
   L.push(T.pageTop({
-    title: `Measurements: ${T.one(config.audit.name)}`,
+    title: `Measurements: ${T.prose(config.audit.name)}`,
     generator: GENERATOR,
     measured: proven,
     open,
@@ -97,7 +97,7 @@ function build(ws, io) {
     const list = checks.filter((c) => c.kind === g);
     if (!list.length) continue;
     L.push(`## Checks: ${g}`, '');
-    if (accessOf.has(g)) L.push(`Needs: ${T.one(accessOf.get(g).safe_form)}`, '');
+    if (accessOf.has(g)) L.push(`Needs: ${T.prose(accessOf.get(g).safe_form)}`, '');
     L.push('| # | Candidate | Live check | It should show |', '|---|---|---|---|',
       ...list.map((c, i) => `| ${i + 1} | ${c.id}${c.f ? ` (${c.f.verdict}, ${c.f.severity && c.f.severity !== 'none' ? T.cap(c.f.severity) : '-'})` : ''} | ${T.code(c.cmd)} | ${T.cell(c.expect)} |`), '');
   }

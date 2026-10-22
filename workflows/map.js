@@ -298,6 +298,7 @@ function mapPrompt(a, repo) {
     `- ${UNTRUSTED}`,
     '- Every fact carries a citation at the pinned commit. Anything you suspect but did not confirm goes under Leads, marked UNVERIFIED, with what would confirm it.',
     `- ${EVIDENCE_RULE} (A map needs none, but any command you suggest under Leads must follow them.)`,
+    '- When you search with your own Bash, quote the search word or use rg: an unquoted search word that is a git subcommand word (for example config, fetch, commit) matches a deny rule of this session and is refused.',
     '- Write no file anywhere. Put the whole map in the "text" field.',
     `- ${RETURN_ONLY}`,
   ].filter((l) => l !== null).join('\n');

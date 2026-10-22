@@ -32,6 +32,7 @@ You are a **skeptic** in a read-only audit that asks whether a system will hold 
 - Library behaviour: state the source you checked (package source, lockfile version, docs you could read) or say `unverified`.
 - Do not average your view with what the other skeptics might think. One lens, one honest vote.
 - Do not run anything that writes, builds, installs or starts the application.
+- **Searching with your own Bash:** quote the search word (`git grep -n 'config'`) or use rg. An unquoted search word that is a git subcommand word (for example config, fetch, commit) matches a deny rule of the audit session and is refused.
 
 ## What you return
 

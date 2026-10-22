@@ -189,7 +189,7 @@ function render(ctx) {
   const L = [];
 
   L.push(T.pageTop({
-    title: `Verification log: ${T.one(config.audit.name)}`,
+    title: `Verification log: ${T.prose(config.audit.name)}`,
     generator: GENERATOR,
     measured: reported.filter((f) => f.verdict === 'PROVEN').length,
     open: final.filter((f) => f.verdict === 'NEEDS-REVIEW').map((f) => f.id),
@@ -252,29 +252,29 @@ function render(ctx) {
   for (const f of final) {
     const v = verdictsDoc.byId.get(f.id);
     const c = cands.get(f.id);
-    L.push(`### ${f.id}`, '', `**${T.one(f.title)}**`, '',
-      `- **Verdict:** ${f.verdict}${f.merged_into ? ` (merged into [${f.merged_into}](#${f.merged_into.toLowerCase()}))` : ''} · **Severity:** ${sev(f.severity)} · **Source:** ${T.one(f.source)} · **Lens:** ${f.lens} · **Repo:** \`${f.repo}\``,
-      `- **Rule that decided it:** ${T.one(f.why) || '-'}`);
-    if (f.override) L.push(`- **Override:** ${f.override.action}${f.synthesized_verdict ? ` (verdict before: ${f.synthesized_verdict})` : ''}. ${T.one(f.override.reason)}${f.override.approved_by ? ` Approved by ${T.one(f.override.approved_by)}.` : ''}`);
+    L.push(`### ${f.id}`, '', `**${T.prose(f.title)}**`, '',
+      `- **Verdict:** ${f.verdict}${f.merged_into ? ` (merged into [${f.merged_into}](#${f.merged_into.toLowerCase()}))` : ''} · **Severity:** ${sev(f.severity)} · **Source:** ${T.prose(f.source)} · **Lens:** ${f.lens} · **Repo:** \`${f.repo}\``,
+      `- **Rule that decided it:** ${T.prose(f.why) || '-'}`);
+    if (f.override) L.push(`- **Override:** ${f.override.action}${f.synthesized_verdict ? ` (verdict before: ${f.synthesized_verdict})` : ''}. ${T.prose(f.override.reason)}${f.override.approved_by ? ` Approved by ${T.prose(f.override.approved_by)}.` : ''}`);
     if (f.merged_from.length) L.push(`- **Also covers:** ${f.merged_from.map((id) => `[${id}](#${id.toLowerCase()})`).join(', ')}`);
-    L.push(`- **Cited code:** ${f.citations.map((x) => `\`${x}\``).join(', ') || '-'}`, `- **Receipt:** ${receiptLink(f)}`);
+    L.push(`- **Cited code:** ${f.citations.map(T.code).join(', ') || '-'}`, `- **Receipt:** ${receiptLink(f)}`);
     if (c) {
-      L.push(`- **Claim as hunted:** ${T.one(c.claim)}`, `- **Mechanism:** ${T.one(c.mechanism)}`);
-      if (c.arithmetic) L.push(`- **Arithmetic as hunted:** ${T.one(c.arithmetic)}`);
-      if (c.mitigations_searched && c.mitigations_searched.length) L.push(`- **Mitigations looked for:** ${c.mitigations_searched.map(T.one).join(' · ')}`);
+      L.push(`- **Claim as hunted:** ${T.prose(c.claim)}`, `- **Mechanism:** ${T.prose(c.mechanism)}`);
+      if (c.arithmetic) L.push(`- **Arithmetic as hunted:** ${T.prose(c.arithmetic)}`);
+      if (c.mitigations_searched && c.mitigations_searched.length) L.push(`- **Mitigations looked for:** ${c.mitigations_searched.map(T.prose).join(' · ')}`);
     }
     const corrected = lenses.map((l) => v.votes[l] && v.votes[l].corrected_threshold).filter(Boolean);
-    if (corrected.length) L.push(`- **Threshold as corrected by the skeptics:** ${corrected.map(T.one).join(' / ')}`);
+    if (corrected.length) L.push(`- **Threshold as corrected by the skeptics:** ${corrected.map(T.prose).join(' / ')}`);
     if (live.has(f.id)) L.push(`- **Live checks recorded, not run:** ${live.get(f.id).map(T.code).join(' · ')}`);
     L.push('', '**Skeptic votes**', '');
     for (const l of lenses) {
       const x = v.votes[l];
-      L.push(x ? `- *${l}*: **${x.vote}** (${sev(x.severity)}). ${T.one(x.reason)}${x.key_citations && x.key_citations.length ? ` Checked: ${x.key_citations.map((k) => `\`${T.one(k)}\``).join(', ')}.` : ''}` : `- *${l}*: no vote`);
+      L.push(x ? `- *${l}*: **${x.vote}** (${sev(x.severity)}). ${T.prose(x.reason)}${x.key_citations && x.key_citations.length ? ` Checked: ${x.key_citations.map(T.code).join(', ')}.` : ''}` : `- *${l}*: no vote`);
     }
     L.push('', '| Gate | Result | fp-check gate | Result |', '|---|---|---|---|',
       ...GATES.map(([g, gl, fp, fpl]) => `| ${gl} | ${v.gates[g]} | ${fpl} | ${v.fp_check[fp]} |`), '');
     const ver = v.verifier;
-    L.push(ver ? `**Verifier:** ${ver.verdict}. Re-run: ${T.one(ver.rerun) || '-'}${ver.citation_drift ? `. Citation drift: ${T.one(ver.citation_drift)}` : ''}${ver.notes ? `. ${T.one(ver.notes)}` : ''}` : '**Verifier:** no check returned.', '');
+    L.push(ver ? `**Verifier:** ${ver.verdict}. Re-run: ${T.prose(ver.rerun) || '-'}${ver.citation_drift ? `. Citation drift: ${T.prose(ver.citation_drift)}` : ''}${ver.notes ? `. ${T.prose(ver.notes)}` : ''}` : '**Verifier:** no check returned.', '');
   }
   if (teamNotes.length) {
     L.push('## Notes for the audit team', '', 'Housekeeping for the people running the audit, not for readers of the log. Hunter notes are agent-written text, quoted as written (masked); read the cited files yourself before acting on one.', '',

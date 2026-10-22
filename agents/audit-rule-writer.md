@@ -28,6 +28,7 @@ This follows the test-first method of Trail of Bits' semgrep-rule-creator.
 - Never copy client code into a test. Tests use invented names and data.
 - A rule hit is evidence that a code shape exists. It is not a finding on its own; the lead links hits to candidates.
 - Do not install anything. If the engine is missing, stop and say so.
+- **Searching with your own Bash:** quote the search word (`git grep -n 'config'`) or use rg. An unquoted search word that is a git subcommand word (for example config, fetch, commit) matches a deny rule of the audit session and is refused.
 - Keep each rule narrow enough that its false-positive shapes can be listed.
 - If a hunter's pattern hint is wrong (it matches safe code), report that instead of loosening the tests.
 

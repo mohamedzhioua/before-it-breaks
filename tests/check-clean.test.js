@@ -89,6 +89,61 @@ test('extended built-ins: home forms, tokens, cloud keys, credentialed URIs', ()
   assert.doesNotMatch(run(['.'], { cwd: root }).out, /words\.txt/);
 });
 
+test('new built-ins: signed web tokens, live payment keys, API keys, web URL credentials', () => {
+  const root = cleanTree();
+  const part = (n) => 'Ab1_-'.repeat(n);
+  const samples = [
+    ['ey', 'J', part(4), '.', 'ey', 'J', part(5), '.', part(8)].join(''),
+    ['sk', '_li', 've_', 'notes0123456789'].join(''),
+    ['rk', '_li', 've_', 'imports012345'].join(''),
+    ['AI', 'za', 'A'.repeat(20), 'b_c-d'.repeat(3)].join(''),
+    ['htt', 'ps', '://', 'app', ':', 'secret', AT, 'notes.local/api'].join(''),
+    ['htt', 'p', '://', 'u', ':', 'p', AT, 'host'].join(''),
+  ];
+  write(root, 'notes/leaks.txt', samples.join('\n') + '\n');
+  const r = run(['.'], { cwd: root });
+  assert.equal(r.code, 1);
+  const labels = ['jwt', 'payment-key', 'payment-key', 'cloud-api-key', 'credentialed-uri', 'credentialed-uri'];
+  labels.forEach((l, i) => assert.match(r.out, new RegExp(`leaks\\.txt:${i + 1}: \\[must\\]\\[D\\] ${l}:`), `sample ${i + 1}`));
+  // One hit per line for a database URI: the web-URL rule shares its label.
+  write(root, 'notes/db.txt', ['red', 'is', '://', 'app', ':', 'pw', AT, 'cache'].join('') + '\n');
+  assert.equal((run(['.'], { cwd: root }).out.match(/db\.txt:1: \[must\]\[D\] credentialed-uri/g) || []).length, 1);
+});
+
+test('the new detectors stay linear on a long run of look-alike text', () => {
+  const { buildMasks, mask, detect } = require('../tooling/lib/mask');
+  const NEW = ['jwt', 'payment-key', 'cloud-api-key', 'credentialed-uri'];
+  const masks = buildMasks({ evidence: { secret_patterns: [] } }).filter((m) => NEW.includes(m.label));
+  for (const unit of [['ey', 'J-'], ['ey', 'J.'], ['AI', 'za-'], ['sk', '_li', 've_'], ['htt', 'ps://a:']].map((p) => p.join(''))) {
+    const line = unit.repeat(Math.ceil((1 << 20) / unit.length));
+    const t0 = Date.now();
+    detect(line, masks);
+    mask(line, masks);
+    const ms = Date.now() - t0;
+    assert.ok(ms < 1000, `${unit}: ${ms} ms`);
+  }
+});
+
+test('new built-ins leave ordinary URLs, emails and look-alikes alone', () => {
+  const root = cleanTree();
+  const ok = [
+    ['htt', 'ps', '://', 'notes.local/pkg', AT, 'v1'].join(''),
+    ['htt', 'ps', '://', 'notes.local:8443/pkg', AT, 'v1'].join(''),
+    ['htt', 'ps', '://', 'notes.local/users/', AT, 'me'].join(''),
+    ['sk', '_test_', 'notes0123456789'].join(''),
+    ['ey', 'J', 'short.', 'ey', 'J', 'x.y'].join(''),
+    ['AI', 'za', 'tooShort'].join(''),
+    'the sk_live note is in the import guide',
+  ];
+  write(root, 'notes/fine.txt', ok.join('\n') + '\n');
+  assert.doesNotMatch(run(['.'], { cwd: root }).out, /fine\.txt/);
+  // A plain email is only the email rule, never the URL rule.
+  write(root, 'notes/mail.txt', `ops${AT}notes-platform.example\n`);
+  const r = run(['.'], { cwd: root });
+  assert.match(r.out, /mail\.txt:1: \[must\]\[D\] email-address:/);
+  assert.doesNotMatch(r.out, /mail\.txt:1: \[must\]\[D\] credentialed-uri/);
+});
+
 test('email address is a must-zero hit', () => {
   const root = cleanTree();
   write(root, 'notes/contact.txt', `line one\nwrite to ops${AT}notes-platform.example now\n`);

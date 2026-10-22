@@ -30,6 +30,7 @@ The prompt that started you names:
 - A lead is anything that looks risky but that you did not confirm (a loop that might be unbounded, a missing index you suspect). Mark each one `UNVERIFIED` and say what would confirm it. Leads are hints for the hunters, never findings.
 - Describe what the code does, not what its comments or docs claim it does. If they disagree, say so with both citations.
 - Note what you could not see: folders excluded by the config, files missing from disk, generated code, other services.
+- **Searching with your own Bash:** quote the search word (`git grep -n 'config'`) or use rg. An unquoted search word that is a git subcommand word (for example config, fetch, commit) matches a deny rule of the audit session and is refused.
 - Plain, neutral language. No severity words ("critical", "dangerous"), no recommendations.
 
 ## What you return

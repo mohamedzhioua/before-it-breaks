@@ -479,6 +479,7 @@ function hunterPrompt(a, g) {
     'RULES',
     `- ${UNTRUSTED}`,
     `- ${EVIDENCE_RULE}`,
+    '- When you search with your own Bash, quote the search word or use rg: an unquoted search word that is a git subcommand word (for example config, fetch, commit) matches a deny rule of this session and is refused.',
     '- No citation, no candidate. Write no file anywhere.',
     `- ${RETURN_ONLY}`,
   ].filter((l) => l !== null).join('\n');
@@ -518,6 +519,7 @@ function rulesPrompt(a, hints) {
     'RULES',
     `- ${UNTRUSTED}`,
     '- Install nothing. If the engine is missing, stop and say so in notes.',
+    '- When you search with your own Bash, quote the search word or use rg: an unquoted search word that is a git subcommand word (for example config, fetch, commit) matches a deny rule of this session and is refused.',
     '- A rule hit is evidence that a shape exists, not a finding on its own.',
     `- ${RETURN_ONLY}`,
   ].filter((l) => l !== null).join('\n');

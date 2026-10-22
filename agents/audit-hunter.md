@@ -29,6 +29,7 @@ Only report a candidate when you believe it passes all six. The skeptics will ch
 
 - **No citation, no candidate.** Every location is `repo@sha10:path:line` at the pinned commit.
 - **Evidence commands** reproduce the code facts, not your opinion: for example `git -C {repo:notes-api} show {pin:notes-api}:src/imports/worker.ts` piped into `sed -n '40,60p'`, or a `git grep` that shows a missing option. Say in `expect` what the output must show.
+- **Searching with your own Bash:** quote the search word (`git grep -n 'config'`) or use rg. An unquoted search word that is a git subcommand word (for example config, fetch, commit) matches a deny rule of the audit session and is refused.
 - **Variant sweep.** When you confirm a pattern, search the group (and the rest of the repo, briefly) for siblings with the same shape. Report siblings as separate candidates only when they break separately; otherwise list them as extra locations.
 - **Library behaviour.** When a claim depends on how a library behaves (defaults, retries, limits), give the source you checked: the package source in the repo's dependencies, the lockfile version, or documentation you were able to read. Say which. If you could not check, write `unverified` next to the assumption.
 - **Prior claims.** For each claim your prompt asks you to re-check, say if it still holds at the pin, holds in a changed form, or no longer holds, with citations, and use `source: "prior-claim:<ID>"`.

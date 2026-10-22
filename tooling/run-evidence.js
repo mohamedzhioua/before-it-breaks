@@ -62,7 +62,14 @@
  *     name two revisions and git blame one, so they never read the working
  *     tree.
  *   - Program-specific: sed scripts may use only p d D n N P g G h H x l z
- *     = q Q { } s y and no s///w or s///e flag; git --format/--pretty takes
+ *     = q Q { } s y and no s///w or s///e flag, and sed runs with --sandbox
+ *     when the installed sed supports it (checked once per run; --dry-run
+ *     says when it does not); .env files and folders (any case, any
+ *     suffix, also as rev:path or glued to an option) are refused by name,
+ *     git pathspecs after -- take no wildcards, grep --include and rg -g
+ *     patterns that could match .env are refused, and grep, rg and git grep
+ *     always get .env excludes as their last include/exclude rule;
+ *     git --format/--pretty takes
  *     a built-in format name (oneline short medium full fuller reference
  *     raw; git ignores a pretty.* alias with those names) or a string with
  *     only plain % placeholders (no %G, which runs gpg), never a bare
@@ -560,6 +567,11 @@ function operandProblem(head, table, parsed, roots) {
     return `${head} takes at most ${table.maxOperands} file (a second one would be written to)`;
   }
   for (const o of opts) {
+    // A value glued to its option (-g.env.x) is not a word of its own.
+    if (typeof o.value === 'string' && ENV_NAME.test(o.value)) return 'reads an .env file';
+    if (['include', 'g', 'glob'].includes(o.name) && globCouldMatchEnv(String(o.value))) {
+      return `"${o.value}": this file pattern could match an .env file; name the file types you need (for example *.ts)`;
+    }
     if (typeof o.value === 'string' && GLOB.test(o.value) && !(table.patternOpts || []).includes(o.name)) {
       return `glob characters (* ? [) are not allowed in the value of ${o.name.length === 1 ? '-' : '--'}${o.name}`;
     }
@@ -577,7 +589,119 @@ const GLOB = /[*?[]/;
 const REV = /^[A-Za-z0-9._/@{}^~-]+$/;
 const COMMIT_REV = /^[0-9a-f]{7,40}(?:[~^][0-9]*)*$/;
 
-function gitPathProblem(p, roots) {
+// An .env name, in any case and with any suffixes, as a whole word, after
+// "/", "\", ":" (git rev:path, e.g. HEAD:.env) or "=" (--include=.env.x),
+// and as a file or a folder (.env/x).
+const ENV_NAME = /(^|[/\\:=])\.env(\.[\w-]+)*(?=$|[/\\])/i;
+const ENV_SAMPLES = ['.env', '.ENV', '.Env', '.env.local', '.env.production.local', '.env.local.bak'];
+
+// Brace alternatives of a glob, expanded ({a,b}c -> ac, bc); null when
+// there are too many to check.
+function expandBraces(glob, limit = 64) {
+  let open = -1;
+  let depth = 0;
+  for (let i = 0; i < glob.length; i++) {
+    if (glob[i] === '\\') { i++; continue; }
+    if (glob[i] === '{') { if (depth++ === 0) open = i; }
+    else if (glob[i] === '}' && depth && --depth === 0) {
+      const parts = [];
+      let d = 0;
+      let start = open + 1;
+      for (let k = open + 1; k < i; k++) {
+        if (glob[k] === '\\') { k++; continue; }
+        if (glob[k] === '{') d++;
+        else if (glob[k] === '}') d--;
+        else if (glob[k] === ',' && d === 0) { parts.push(glob.slice(start, k)); start = k + 1; }
+      }
+      parts.push(glob.slice(start, i));
+      const out = [];
+      for (const p of parts) {
+        const sub = expandBraces(glob.slice(0, open) + p + glob.slice(i + 1), limit);
+        if (!sub) return null;
+        out.push(...sub);
+        if (out.length > limit) return null;
+      }
+      return out;
+    }
+  }
+  return [glob];
+}
+
+// Tokens of one path segment: star, any (?), cls (a [...] class), lit.
+function globTokens(seg) {
+  const out = [];
+  for (let i = 0; i < seg.length; i++) {
+    const c = seg[i];
+    if (c === '\\' && i + 1 < seg.length) { out.push({ t: 'lit', c: seg[++i] }); continue; }
+    if (c === '*') out.push({ t: 'star' });
+    else if (c === '?') out.push({ t: 'any' });
+    else if (c === '[') {
+      const end = seg.indexOf(']', i + 2);
+      if (end < 0) { out.push({ t: 'lit', c }); continue; }
+      let body = seg.slice(i + 1, end);
+      if (body[0] === '!') body = '^' + body.slice(1);
+      let re;
+      try { re = new RegExp('^[' + body.replace(/\\/g, '\\\\') + ']$'); } catch (e) { re = /^[\s\S]$/; }
+      out.push({ t: 'cls', re });
+      i = end;
+    } else out.push({ t: 'lit', c });
+  }
+  return out;
+}
+
+// True when a name matched by these tokens could start with ".e" or ".E".
+// A "*" that is followed by more than wildcards stands for nothing here
+// ("*.ts" is allowed); a run of wildcards at the end stands for anything.
+function couldStartWithDotE(tokens) {
+  let tail = tokens.length;
+  while (tail > 0 && ['star', 'any'].includes(tokens[tail - 1].t)) tail--;
+  const open = tokens.slice(tail).some((x) => x.t === 'star');
+  const close = (set) => {
+    const out = new Set(set);
+    for (const s of out) if (s < tokens.length && tokens[s].t === 'star') out.add(s + 1);
+    return out;
+  };
+  const eats = (tok, chars) => tok.t === 'any' || (tok.t === 'lit' && chars.includes(tok.c)) || (tok.t === 'cls' && chars.some((ch) => tok.re.test(ch)));
+  let states = new Set([0]);
+  for (const chars of [['.'], ['e', 'E']]) {
+    const next = new Set();
+    for (const s of close(states)) {
+      if (open && s >= tail) return true;
+      if (s < tokens.length && eats(tokens[s], chars)) next.add(s + 1);
+    }
+    states = next;
+    if (!states.size) return false;
+  }
+  return true;
+}
+
+function tokensRegExp(tokens) {
+  const src = tokens.map((x) => (x.t === 'star' ? '.*' : x.t === 'any' ? '.' : x.t === 'cls' ? x.re.source.slice(1, -1) : escapeRe(x.c))).join('');
+  try { return new RegExp('^' + src + '$', 'i'); } catch (e) { return null; }
+}
+
+// True when an include glob (grep --include, rg -g/--glob) could match an
+// .env file or folder: any segment that could start with ".e", or that
+// matches an .env name. rg exclusions ("!...") are allowed.
+function globCouldMatchEnv(glob) {
+  if (glob.startsWith('!')) return false;
+  const alts = expandBraces(glob);
+  if (!alts) return true;
+  for (const alt of alts) {
+    for (const seg of alt.split('/')) {
+      const tokens = globTokens(seg);
+      if (couldStartWithDotE(tokens)) return true;
+      const rx = tokensRegExp(tokens);
+      if (!rx || ENV_SAMPLES.some((s) => rx.test(s))) return true;
+    }
+  }
+  return false;
+}
+
+// spec: a pathspec after "--" (git reads it as a glob); rev:path and -L
+// paths are literal.
+function gitPathProblem(p, roots, spec) {
+  if (spec && GLOB.test(p)) return `"${p}": wildcards (* ? [) are not allowed in git pathspecs (one could name an .env file); name a folder or a file`;
   if (path.isAbsolute(p) || /^[A-Za-z]:/.test(p)) return pathProblem(p, roots);
   if (p.startsWith(':')) return `git pathspec magic "${p}" is not allowed`;
   if (p.startsWith('~')) return `"${p}": ~ is not allowed`;
@@ -617,6 +741,9 @@ function gitProblem(words, ev, roots) {
     if (!revs.length) return 'git grep needs a pattern';
     revs = revs.slice(1);
   }
+  for (const o of parsed.opts) {
+    if (typeof o.value === 'string' && ENV_NAME.test(o.value)) return 'reads an .env file';
+  }
   // -L <range>:<file> carries a path of its own.
   for (const o of parsed.opts) {
     if (o.name === 'L' && typeof o.value === 'string' && o.value.includes(':')) {
@@ -637,7 +764,7 @@ function gitProblem(words, ev, roots) {
     }
     revCount += rev.includes('..') ? 2 : 1;
   }
-  for (const p of paths) { const q = gitPathProblem(p, roots); if (q) return q; }
+  for (const p of paths) { const q = gitPathProblem(p, roots, true); if (q) return q; }
   if (table.revs && revCount < table.revs) {
     return `git ${sub} must name ${table.revs === 2 ? 'two revisions (A B or A..B)' : 'a revision'} so it does not read the working tree`;
   }
@@ -659,7 +786,7 @@ function stepProblem(words, ev, roots) {
   if (words[0].repo || /[/\\]/.test(head)) return `"${head}": give the program name only, not a path`;
   if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(head)) return 'setting variables before a command (VAR=value) is not allowed';
   if (!ev.allowed_heads.includes(head)) return `"${head}" is not in evidence.allowed_heads`;
-  if (words.some((w) => /(^|[/\\])\.env(\.[A-Za-z0-9_-]+)?$/.test(w.v))) return 'reads an .env file';
+  if (words.some((w) => ENV_NAME.test(w.v))) return 'reads an .env file';
   if (head === 'git') return gitProblem(words.slice(1), ev, roots);
   const table = TABLES[head];
   if (!table) return `"${head}" has no option list in this kit, so it is not run`;
@@ -742,6 +869,75 @@ function childEnv(tmp, binDirs) {
 
 // GIT_PRE (the -c settings before every git subcommand) is shared with pin.js.
 
+// Fixed arguments put before every sed step when the installed sed accepts
+// them: GNU sed's --sandbox refuses the e, r and w commands itself, on top
+// of sedScriptProblem.
+const SED_FIXED = ['--sandbox'];
+
+// Asks a sed binary, in the given child environment, whether it knows
+// --sandbox. The runner asks once per run, at the first sed step.
+function sedSandbox(bin, env, cwd) {
+  if (!bin) return false;
+  const r = spawnSync(bin, [...SED_FIXED, '--version'], { cwd, env, encoding: 'utf8', timeout: 20000, windowsHide: true, shell: false, input: '' });
+  return r.status === 0;
+}
+
+// The same question for --dry-run, in a throwaway child environment.
+// -> true, false, or null when no sed is installed.
+function probeSed(dirs) {
+  const bin = findProgram('sed', dirs);
+  if (!bin) return null;
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bib-sedprobe-'));
+  try {
+    return sedSandbox(bin, childEnv(tmp, [path.dirname(bin)]), tmp);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+const SED_NO_SANDBOX = 'note: the installed sed does not support --sandbox; the kit\'s own sed script check is the only guard';
+
+// Added to every searching step so a folder read never shows an .env file
+// or anything in an .env folder. grep and rg let the LAST matching
+// include/exclude decide, so these go after the step's own options (and
+// before a "--"); the step's own include patterns that could match .env
+// are refused by the classifier as well. git grep gets exclude pathspecs.
+const GREP_ENV_EXCLUDE = ['--exclude=.[eE][nN][vV]*', '--exclude-dir=.[eE][nN][vV]*'];
+const RG_ENV_EXCLUDE = ['--iglob=!.env*'];
+const GIT_ENV_EXCLUDE = [':(exclude,icase,glob)**/.env*', ':(exclude,icase,glob)**/.env*/**'];
+
+// Index of the "--" that ends the options of args (read with the same table
+// as parseOptions, so a "--" given as an option value does not count), or -1.
+function optionsEnd(args, table) {
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === '--') return i;
+    if (a === '-' || !a.startsWith('-')) continue;
+    if (a.startsWith('--')) {
+      const eq = a.indexOf('=');
+      const type = table.long[eq < 0 ? a.slice(2) : a.slice(2, eq)];
+      if (eq < 0 && type === 'v2') i += 2;
+      else if (eq < 0 && type && !['f', 'o'].includes(type)) i++;
+      continue;
+    }
+    if (table.numeric && /^-[0-9]+$/.test(a)) continue;
+    for (let k = 1; k < a.length; k++) {
+      const type = table.short[a[k]];
+      if (!type || type === 'f') continue;
+      if (k === a.length - 1) i++;
+      break;
+    }
+  }
+  return -1;
+}
+
+// Puts extra options after the step's own options: before the "--" that
+// ends them, or at the end (grep and rg read options after operands too).
+function withLastOptions(args, table, extra) {
+  const end = optionsEnd(args, table);
+  return end < 0 ? [...args, ...extra] : [...args.slice(0, end), ...extra, ...args.slice(end)];
+}
+
 // Detectors and masks (buildMasks, mask, detect) live in lib/mask.js, shared
 // with the builders.
 
@@ -811,8 +1007,16 @@ function execute(steps, ctx, ev) {
         while (args[sub].startsWith('-')) sub += args[sub] === '-C' ? 2 : 1;
         const fixed = GIT[args[sub]].fixed || [];
         const root = ctx.roots.find((r) => norm(r.dir) === norm(args[args.indexOf('-C') + 1]));
-        args = [...GIT_PRE, ...args.slice(0, sub + 1), ...fixed, ...args.slice(sub + 1)];
+        let rest = args.slice(sub + 1);
+        if (args[sub] === 'grep') rest = optionsEnd(rest, GIT.grep) < 0 ? [...rest, '--', ...GIT_ENV_EXCLUDE] : [...rest, ...GIT_ENV_EXCLUDE];
+        args = [...GIT_PRE, ...args.slice(0, sub + 1), ...fixed, ...rest];
         if (root && ctx.emptyTree[root.name]) env.GIT_ATTR_SOURCE = ctx.emptyTree[root.name];
+      }
+      if (s.head === 'grep') args = withLastOptions(args, TABLES.grep, GREP_ENV_EXCLUDE);
+      if (s.head === 'rg') args = withLastOptions(args, TABLES.rg, RG_ENV_EXCLUDE);
+      if (s.head === 'sed') {
+        if (ctx.sedSandbox === undefined) ctx.sedSandbox = sedSandbox(bins[k], env, cwd);
+        if (ctx.sedSandbox) args = [...SED_FIXED, ...args];
       }
       const left = deadline - Date.now();
       if (left <= 0) return { exit: 'timeout', stdout: input.toString('utf8'), stderr, tmp };
@@ -971,13 +1175,16 @@ function run(opts, io) {
 
   if (opts.dryRun) {
     const tally = { run: 0, 'skipped-live': 0, 'skipped-unsafe': 0 };
+    let usesSed = false;
     for (const c of candidates) {
       c.evidence.forEach((e, i) => {
         const cl = classify(e.cmd, ev, base);
         tally[cl.status]++;
+        if (cl.status === 'run' && cl.steps.some((s) => s.head === 'sed')) usesSed = true;
         io.out(`${c.id} #${i + 1} ${cl.status === 'run' ? 'would run' : cl.status}${cl.reason ? ': ' + cl.reason : ''}`);
       });
     }
+    if (usesSed && probeSed(programDirs()) === false) io.out(SED_NO_SANDBOX);
     io.out(`dry run: ${tally.run} would run, ${tally['skipped-live']} skipped-live, ${tally['skipped-unsafe']} skipped-unsafe; nothing written`);
     return 0;
   }
@@ -986,7 +1193,9 @@ function run(opts, io) {
   for (const [name, dir] of Object.entries(paths.repos)) {
     if (dir) for (const s of spellings(dir)) replacements.push([s, `{repo:${name}}`]);
   }
-  const ctx = { ...base, config, pins, masks: buildMasks(config), replacements, dirs: programDirs(), emptyTree: emptyTrees(roots) };
+  const dirs = programDirs();
+  const ctx = { ...base, config, pins, masks: buildMasks(config), replacements, dirs, emptyTree: emptyTrees(roots) };
+  const noteSed = () => { if (ctx.sedSandbox === false) io.err(SED_NO_SANDBOX); };
 
   if (opts.only) {
     const c = candidates.find((x) => x.id === opts.only);
@@ -995,6 +1204,7 @@ function run(opts, io) {
       throw new CliError(`--cmd ${opts.cmd}: ${c.id} has ${c.evidence.length} command${c.evidence.length === 1 ? '' : 's'}`);
     }
     io.out(receiptFor(c, ctx, opts.cmd).text);
+    noteSed();
     return 0;
   }
 
@@ -1022,6 +1232,7 @@ function run(opts, io) {
   io.out(`${candidates.length} receipts; ran ${t.ran} (non-zero exit ${t.failed}), skipped-live ${t.skipped_live}, skipped-unsafe ${t.skipped_unsafe}, skipped-error ${t.skipped_error}`);
   const none = index.candidates.filter((x) => x.ran - x.failed === 0).map((x) => x.id);
   io.out(`candidates with no command that ran cleanly: ${none.join(', ') || 'none'}`);
+  noteSed();
   return 0;
 }
 
@@ -1068,7 +1279,7 @@ function main(argv, io) {
   }
 }
 
-module.exports = { main, classify, lex, buildMasks, mask, detect, sedScriptProblem, makeRoots, TABLES, GIT };
+module.exports = { main, classify, lex, buildMasks, mask, detect, sedScriptProblem, sedSandbox, probeSed, globCouldMatchEnv, optionsEnd, makeRoots, TABLES, GIT, SED_FIXED, GREP_ENV_EXCLUDE, RG_ENV_EXCLUDE, GIT_ENV_EXCLUDE };
 
 if (require.main === module) {
   process.exitCode = main(process.argv.slice(2));

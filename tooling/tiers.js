@@ -28,7 +28,7 @@
  *
  * Exports: buildTiers(config) -> [{ id, label, max? }], tierOf(item, config)
  *   -> tier id, maturity(counts, levels), fmtN(n), breaksText(item),
- *   levelsOf(config); text helpers cap, one, cell, code, rel(from, to,
+ *   levelsOf(config); text helpers cap, one, prose, cell, code, rel(from, to,
  *   anchor); pageTop(opts), legend(), trustLine(measured, total, link),
  *   kitDocUrl(page); workspace helpers loadWorkspace(ws), readCandidates,
  *   readFinal, readInputs, sortFindings, countBy, readJson, readOptional,
@@ -128,10 +128,20 @@ function breaksText(item) {
 
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 const one = (s) => String(s === null || s === undefined ? '' : s).replace(/\s+/g, ' ').trim();
-const cell = (s) => one(s).replace(/\|/g, '\\|') || '-';
+// Agent-written text placed in Markdown prose: one line, with "<" written as
+// &lt; (no raw HTML) and "![" as "!\[" (no image that loads from elsewhere).
+// one() keeps the raw text; code() keeps the raw text inside backticks.
+const prose = (s) => one(s).replace(/</g, '&lt;').replace(/!\[/g, '!\\[');
+const cell = (s) => prose(s).replace(/\|/g, '\\|') || '-';
+// A code span that always holds: the fence is one backtick longer than the
+// longest backtick run inside, padded with a space when the text starts or
+// ends with a backtick (CommonMark).
 function code(s) {
   const t = one(s).replace(/\|/g, '\\|');
-  return t.includes('`') ? `\`\` ${t} \`\`` : `\`${t}\``;
+  const longest = Math.max(0, ...(t.match(/`+/g) || []).map((r) => r.length));
+  const fence = '`'.repeat(longest + 1);
+  const pad = t.startsWith('`') || t.endsWith('`') ? ' ' : '';
+  return `${fence}${pad}${t}${pad}${fence}`;
 }
 
 // Relative Markdown link target from one file to another, with / separators.
@@ -366,6 +376,7 @@ module.exports = {
   breaksText,
   cap,
   one,
+  prose,
   cell,
   code,
   rel,

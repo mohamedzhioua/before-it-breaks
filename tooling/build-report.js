@@ -100,7 +100,7 @@ function build(ws, io, strict) {
     + (sized ? `The first to break is [${sized.id}](#${sized.id.toLowerCase()}), at ${T.breaksText(inp(sized))}.` : 'No finding has a known breaking size yet.');
 
   L.push(T.pageTop({
-    title: `Audit report: ${T.one(config.audit.name)}`,
+    title: `Audit report: ${T.prose(config.audit.name)}`,
     generator: GENERATOR,
     measured,
     open,
@@ -108,22 +108,22 @@ function build(ws, io, strict) {
     total: findings.length,
     measurementsLink: T.rel(file, paths.outputs.measurements),
     intro: [
-      `**The question:** ${T.one(config.audit.question)}`,
+      `**The question:** ${T.prose(config.audit.question)}`,
       '',
-      `The size that matters is **${T.one(s.unit)}**, with a target of ${T.fmtN(s.target)}${s.platform_target ? ` and ${T.fmtN(s.platform_target)} across the whole platform` : ''}. Audit date ${config.audit.date}; pinned commits ${T.pinList(config, pins)}. Citations read \`repo@commit:path:line\`.`,
+      `The size that matters is **${T.prose(s.unit)}**, with a target of ${T.fmtN(s.target)}${s.platform_target ? ` and ${T.fmtN(s.platform_target)} across the whole platform` : ''}. Audit date ${config.audit.date}; pinned commits ${T.pinList(config, pins)}. Citations read \`repo@commit:path:line\`.`,
       '',
       `Findings appear most severe first; within one severity, the one that fails at the smallest size comes first. How each one was tested: [the verification log](${T.rel(file, paths.outputs.log)}). What to change, module by module: [the recommendations](${T.rel(file, paths.outputs.recommendations)}).`,
     ].join('\n'),
   }));
 
-  L.push('### Severity levels', '', ...levels.map((l) => `- **${T.cap(l)}**: ${T.one(config.severity_rubric[l])}`), '',
-    '### Effort sizes', '', ...Object.entries(config.effort_scale || {}).map(([k, v]) => `- **${k}**: ${T.one(v)}`), '');
+  L.push('### Severity levels', '', ...levels.map((l) => `- **${T.cap(l)}**: ${T.prose(config.severity_rubric[l])}`), '',
+    '### Effort sizes', '', ...Object.entries(config.effort_scale || {}).map(([k, v]) => `- **${k}**: ${T.prose(v)}`), '');
 
   L.push('## Summary', '', '| Severity | Findings |', '|---|---|',
     ...levels.map((l, i) => `| ${sevHead[i]} | ${row(findings)[i]} |`), `| **Total** | **${findings.length}** |`, '');
 
   L.push('### By tier', '',
-    `Where findings break as the system grows. Each finding is sized in its own unit, its \`breaks_at_basis\` (for example ${T.one(config.scale.bases.slice(0, 2).join(' or '))}), so one row can hold findings measured in different units; the "Breaks at" column of the index names the unit of each.`, '',
+    `Where findings break as the system grows. Each finding is sized in its own unit, its \`breaks_at_basis\` (for example ${T.prose(config.scale.bases.slice(0, 2).join(' or '))}), so one row can hold findings measured in different units; the "Breaks at" column of the index names the unit of each.`, '',
     `| Tier | Size range | ${sevHead.join(' | ')} | Count |`, `|---|---|${levels.map(() => '---|').join('')}---|`,
     ...tiers.map((t) => {
       const g = findings.filter((f) => T.tierOf(inp(f), config) === t.id && inp(f));
@@ -155,7 +155,7 @@ function build(ws, io, strict) {
       const x = inp(f);
       const c = cands.get(f.id);
       const receipt = f.receipt ? `[\`${f.receipt}\`](${T.rel(file, path.join(paths.work, 'phase3', 'receipts', `${f.id}.md`))})` : '-';
-      L.push(`### ${f.id}`, '', `**${T.one(x ? x.plain : f.title)}**`, '', '| | |', '|---|---|',
+      L.push(`### ${f.id}`, '', `**${T.prose(x ? x.plain : f.title)}**`, '', '| | |', '|---|---|',
         `| Verdict | ${f.verdict} |`,
         `| Severity | ${sevHead[li]} |`,
         `| Area | ${T.cell(areaOf(f))} · repo \`${f.repo}\` |`,
@@ -164,10 +164,10 @@ function build(ws, io, strict) {
         `| Effort | ${x ? x.effort : '-'} |`,
         `| Also covers | ${f.merged_from.length ? f.merged_from.join(', ') : '-'} |`,
         `| Receipt | ${receipt} |`, '');
-      if (c) L.push(`**What happens.** ${T.one(c.claim)}`, '', `**Mechanism.** ${T.one(c.mechanism)}`, '');
-      L.push(`**Threshold.** ${x && x.threshold ? T.one(x.threshold) : '*not drafted yet*'}${f.corrected ? ' *(corrected by the skeptics; the original sums are in the verification log)*' : ''}`, '',
-        `**Evidence.** ${f.citations.map((k) => `\`${k}\``).join(' · ') || '-'}`, '',
-        `**Fix direction.** ${x ? T.one(x.fix_direction) : '*not drafted yet*'}`, '');
+      if (c) L.push(`**What happens.** ${T.prose(c.claim)}`, '', `**Mechanism.** ${T.prose(c.mechanism)}`, '');
+      L.push(`**Threshold.** ${x && x.threshold ? T.prose(x.threshold) : '*not drafted yet*'}${f.corrected ? ' *(corrected by the skeptics; the original sums are in the verification log)*' : ''}`, '',
+        `**Evidence.** ${f.citations.map(T.code).join(' · ') || '-'}`, '',
+        `**Fix direction.** ${x ? T.prose(x.fix_direction) : '*not drafted yet*'}`, '');
     }
   });
 
@@ -183,7 +183,7 @@ function build(ws, io, strict) {
 
   if (conflicts.length) {
     L.push('## Notes for the audit team', '', 'Housekeeping for the people running the audit, not for readers of the report. Each line is a report input whose size reading disagrees with the verified candidate or with itself; check the finding and correct the report input.', '',
-      ...conflicts.map((p) => `- ${T.one(p)}`), '');
+      ...conflicts.map((p) => `- ${T.prose(p)}`), '');
   }
 
   T.writeFile(file, L.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s*$/, '\n'));

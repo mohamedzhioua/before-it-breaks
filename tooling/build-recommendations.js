@@ -183,7 +183,7 @@ function render(ctx, a, plans, cross, diagrams, problems) {
   const L = [];
 
   L.push(T.pageTop({
-    title: `Recommendations: ${T.one(config.audit.name)}`,
+    title: `Recommendations: ${T.prose(config.audit.name)}`,
     generator: GENERATOR,
     measured,
     open: ctx.open,
@@ -205,9 +205,9 @@ function render(ctx, a, plans, cross, diagrams, problems) {
   L.push(`| **All** | | ${levels.map((l) => `**${count(a.findings, l)}**`).join(' | ')} | **${total}** | |`, '');
 
   if (cross) {
-    L.push('## Decision records', '', `${T.one(cross.intro)}`, '', 'Each record follows a short MADR form. Every record has the status *proposed*: the decision belongs to the team that owns the code.', '');
+    L.push('## Decision records', '', `${T.prose(cross.intro)}`, '', 'Each record follows a short MADR form. Every record has the status *proposed*: the decision belongs to the team that owns the code.', '');
     for (const s of cross.sections) {
-      L.push(`<a id="${sectionAnchor(s.id)}"></a>`, '', `### ${T.one(s.title)}`, '', '| | |', '|---|---|',
+      L.push(`<a id="${sectionAnchor(s.id)}"></a>`, '', `### ${T.prose(s.title)}`, '', '| | |', '|---|---|',
         `| Status | ${s.status} |`, `| Context | ${T.cell(s.context)} |`,
         `| Options | ${s.options.map((o, i) => `${i + 1}. ${T.cell(o)}`).join('<br>')} |`,
         `| Decision | ${T.cell(s.decision)} |`, `| Consequences | ${T.cell(s.consequences)} |`,
@@ -233,12 +233,12 @@ function render(ctx, a, plans, cross, diagrams, problems) {
     for (const m of ms) {
       const p = plans.get(m.id);
       const sevs = levels.filter((l) => count(m.primary, l)).map((l) => `${count(m.primary, l)} ${l}`).join(', ') || 'none';
-      L.push(`<a id="${anchorOf(m.id)}"></a>`, '', `#### ${T.one(m.label)} (\`${m.id}\`)`, '',
-        `${m.layer ? `Layer: ${T.one(m.layer)}. ` : ''}Findings here: ${m.primary.length} (${sevs})${m.touches.length ? `; ${m.touches.length} more ${m.touches.length === 1 ? 'touches' : 'touch'} it` : ''}.${m.doc ? ` How it works today: [${T.one(m.doc.split('#')[0])}](${T.rel(file, path.join(paths.workspace, m.doc.split('#')[0]), m.doc.split('#')[1])}).` : ''}`, '');
+      L.push(`<a id="${anchorOf(m.id)}"></a>`, '', `#### ${T.prose(m.label)} (\`${m.id}\`)`, '',
+        `${m.layer ? `Layer: ${T.prose(m.layer)}. ` : ''}Findings here: ${m.primary.length} (${sevs})${m.touches.length ? `; ${m.touches.length} more ${m.touches.length === 1 ? 'touches' : 'touch'} it` : ''}.${m.doc ? ` How it works today: [${T.one(m.doc.split('#')[0])}](${T.rel(file, path.join(paths.workspace, m.doc.split('#')[0]), m.doc.split('#')[1])}).` : ''}`, '');
       if (p) {
-        L.push(`**Plan.** ${T.one(p.summary)}`, '');
+        L.push(`**Plan.** ${T.prose(p.summary)}`, '');
         p.recs.forEach((r) => {
-          L.push(`${r.order}. **${T.one(r.change)}** Target: ${T.one(r.target)} Effort ${r.effort}${r.effort_note ? ` (${T.one(r.effort_note).replace(/\.$/, '')})` : ''}.${r.depends_on.length ? ` Waits for: ${r.depends_on.map((d) => dep(file, d)).join(', ')}.` : ''} Findings: ${r.finding_ids.map((id) => fid(file, id)).join(', ')}.`);
+          L.push(`${r.order}. **${T.prose(r.change)}** Target: ${T.prose(r.target)} Effort ${r.effort}${r.effort_note ? ` (${T.prose(r.effort_note).replace(/\.$/, '')})` : ''}.${r.depends_on.length ? ` Waits for: ${r.depends_on.map((d) => dep(file, d)).join(', ')}.` : ''} Findings: ${r.finding_ids.map((id) => fid(file, id)).join(', ')}.`);
         });
         L.push('');
       } else if (m.primary.length) L.push('*No plan recorded for this module yet.*', '');
@@ -255,20 +255,20 @@ function render(ctx, a, plans, cross, diagrams, problems) {
     : 'No element-by-element changes recorded yet (`work/phase6/diagrams/delta.json`).');
   if (diagrams.delta.length) L.push('## What changes', '', deltaTable(file), '');
   L.push('## Notes for the audit team', '', 'Housekeeping for the people running the audit, not for readers of the recommendations.', '',
-    ...(problems.length ? problems.map((p) => `- ${T.one(p)}`) : ['- All plans, decisions and roadmap entries name known findings, modules and sections.']), '');
+    ...(problems.length ? problems.map((p) => `- ${T.prose(p)}`) : ['- All plans, decisions and roadmap entries name known findings, modules and sections.']), '');
 
   const T2 = [];
   T2.push(T.pageTop({
-    title: `Target architecture: ${T.one(config.audit.name)}`,
+    title: `Target architecture: ${T.prose(config.audit.name)}`,
     generator: GENERATOR,
     measured,
     open: ctx.open,
     total,
     measurementsLink: T.rel(target, paths.outputs.measurements),
-    intro: `${cross ? T.one(cross.intro) : 'No cross-cutting decisions have been recorded yet, so this page has no target design to show.'} The reasoning behind each change, per module: [the recommendations](${T.rel(target, file)}).`,
+    intro: `${cross ? T.prose(cross.intro) : 'No cross-cutting decisions have been recorded yet, so this page has no target design to show.'} The reasoning behind each change, per module: [the recommendations](${T.rel(target, file)}).`,
   }));
   T2.push('## Solution strategy', '');
-  if (cross && cross.sections.length) T2.push(...cross.sections.map((s) => `- **${T.one(s.title)}.** ${T.one(s.decision)} ([record](${T.rel(target, file, sectionAnchor(s.id))}))`), '');
+  if (cross && cross.sections.length) T2.push(...cross.sections.map((s) => `- **${T.prose(s.title)}.** ${T.prose(s.decision)} ([record](${T.rel(target, file, sectionAnchor(s.id))}))`), '');
   else T2.push('No decisions recorded yet.', '');
   T2.push(`The order of work is in [the roadmap](${T.rel(target, file, 'roadmap')}).`, '');
   if (g) T2.push('## Change dependencies', '', g, '');

@@ -63,8 +63,9 @@
  *
  * Built-in checks (generic, no project terms):
  *   [must][D]   user-home paths (plain and URL-encoded), credentialed
- *               connection URIs, cloud access keys, private-key headers,
- *               well-known token prefixes, email addresses.
+ *               connection URIs and web URLs, cloud access and API keys,
+ *               private-key headers, well-known token prefixes, signed
+ *               web tokens, live payment keys, email addresses.
  *   [review][E] 40-hex strings and "@<10 hex>:" commit citations.
  *   [must][F]   files with extension .pptx .pdf .docx .png .jpg .jpeg .zip,
  *               files larger than 500 KB, and binary files that cannot be
@@ -115,6 +116,11 @@ const NOT_PATH = '[^/' + BS + BS + S + '"\'<>]';
 const URI_USER = '[^<"' + S + ':' + AT + '/]{0,256}';
 const URI_PASS = '[^<"' + S + AT + '/]{0,256}';
 const B = BS + 'b';
+const B64URL = '[A-Za-z0-9_' + BS + '-]';
+// Not preceded by a base64url character: a run of them starts one match
+// attempt, not one per position (a word boundary would restart after
+// every '-').
+const NOT_AFTER_B64 = '(?<!' + B64URL + ')';
 const BUILTINS = [
   { sev: 'must', cls: 'D', label: 'user-home-path',
     re: rx(['[A-Za-z]', ':', SEP, '{1,4}', 'Users', SEP], 'i') },
@@ -130,6 +136,16 @@ const BUILTINS = [
     re: rx(['mongo', 'db(?:' + BS + '+srv)?', ':', '//', '[^<"' + S + AT + '/]{1,256}', AT], 'i') },
   { sev: 'must', cls: 'D', label: 'credentialed-uri',
     re: rx(['(?:red', 'iss?|post', 'gres(?:ql)?|my', 'sql|am', 'qps?)', ':', '//', URI_USER, ':', URI_PASS, AT], 'i') },
+  // Web URL with a user and a password before the host. The user part
+  // cannot hold "/", so "https://host/path@v1" is not a hit.
+  { sev: 'must', cls: 'D', label: 'credentialed-uri',
+    re: rx([B, 'htt', 'ps?', ':', '//', '[^<"' + S + ':' + AT + '/]{1,256}', ':', '[^<"' + S + AT + '/]{1,256}', AT], 'i') },
+  { sev: 'must', cls: 'D', label: 'jwt',
+    re: rx([NOT_AFTER_B64, 'ey', 'J', B64URL, '{8,4096}', BS, '.', 'ey', 'J', B64URL, '{8,4096}', BS, '.', B64URL, '{8,4096}'], '') },
+  { sev: 'must', cls: 'D', label: 'payment-key',
+    re: rx([B, '(?:sk|rk)', '_li', 've_', '[0-9A-Za-z]{10,256}'], '') },
+  { sev: 'must', cls: 'D', label: 'cloud-api-key',
+    re: rx([NOT_AFTER_B64, 'AI', 'za', '[0-9A-Za-z_' + BS + '-]{35}'], '') },
   { sev: 'must', cls: 'D', label: 'cloud-access-key',
     re: rx([B, '(?:AK|AS)', 'IA', '[0-9A-Z]{12,64}'], '') },
   { sev: 'must', cls: 'D', label: 'private-key-block',

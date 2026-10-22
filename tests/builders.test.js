@@ -19,6 +19,7 @@ const tiers = require('../tooling/tiers');
 const { loadConfig } = require('../tooling/lib/config');
 const { slugGithub, slugGitlab, headingText } = require('../tooling/check-links');
 
+const AT_SIGN = String.fromCharCode(64);
 const BUILDS = ['log', 'report', 'measurements', 'recommendations', 'issues', 'explorer'];
 const PAGES = ['02-audit-report.md', '03-verification-log.md', '04-measurements.md', '05-recommendations.md',
   path.join('system-docs', '01-target-architecture.md'), path.join('work', 'phase6', 'issues.md')];
@@ -330,6 +331,90 @@ test('secrets planted in agent text never reach a generated page or data file', 
   assert.equal(clean.code, 0, clean.out + clean.err);
   // Mermaid labels: angle brackets and backticks are entity-coded.
   assert.match(read(ws, '05-recommendations.md'), /\["One #lt;b#gt;job#lt;\/b#gt; policy for #96;queues#96;"\]/);
+});
+
+test('prose() and cell() escape raw HTML and images; one() and code() keep the raw text', () => {
+  assert.equal(tiers.prose('a  <img src=x>\n![p](https://notes.invalid/p.png)'), 'a &lt;img src=x> !\\[p](https://notes.invalid/p.png)');
+  assert.equal(tiers.cell('<b>x</b> | ![y](z)'), '&lt;b>x&lt;/b> \\| !\\[y](z)');
+  assert.equal(tiers.cell(''), '-');
+  assert.equal(tiers.one('a <b>'), 'a <b>');
+  assert.equal(tiers.code('grep -n "<T>" src'), '`grep -n "<T>" src`');
+  assert.equal(tiers.code('![x](y)'), '`![x](y)`');
+});
+
+// Removes CommonMark code spans: a run of n backticks up to the next run of
+// exactly n backticks. What is left is what renders as Markdown.
+function outsideCodeSpans(md) {
+  let out = '';
+  let i = 0;
+  while (i < md.length) {
+    if (md[i] !== '`') { out += md[i++]; continue; }
+    let n = 0;
+    while (md[i + n] === '`') n++;
+    const re = new RegExp(`(?<!\`)\`{${n}}(?!\`)`, 'g');
+    re.lastIndex = i + n;
+    const close = re.exec(md);
+    if (!close) { out += md.slice(i, i + n); i += n; continue; }
+    i = close.index + n;
+  }
+  return out;
+}
+
+test('code() fences any backtick run, so text in it never escapes the span', () => {
+  const BT = '`';
+  const evil = `x ${BT.repeat(2)} <img src=//t/p> ${BT.repeat(2)}`;
+  const span = tiers.code(evil);
+  assert.equal(span, `${BT.repeat(3)} ${evil} ${BT.repeat(3)}`);
+  assert.ok(!outsideCodeSpans(`see ${span} here`).includes('<img'), span);
+  assert.equal(tiers.code(`a${BT}b`), `${BT.repeat(2)}a${BT}b${BT.repeat(2)}`);
+  assert.equal(tiers.code(`${BT}a`), `${BT.repeat(2)} ${BT}a ${BT.repeat(2)}`);
+  // The old fixed double fence broke on a double run inside.
+  assert.ok(outsideCodeSpans(`${BT.repeat(2)} ${evil} ${BT.repeat(2)}`).includes('<img'), 'the helper sees the old escape');
+});
+
+test('agent text with HTML or an image never reaches a page raw; code spans stay raw', (t) => {
+  const ws = workspace(t, 'escape');
+  const tag = '<img src=x onerror=alert(1)>';
+  const img = '![pixel](https://tracker.invalid/p.png)';
+  const edit = (rel, fn) => { const f = path.join(ws, rel); const v = JSON.parse(fs.readFileSync(f, 'utf8')); fn(v); fs.writeFileSync(f, JSON.stringify(v, null, 2)); };
+  edit(path.join('work', 'candidates.json'), (d) => {
+    const c = d.candidates.find((x) => x.id === 'SVC-JOBS-01');
+    c.claim = `Jobs pile up ${tag} ${img}`;
+    c.mechanism = `Mechanism ${img}`;
+    c.mitigations_searched = [`Looked for a cap ${tag}`];
+  });
+  edit(path.join('work', 'phase3', 'verdicts.json'), (d) => {
+    const v = d.verdicts.find((x) => x.id === 'SVC-JOBS-01');
+    v.votes.reach.reason = `Reached ${tag}.`;
+    v.votes.reach.key_citations = ['x ' + '``' + ' <img src=//t/p> ' + '``'];
+    v.verifier.notes = `Notes ${img}`;
+  });
+  edit(path.join('work', 'phase5', 'report-inputs.json'), (d) => { d.items[0].plain = `Digest ${tag} ${img}`; d.items[0].fix_direction = `Fix ${img}`; });
+  edit(path.join('work', 'phase6', 'cross-cutting.json'), (d) => { d.roadmap.now[0].change = `Change ${tag} ${img}.`; d.sections[0].decision = `Decide ${tag}`; });
+  buildAll(ws);
+  for (const f of PAGES) {
+    const text = read(ws, f);
+    assert.ok(!outsideCodeSpans(text).includes('<img'), `${f}: raw HTML`);
+    assert.ok(!outsideCodeSpans(text).includes(img), `${f}: raw image`);
+  }
+  assert.match(read(ws, '02-audit-report.md'), /Jobs pile up &lt;img src=x onerror=alert\(1\)> !\\\[pixel\]/);
+  const log = read(ws, '03-verification-log.md');
+  assert.ok(log.includes('``` x `` <img src=//t/p> `` ```'), 'key citation stays raw inside a longer fence');
+  assert.match(log, /Looked for a cap &lt;img/);
+  // An evidence command keeps its raw text inside backticks.
+  edit(path.join('work', 'candidates.json'), (d) => { d.candidates.find((x) => x.id === 'DATA-INDEX-01').evidence[1].cmd = 'git grep -n "<T>" src'; });
+  assert.equal(kit(['build', 'measurements', ws]).code, 0);
+  assert.match(read(ws, '04-measurements.md'), /`git grep -n "<T>" src`/);
+});
+
+test('CSV cells that a spreadsheet would read as a formula get a leading quote', () => {
+  const { csv } = require('../tooling/build-issues');
+  for (const c of ['=', '+', '-', AT_SIGN, '\t', '\r']) {
+    assert.equal(csv(`${c}SUM(A1)`), `"'${c}SUM(A1)"`, JSON.stringify(c));
+  }
+  assert.equal(csv('Stream "note" imports'), '"Stream ""note"" imports"');
+  assert.equal(csv('a=b'), '"a=b"');
+  assert.equal(csv('=HYPERLINK("x")'), `"'=HYPERLINK(""x"")"`);
 });
 
 // ---------- check-links ----------

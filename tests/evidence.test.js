@@ -104,6 +104,11 @@ test('plain read-only pipelines are accepted and become argument lists', (t) => 
     'git -C {repo:notes-api} blame -L 1,3 {pin:notes-api} -- package.json',
     "grep -rn --include='*.ts' -e removeOnFail {repo:notes-api}/src",
     'git -C {repo:notes-api} ls-tree -r --name-only {pin:notes-api} | wc -l',
+    // literal rev:path with brackets, safe include and exclude patterns
+    "git -C {repo:notes-api} show '{pin:notes-api}:app/[id]/page.tsx'",
+    "rg -n -g '*.ts' -g '!.env*' removeOnFail {repo:notes-api}/src",
+    "grep -rn --include='*.ts' --exclude='.env*' -e x {repo:notes-api}/src",
+    'cat {repo:notes-api}/src/environment.ts',
     'head -n 2 {repo:notes-api}/package.json 2>&1',
   ]) {
     const x = classify(c, EV, ctx);
@@ -178,6 +183,37 @@ test('every refused class is refused with its reason (classified only)', (t) => 
     [`${G} grep -n x ${P} -- ../up`, /"\.\."/],
     [`${G} show ${P}:${'/etc'}/hosts`, /outside the repos/],
     [`cat ${R}/.env`, /\.env/],
+    // git rev:path forms
+    [`${G} show ${P}:.env`, /reads an \.env file/],
+    [`${G} show HEAD:.env.local`, /reads an \.env file/],
+    [`${G} show ${P}:config/.env.local`, /reads an \.env file/],
+    // any case, any number of suffixes
+    [`cat ${R}/.ENV`, /reads an \.env file/],
+    [`cat ${R}/config/.env.production.local`, /reads an \.env file/],
+    [`${G} show ${P}:.env.local.bak`, /reads an \.env file/],
+    // wildcards in git pathspecs, and include patterns that could match .env
+    [`${G} grep -n -e x ${P} -- '.en?'`, /wildcards .* git pathspecs/],
+    [`${G} grep -n -e x ${P} -- '*.env*'`, /wildcards .* git pathspecs/],
+    [`${G} grep -n -e x ${P} -- '.en[v]'`, /wildcards .* git pathspecs/],
+    [`${G} log -p ${P} -- 'config/*'`, /wildcards .* git pathspecs/],
+    [`${G} grep -n -e x ${P} -- ':(glob)**/.e*'`, /wildcards|pathspec magic/],
+    [`grep -rn --include='.env*' -e x ${R}/src`, /could match an \.env file/],
+    [`grep -rn --include='*' -e x ${R}/src`, /could match an \.env file/],
+    [`grep -rn --include='config/.e?v' -e x ${R}/src`, /could match an \.env file/],
+    [`rg -n -g '*' x ${R}/src`, /could match an \.env file/],
+    [`rg -n --glob='.{env,cfg}' x ${R}/src`, /could match an \.env file/],
+    [`rg -n -g '.EN[V]*' x ${R}/src`, /could match an \.env file/],
+    // values glued to an option, .env folders, and globs that could start with ".e"
+    [`grep -rn --include=.env.staging -e x ${R}/src`, /reads an \.env file/],
+    [`grep -rn --include='.env.st?ging' -e x ${R}/src`, /could match an \.env file/],
+    [`rg -n -g.env.staging x ${R}/src`, /reads an \.env file/],
+    [`rg -n --glob=.env.staging x ${R}/src`, /reads an \.env file/],
+    [`rg -n -g '.?nv' x ${R}/src`, /could match an \.env file/],
+    [`grep -rn --include='.[eE]*' -e x ${R}/src`, /could match an \.env file/],
+    [`grep -rn --include='?*' -e x ${R}/src`, /could match an \.env file/],
+    [`cat ${R}/.env/x`, /reads an \.env file/],
+    [`cat ${R}/config/.ENV.d/settings.json`, /reads an \.env file/],
+    [`${G} show ${P}:config/.env/x`, /reads an \.env file/],
     // git structure
     [`git -C ${'/elsewhere'} log`, /-C must be followed by \{repo/],
     [`git -C ${R}/src log`, /-C must be followed by \{repo/],
@@ -256,6 +292,148 @@ test('heads without an option table stay refused even if the config allows them'
     assert.match(r.reason, /no option list/, c);
   }
   for (const c of ['awk 1', 'jq .']) assert.match(classify(c, ev, {}).reason, /is never run/, c);
+});
+
+// Runs the evidence runner with spawnSync wrapped, so the test sees the argv and the
+// environment each program got. -> { res, calls: [{ bin, args, home }] }
+function runnerTraced(t, args) {
+  const dir = tmp(t, 'trace');
+  const log = path.join(dir, 'spawn.log');
+  const hook = path.join(dir, 'trace.js');
+  fs.writeFileSync(hook, [
+    "const cp = require('child_process');",
+    "const fs = require('fs');",
+    'const real = cp.spawnSync;',
+    'cp.spawnSync = function (bin, argv, opts) {',
+    '  fs.appendFileSync(process.env.BIB_TRACE, JSON.stringify({ bin: String(bin), args: argv || [], home: opts && opts.env ? opts.env.HOME || null : null }) + "\\n");',
+    '  return real.apply(this, arguments);',
+    '};',
+  ].join('\n'));
+  const res = spawnSync(process.execPath, ['-r', hook, path.join(ROOT, 'tooling', 'run-evidence.js'), ...args], { encoding: 'utf8', timeout: 180000, env: { ...process.env, BIB_TRACE: log } });
+  const calls = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+  return { res, calls };
+}
+const base0 = () => JSON.parse(fs.readFileSync(path.join(DATA, 'fixture-candidates.json'), 'utf8')).candidates[0];
+const isSed = (c) => /(^|[\\/])sed(\.exe)?$/i.test(c.bin);
+
+test('sed gets --sandbox, probed once in the child environment, and only when a step uses sed', (t) => {
+  const { SED_FIXED, sedSandbox } = require('../tooling/run-evidence');
+  assert.deepEqual(SED_FIXED, ['--sandbox']);
+  assert.equal(sedSandbox(null), false, 'no sed binary: no sandbox');
+  const direct = spawnSync('sed', ['--sandbox', '--version'], { encoding: 'utf8' });
+  if (direct.status !== 0) { t.skip('the sed on PATH has no --sandbox'); return; }
+  const cand = (id, cmd) => ({ ...base0(), id, evidence: [{ cmd, expect: 'see the output' }] });
+  // No sed step: no probe.
+  const plain = setup(t, 'sedless', [cand('SVC-JOBS-20', 'git -C {repo:notes-api} show {pin:notes-api}:package.json')]);
+  assert.equal(kit(['pin', plain.ws]).code, 0);
+  const none = runnerTraced(t, [plain.ws]);
+  assert.equal(none.res.status, 0, none.res.stdout + none.res.stderr);
+  assert.equal(none.calls.filter(isSed).length, 0, 'no sed step, no sed probe');
+  // Two sed steps: one probe, in the child's own HOME, then --sandbox first on every sed step.
+  const { ws } = setup(t, 'sedbox', [
+    cand('SVC-JOBS-21', "sed -n '1p' {repo:notes-api}/package.json"),
+    cand('SVC-JOBS-22', "git -C {repo:notes-api} show {pin:notes-api}:package.json | sed -n '2p'"),
+  ]);
+  assert.equal(kit(['pin', ws]).code, 0);
+  const dry = kit(['evidence', ws, '--dry-run']);
+  assert.equal(dry.code, 0, dry.out + dry.err);
+  assert.doesNotMatch(dry.out, /does not support --sandbox/);
+  const run = runnerTraced(t, [ws]);
+  assert.equal(run.res.status, 0, run.res.stdout + run.res.stderr);
+  const seds = run.calls.filter(isSed);
+  const probes = seds.filter((c) => c.args.includes('--version'));
+  assert.equal(probes.length, 1, JSON.stringify(seds));
+  assert.ok(probes[0].home && probes[0].home !== process.env.HOME, 'the probe runs in the child environment');
+  const steps = seds.filter((c) => !c.args.includes('--version'));
+  assert.equal(steps.length, 2);
+  for (const c of steps) assert.equal(c.args[0], '--sandbox', JSON.stringify(c.args));
+  assert.doesNotMatch(run.res.stderr, /does not support --sandbox/);
+  const receipt = fs.readFileSync(path.join(ws, 'work', 'phase3', 'receipts', 'SVC-JOBS-21.md'), 'utf8');
+  assert.match(receipt, /classification: ran\nexit code: 0\noutput \(1 line\):\n```\n\{\n```/);
+});
+
+test('.env files and folders never reach a receipt through a folder search; user includes still apply', (t) => {
+  const { GREP_ENV_EXCLUDE, RG_ENV_EXCLUDE, GIT_ENV_EXCLUDE } = require('../tooling/run-evidence');
+  const cand = (id, cmd) => ({ ...base0(), id, evidence: [{ cmd, expect: 'see the output' }] });
+  const { ws, repo } = setup(t, 'envskip', [
+    cand('SVC-JOBS-23', 'git -C {repo:notes-api} grep -n -e ENVMARKER {pin:notes-api}'),
+    cand('SVC-JOBS-24', 'git -C {repo:notes-api} grep -n -e ENVMARKER {pin:notes-api} -- config'),
+    cand('SVC-JOBS-25', 'grep -rn -e ENVMARKER {repo:notes-api}/config'),
+    cand('SVC-JOBS-26', "grep -rn --include='*.ts' -e ENVMARKER {repo:notes-api}/config"),
+    cand('SVC-JOBS-27', 'rg -n --hidden ENVMARKER {repo:notes-api}/config'),
+    cand('SVC-JOBS-28', "rg -n --hidden -g '*.ts' ENVMARKER {repo:notes-api}/config"),
+  ]);
+  fs.mkdirSync(path.join(repo.path, 'config', '.env'), { recursive: true });
+  const files = { '.env': 'root', 'config/.env/x': 'in an .env folder', 'config/.ENV.local': 'upper', 'config/.env.staging': 'staging',
+    'config/app.txt': 'app.txt', 'config/app.ts': 'app.ts', 'config/data.json': 'data.json' };
+  for (const [rel, v] of Object.entries(files)) fs.writeFileSync(path.join(repo.path, rel), `ENVMARKER ${v}\n`);
+  git(repo.path, ['add', '-A']);
+  git(repo.path, ['commit', '-q', '-m', 'add config']);
+  assert.equal(kit(['pin', ws]).code, 0);
+  const run = runnerTraced(t, [ws]);
+  assert.equal(run.res.status, 0, run.res.stdout + run.res.stderr);
+  const dir = path.join(ws, 'work', 'phase3', 'receipts');
+  const receipt = (id) => fs.readFileSync(path.join(dir, `${id}.md`), 'utf8');
+  const hidden = /ENVMARKER (root|in an \.env folder|upper|staging)/;
+  for (const id of ['SVC-JOBS-23', 'SVC-JOBS-24', 'SVC-JOBS-25']) {
+    assert.match(receipt(id), /ENVMARKER app\.txt/, `${id} still searches`);
+    assert.match(receipt(id), /ENVMARKER data\.json/, `${id} still searches`);
+    assert.doesNotMatch(receipt(id), hidden, `${id} showed an .env file`);
+  }
+  // Regression guard: the user's include still limits the search.
+  assert.match(receipt('SVC-JOBS-26'), /ENVMARKER app\.ts/);
+  assert.doesNotMatch(receipt('SVC-JOBS-26'), /app\.txt|data\.json/);
+  assert.doesNotMatch(receipt('SVC-JOBS-26'), hidden);
+  // rg: checked only when it is installed; otherwise the receipt says it was not found.
+  const rg = receipt('SVC-JOBS-27');
+  if (/classification: ran/.test(rg)) {
+    assert.match(rg, /ENVMARKER app\.txt/);
+    assert.doesNotMatch(rg, hidden);
+    assert.match(receipt('SVC-JOBS-28'), /ENVMARKER app\.ts/);
+    assert.doesNotMatch(receipt('SVC-JOBS-28'), /app\.txt|data\.json/);
+    const rgCall = run.calls.find((c) => /(^|[\\/])rg(\.exe)?$/i.test(c.bin) && c.args.includes('*.ts'));
+    assert.ok(rgCall && rgCall.args.indexOf('*.ts') < rgCall.args.indexOf(RG_ENV_EXCLUDE[0]), 'the kit glob comes after the user glob');
+  } else {
+    assert.match(rg, /program not found: rg/);
+    t.diagnostic('rg is not installed: the rg receipts were not checked (skipped)');
+  }
+  // Argv order: the kit's excludes come after every user option.
+  const named = (re) => run.calls.filter((c) => re.test(c.bin));
+  const greps = named(/(^|[\\/])grep(\.exe)?$/i);
+  assert.equal(greps.length, 2);
+  for (const c of greps) {
+    const at = c.args.indexOf(GREP_ENV_EXCLUDE[0]);
+    assert.ok(at > 0, JSON.stringify(c.args));
+    assert.deepEqual(c.args.slice(at, at + 2), GREP_ENV_EXCLUDE);
+    const userOpts = c.args.map((a, i) => (a.startsWith('-') && !GREP_ENV_EXCLUDE.includes(a) ? i : -1)).filter((i) => i >= 0);
+    assert.ok(userOpts.every((i) => i < at), `kit excludes come last: ${JSON.stringify(c.args)}`);
+  }
+  const inc = greps.find((c) => c.args.includes('--include=*.ts'));
+  assert.ok(inc && inc.args.indexOf('--include=*.ts') < inc.args.indexOf(GREP_ENV_EXCLUDE[0]));
+  const gitGreps = named(/(^|[\\/])git(\.exe)?$/i).filter((c) => c.args.includes('grep'));
+  assert.equal(gitGreps.length, 2);
+  for (const c of gitGreps) assert.deepEqual(c.args.slice(-2), GIT_ENV_EXCLUDE);
+  assert.ok(Array.isArray(RG_ENV_EXCLUDE) && RG_ENV_EXCLUDE[0].startsWith('--iglob=!'));
+});
+
+test('the kit puts its excludes after the step options, never inside an option value', () => {
+  const { optionsEnd, TABLES } = require('../tooling/run-evidence');
+  assert.equal(optionsEnd(['-n', '-e', 'x', '--', 'p'], TABLES.grep), 3);
+  assert.equal(optionsEnd(['-e', '--', 'x'], TABLES.grep), -1, 'a "--" that is the value of -e');
+  assert.equal(optionsEnd(['--regexp', '--', 'p'], TABLES.grep), -1);
+  assert.equal(optionsEnd(['-g', '--', 'x'], TABLES.rg), -1);
+  assert.equal(optionsEnd(['-n', 'x', '--', 'p'], TABLES.rg), 2);
+});
+
+test('include patterns that could match an .env file or folder are refused', () => {
+  const { globCouldMatchEnv } = require('../tooling/run-evidence');
+  for (const g of ['.env.staging', '.en?', '*.env*', '.en[v]', '.?nv', '.[eE]*', '*', '?*', '.E*', 'config/*', '.{env,cfg}',
+    '.EN[V]*', 'src/**', '*env*', '{*.ts,.e*}', '.env/*.ts']) {
+    assert.equal(globCouldMatchEnv(g), true, g);
+  }
+  for (const g of ['*.ts', '*.json', 'src/*.ts', '!.env*', '?', '*.{ts,tsx}', 'app.config', 'environment.ts']) {
+    assert.equal(globCouldMatchEnv(g), false, g);
+  }
 });
 
 test('lexer and sed parser details', () => {

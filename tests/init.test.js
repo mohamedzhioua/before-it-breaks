@@ -184,6 +184,43 @@ test('.claude/settings.json denies writes by git, installs and edits in the repo
   }
 });
 
+test('.claude/settings.json also denies network tools, shells, script runners and git remote work', (t) => {
+  const { ws, res } = setup(t, 'init-settings-net');
+  assert.equal(res.code, 0, res.out + res.err);
+  const deny = JSON.parse(fs.readFileSync(path.join(ws, '.claude', 'settings.json'), 'utf8')).permissions.deny;
+  for (const p of ['curl', 'wget', 'nc', 'ssh', 'scp', 'python', 'python3', 'perl', 'ruby', 'npx', 'npm run', 'node -e', 'node --eval',
+    'node -p', 'node --print', 'node -i', 'bash', 'sh', 'zsh', 'powershell', 'pwsh', 'cmd',
+    'npm exec', 'npm x', 'pnpm dlx', 'pnpm exec', 'yarn dlx', 'bunx', 'bun x', 'bun run', 'curl.exe', 'wget.exe', 'py']) {
+    assert.ok(deny.includes(`Bash(${p})`) && deny.includes(`Bash(${p} *)`), `missing Bash(${p}) forms`);
+  }
+  for (const sub of ['fetch', 'clone', 'remote', 'config', 'submodule']) {
+    for (const rule of [`Bash(git ${sub})`, `Bash(git ${sub} *)`, `Bash(git * ${sub})`, `Bash(git * ${sub} *)`]) {
+      assert.ok(deny.includes(rule), `missing ${rule}`);
+    }
+  }
+  const r = '/w/notes-service';
+  for (const cmd of ['curl https://notes.example/api', 'wget https://notes.example', 'nc notes.example 80', 'ssh notes-host', 'scp a notes-host:b',
+    'python -c "print(1)"', 'python3 script.py', 'perl -e 1', 'ruby -e 1', 'npx left-pad', 'npm run build', 'node -e "1"',
+    'node --eval "1"', 'node -p 1', 'node --print 1', 'node -i', 'bash -c "ls"', 'bash', 'sh -c "ls"', 'zsh', 'powershell -c ls',
+    'pwsh -c ls', 'cmd /c dir', `git -C ${r} fetch`, `git -C ${r} remote -v`, `git -C ${r} config core.pager cat`, 'git clone notes-host:x',
+    `git -C ${r} submodule update`, 'git fetch origin',
+    'npm exec left-pad', 'npm x left-pad', 'pnpm dlx left-pad', 'pnpm exec x', 'yarn dlx left-pad', 'bunx left-pad', 'bun x left-pad',
+    'bun run build', 'curl.exe https://notes.example', 'wget.exe https://notes.example', 'py -c "print(1)"',
+    // Collateral of the "git * <sub>" form: an unquoted search word that is a git subcommand.
+    `git -C ${r} grep -n config abc123 -- src`]) {
+    assert.ok(denies(deny, cmd), `should deny: ${cmd}`);
+  }
+  // The kit's own commands, and the commands its skills, agents and lenses tell an agent to run, stay allowed.
+  const k = '/k/before-it-breaks';
+  for (const cmd of [`node "${k}/kit.js" evidence /w/ws --only SVC-IMPORT-01 --cmd 2`, `node ${k}/kit.js pin /w/ws`,
+    `node "${k}/kit.js" build report /w/ws --strict`, `node "${k}/kit.js" check secrets /w/ws`, `node ${k}/kit.js help`,
+    `git -C ${r} show abc123:config/app.json`, `git -C ${r} grep -n 'config' abc123 -- src`, `git -C ${r} grep -n -e 'fetch(' abc123 -- src`,
+    `git -C ${r} show abc123:src/imports/worker.ts | sed -n 40,60p`, `git -C ${r} ls-tree -r --name-only abc123`,
+    "rg -n 'remote' src", 'semgrep --test --metrics=off rules', `git -C ${r} log --format='%h %s' -5 abc123`]) {
+    assert.ok(!denies(deny, cmd), `should allow: ${cmd}`);
+  }
+});
+
 test('init refuses a folder inside the kit (exit 2) and writes nothing', (t) => {
   const root = tmp(t, 'init-inkit');
   const repo = makeFixtureRepo(path.join(root, 'notes-service')).path;
