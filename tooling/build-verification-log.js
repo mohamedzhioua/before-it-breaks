@@ -312,6 +312,7 @@ function build(ws, io) {
   const cands = T.readCandidates(paths);
   const verdictsFile = path.join(paths.work, 'phase3', 'verdicts.json');
   const { value: vdoc, sha: verdictsSha } = T.readJsonSha(verdictsFile, 'work/phase3/verdicts.json (run `kit synthesize` first)');
+  T.checkSynthesis(paths);
   T.problems('work/phase3/verdicts.json', validateVerdicts(vdoc));
   const indexFile = path.join(paths.work, 'phase3', 'receipts', '_index.json');
   const index = T.readOptional(indexFile, 'work/phase3/receipts/_index.json', null);

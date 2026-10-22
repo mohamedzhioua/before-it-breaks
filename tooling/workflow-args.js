@@ -33,8 +33,9 @@
  *                  work/phase3/batches/B<n>.json (from `kit batches`), which
  *                  the agents read themselves, so candidate texts are not
  *                  copied into args; shas (the batch file's candidate shas)
- *                  and plan (the batch-plan id of runs.json) are given when
- *                  present, and the workflow returns them as bound_to; verify, pool
+ *                  and plan (the batch-plan id of runs.json), which the
+ *                  workflow returns as bound_to (batch files or a runs.json
+ *                  without them are from an older kit: exit 1); verify, pool
  *                  (concurrency.verify_pool), skeptic_briefs, receipts_dir.
  *                  Args stay small enough to paste into a Workflow call:
  *                  hunt carries only the config's group entries, report-inputs
@@ -67,7 +68,8 @@
  * (custom skeptic lens: <workspace>/method/skeptics/<lens>.md).
  *
  * Every phase needs work/pins.json, so Phase 0 (`kit pin`) comes first.
- * Exit codes: 0 printed, 2 usage, config or missing input.
+ * Exit codes: 0 printed, 1 verify batch files from an older kit version (run
+ * `kit batches` again), 2 usage, config or missing input.
  *
  * Export: buildArgs(phase, { workspace, run, date, targetDesign }) -> object
  */
@@ -79,6 +81,8 @@ const { readPins } = require('./pin');
 const { groupFindings } = require('./lib/modules');
 
 class CliError extends Error {}
+// The workspace files are from an older kit version: exit 1.
+class OldFilesError extends Error {}
 
 const PHASES = ['map', 'hunt', 'verify', 'report-inputs', 'recommend'];
 const SURVIVED = ['PROVEN-STATIC', 'PROVEN', 'UNPROVEN'];
@@ -199,10 +203,13 @@ function huntPart(config, paths, n) {
   };
 }
 
+const OLD_BATCHES = 'batch files are from an older version: run `kit batches` again';
+
 function verifyPart(config, paths, n) {
   const dir = path.join(paths.work, 'phase3');
   const plan = readJson(path.join(dir, 'runs.json'), 'work/phase3/runs.json is missing: run `kit batches` first');
   if (!plan || !Array.isArray(plan.runs) || !plan.runs.length) throw new CliError('work/phase3/runs.json has no runs; run `kit batches` again');
+  if (typeof plan.plan !== 'string') throw new OldFilesError(OLD_BATCHES);
   const runPlan = pick(plan.runs, n);
   const perBatch = config.verify.skeptic_lenses.length + 1;
   if (runPlan.batches.length * perBatch > config.concurrency.max_agents_per_workflow) {
@@ -212,13 +219,14 @@ function verifyPart(config, paths, n) {
     const data = readJson(path.join(dir, 'batches', `${b}.json`), `work/phase3/batches/${b}.json is missing: run \`kit batches\` again`);
     const ids = (data.candidates || []).map((c) => c.id);
     // The candidate shas of the batch file travel with the args, so the
-    // verify run can return them with its votes (bound_to).
-    const shas = data && data.shas !== null && typeof data.shas === 'object' && !Array.isArray(data.shas) ? { shas: data.shas } : {};
-    return { batch: b, file: path.join(dir, 'batches', `${b}.json`), groups: data.groups || [], size: ids.length, ids, ...shas };
+    // verify run can return them with its votes (bound_to). Batch files
+    // without them come from an older kit and would lose that binding.
+    if (!data || data.shas === null || typeof data.shas !== 'object' || Array.isArray(data.shas)) throw new OldFilesError(OLD_BATCHES);
+    return { batch: b, file: path.join(dir, 'batches', `${b}.json`), groups: data.groups || [], size: ids.length, ids, shas: data.shas };
   });
   return {
     runs_total: plan.runs.length,
-    ...(typeof plan.plan === 'string' ? { plan: plan.plan } : {}),
+    plan: plan.plan,
     batches,
     verify: config.verify,
     pool: config.concurrency.verify_pool,
@@ -331,6 +339,10 @@ function main(argv, io) {
     io.out(JSON.stringify(buildArgs(opts.phase, opts), null, 2));
     return 0;
   } catch (e) {
+    if (e instanceof OldFilesError) {
+      io.err(`args: ${e.message}`);
+      return 1;
+    }
     if (e instanceof CliError || e instanceof ConfigError) {
       io.err(`args: ${e.message}`);
       if (e instanceof ConfigError && e.errors.length > 1) e.errors.forEach((m) => io.err(`  - ${m}`));

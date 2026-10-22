@@ -18,6 +18,7 @@ const DATA = path.join(__dirname, 'fixtures', 'data');
 const WORKFLOWS = path.join(ROOT, 'workflows');
 const PHASES = ['map', 'hunt', 'verify', 'report-inputs', 'recommend'];
 const { makeFixtureRepo } = require('./fixtures/make-fixture-repo');
+const { writeFixtureVotes } = require('./fixtures/fixture-votes');
 const { splitWorkflow, main: checkMain } = require('../tooling/check-workflows');
 const { validateConfig } = require('../tooling/lib/config');
 
@@ -49,7 +50,7 @@ function makeWorkspace(root, edit) {
     const r = kit(step);
     assert.equal(r.code, 0, `${step[0]}: ${r.out}${r.err}`);
   }
-  fs.copyFileSync(path.join(DATA, 'fixture-votes-B1.json'), path.join(ws, 'work', 'phase3', 'votes-B1.json'));
+  writeFixtureVotes(ws);
   const s = kit(['synthesize', ws]);
   assert.equal(s.code, 0, s.out + s.err);
   return ws;
@@ -660,4 +661,17 @@ test('kit save hunt keeps the hunt summary in work/phase2/hunt-<N>.json and chec
   }
   assert.ok(!fs.existsSync(path.join(WS, 'work', 'phase2', 'hunt-H3.json')), 'nothing written for an invalid summary');
   fs.rmSync(file);
+});
+
+test('the verify workflow returns bound_to only when every batch carries its candidate shas', async () => {
+  const full = (await run('verify', copy(ARGS.verify), cannedAnswer)).result;
+  assert.ok(full.bound_to, 'all batches have shas');
+  const args = copy(ARGS.verify);
+  delete args.batches[0].shas;
+  const { result } = await run('verify', args, cannedAnswer);
+  assert.notEqual(result.status, 'invalid_args', JSON.stringify(result.errors));
+  assert.ok(!('bound_to' in result), 'one batch without shas: no bound_to');
+  const noPlan = copy(ARGS.verify);
+  delete noPlan.plan;
+  assert.ok(!('bound_to' in (await run('verify', noPlan, cannedAnswer)).result), 'no plan: no bound_to');
 });

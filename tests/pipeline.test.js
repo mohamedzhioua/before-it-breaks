@@ -13,6 +13,8 @@ const ROOT = path.join(__dirname, '..');
 const KIT = path.join(ROOT, 'kit.js');
 const DATA = path.join(__dirname, 'fixtures', 'data');
 const { makeFixtureRepo } = require('./fixtures/make-fixture-repo');
+const { writeFixtureVotes } = require('./fixtures/fixture-votes');
+const { contentSha } = require('../tooling/lib/content-sha');
 const { COMMANDS, GROUPS } = require('../kit');
 const shapes = require('../tooling/lib/shapes');
 const { loadConfig } = require('../tooling/lib/config');
@@ -107,7 +109,7 @@ test('a candidate fixed at the pin is refuted with "fixed at pin", even without 
   assert.equal(v.verdict, 'REFUTED');
   assert.equal(v.why, 'fixed at pin');
   assert.equal(v.status, 'fixed');
-  const file = { date: '2027-03-08', skeptic_lenses: ['reach', 'mech', 'math'], survive_votes: 2, missing_agents: [], unknown_ids: [], verdicts: doc.verdicts };
+  const file = { date: '2027-03-08', skeptic_lenses: ['reach', 'mech', 'math'], survive_votes: 2, missing_agents: [], unknown_ids: [], overrides_sha256: null, pins_sha256: null, receipts_sha256: null, verdicts: doc.verdicts };
   assert.deepEqual(shapes.validateVerdicts(file), [], 'status "fixed" is a valid verdict status');
 });
 
@@ -250,7 +252,7 @@ test('synthesize gives the expected verdicts, applies overrides and refuses "add
   const ev = kit(['evidence', ws]);
   assert.equal(ev.code, 0, ev.out + ev.err);
   const p3 = path.join(ws, 'work', 'phase3');
-  fs.copyFileSync(path.join(DATA, 'fixture-votes-B1.json'), path.join(p3, 'votes-B1.json'));
+  writeFixtureVotes(ws);
 
   const plain = kit(['synthesize', ws]);
   assert.equal(plain.code, 0, plain.out + plain.err);
@@ -314,7 +316,8 @@ function demoConfig() {
 function unitInputs() {
   const candidates = JSON.parse(fs.readFileSync(path.join(DATA, 'fixture-candidates.json'), 'utf8')).candidates;
   const outputs = [JSON.parse(fs.readFileSync(path.join(DATA, 'fixture-votes-B1.json'), 'utf8'))];
-  const receipts = { date: '2027-03-08', pins: {}, totals: { ran: 0, failed: 0, skipped_live: 0, skipped_unsafe: 0 }, candidates: [] };
+  // One receipt per candidate, with the receipt id the fixture checks name.
+  const receipts = { date: '2027-03-08', pins: {}, totals: { ran: 0, failed: 0, skipped_live: 0, skipped_unsafe: 0 }, candidates: candidates.map((c) => ({ id: c.id, receipt: '000000000000', sha: contentSha(c), commands: [], ran: 0, failed: 0, skipped_live: 0, skipped_unsafe: 0, skipped_error: 0 })) };
   return { candidates, outputs, receipts };
 }
 
@@ -397,7 +400,7 @@ test('kit args recommend resolves modules from the surviving findings and splits
   });
   assert.equal(kit(['args', 'recommend', ws]).code, 2, 'recommend needs verdicts.json');
   assert.equal(kit(['evidence', ws]).code, 0);
-  fs.copyFileSync(path.join(DATA, 'fixture-votes-B1.json'), path.join(ws, 'work', 'phase3', 'votes-B1.json'));
+  writeFixtureVotes(ws);
   assert.equal(kit(['synthesize', ws]).code, 0);
   const verdicts = JSON.parse(fs.readFileSync(path.join(ws, 'work', 'phase3', 'verdicts.json'), 'utf8')).verdicts;
   const survived = verdicts.filter((v) => ['PROVEN', 'PROVEN-STATIC', 'UNPROVEN'].includes(v.verdict)).map((v) => v.id);

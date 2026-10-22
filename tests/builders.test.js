@@ -58,6 +58,17 @@ function hashes(ws) {
   return Object.fromEntries(OUTPUTS.map((f) => [f, crypto.createHash('sha256').update(fs.readFileSync(path.join(ws, f))).digest('hex')]));
 }
 
+// After a test plants text in candidates.json, record the new candidate shas
+// in verdicts.json, as a fresh kit synthesize would.
+function restamp(ws) {
+  const { contentSha } = require('../tooling/lib/content-sha');
+  const cands = new Map(json(ws, path.join('work', 'candidates.json')).candidates.map((c) => [c.id, c]));
+  const file = path.join(ws, 'work', 'phase3', 'verdicts.json');
+  const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+  for (const v of doc.verdicts) v.sha = contentSha(cands.get(v.id));
+  fs.writeFileSync(file, JSON.stringify(doc, null, 2));
+}
+
 // ---------- shapes ----------
 
 test('the fixture data passes every shape check', () => {
@@ -314,6 +325,7 @@ test('secrets planted in agent text never reach a generated page or data file', 
     d.roadmap.now[0].change = `Rotate ${token} and clean up failed jobs.`;
     d.sections[0].title = 'One <b>job</b> policy for `queues`';
   });
+  restamp(ws);
   buildAll(ws);
   assert.equal(kit(['build', 'issues', ws, '--tracker', 'gitlab']).code, 0);
   const files = OUTPUTS.concat([path.join('work', 'phase6', 'issues.csv')]);
@@ -391,6 +403,7 @@ test('agent text with HTML or an image never reaches a page raw; code spans stay
   });
   edit(path.join('work', 'phase5', 'report-inputs.json'), (d) => { d.items[0].plain = `Digest ${tag} ${img}`; d.items[0].fix_direction = `Fix ${img}`; });
   edit(path.join('work', 'phase6', 'cross-cutting.json'), (d) => { d.roadmap.now[0].change = `Change ${tag} ${img}.`; d.sections[0].decision = `Decide ${tag}`; });
+  restamp(ws);
   buildAll(ws);
   for (const f of PAGES) {
     const text = read(ws, f);
@@ -403,6 +416,8 @@ test('agent text with HTML or an image never reaches a page raw; code spans stay
   assert.match(log, /Looked for a cap &lt;img/);
   // An evidence command keeps its raw text inside backticks.
   edit(path.join('work', 'candidates.json'), (d) => { d.candidates.find((x) => x.id === 'DATA-INDEX-01').evidence[1].cmd = 'git grep -n "<T>" src'; });
+  restamp(ws);
+  assert.equal(kit(['build', 'log', ws]).code, 0, 'the edited candidate needs a fresh synthesis and log');
   assert.equal(kit(['build', 'measurements', ws]).code, 0);
   assert.match(read(ws, '04-measurements.md'), /`git grep -n "<T>" src`/);
 });

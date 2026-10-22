@@ -31,9 +31,10 @@
  *   levelsOf(config); text helpers cap, one, prose, cell, code, rel(from, to,
  *   anchor); pageTop(opts), legend(), trustLine(measured, total, link),
  *   kitDocUrl(page); workspace helpers loadWorkspace(ws, opts?),
- *   readCandidates, readFinal, checkFresh, readInputs, sortFindings,
- *   countBy, readJson, readJsonSha, readOptional, problems, writeFile,
- *   byStr; runCli(argv, io, spec, fn), strictExit(strict, warnings, io); BuildError, StaleError (exit 1 from runCli),
+ *   readCandidates, readFinal, checkFresh, checkSynthesis, readInputs,
+ *   sortFindings, countBy, readJson, readJsonSha, readOptional, problems,
+ *   writeFile, byStr; runCli(argv, io, spec, fn), strictExit(strict,
+ *   warnings, io); BuildError, StaleError (exit 1 from runCli),
  *   REPORTED, NOT_SIZE_DRIVEN, VERDICT_MEANING; main(argv) prints the
  *   tier ladder of a workspace.
  */
@@ -307,8 +308,9 @@ function readCandidates(paths) {
 const FINAL_FILE = (paths) => path.join(paths.work, 'phase3', 'final-verdicts.json');
 
 // Throws StaleError (exit 1) when phase3/verdicts.json is no longer the
-// file `kit build log` read: its sha256 must equal the verdicts_sha256 that
-// build log recorded in final-verdicts.json.
+// file `kit build log` read (its sha256 must equal the verdicts_sha256 that
+// build log recorded in final-verdicts.json), or when synthesis itself is out
+// of date (checkSynthesis).
 function checkFresh(paths) {
   const { fileSha } = require('./lib/content-sha');
   let recorded;
@@ -324,6 +326,38 @@ function checkFresh(paths) {
     throw new StaleError(typeof recorded === 'string'
       ? 'work/phase3/verdicts.json changed after `kit build log`; re-run it'
       : 'work/phase3/final-verdicts.json does not record which verdicts.json it was built from; re-run `kit build log`');
+  }
+  checkSynthesis(paths);
+}
+
+// Throws StaleError (exit 1) when candidates.json or master-overrides.json
+// changed after `kit synthesize`: every verdict's sha must be the contentSha
+// of the candidate with its id, with the same ids on both sides, and
+// verdicts.json's overrides_sha256 must be the sha256 of the overrides file
+// (null when there is none); and when pins.json or receipts/_index.json
+// changed (pins_sha256, receipts_sha256; null for an absent file, and null
+// against a sha counts as a change). Files are read raw (no masking), as
+// synthesis read them.
+function checkSynthesis(paths) {
+  const { contentSha, fileSha } = require('./lib/content-sha');
+  const raw = (file, label) => {
+    try {
+      return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
+    } catch (e) {
+      throw new BuildError(`cannot read ${label} (${e.code || e.message})`);
+    }
+  };
+  const vdoc = raw(path.join(paths.work, 'phase3', 'verdicts.json'), 'work/phase3/verdicts.json');
+  const cdoc = raw(path.join(paths.work, 'candidates.json'), 'work/candidates.json');
+  const cands = Array.isArray(cdoc) ? cdoc : cdoc && Array.isArray(cdoc.candidates) ? cdoc.candidates : [];
+  const now = new Map(cands.map((c) => [c && c.id, contentSha(c)]));
+  const list = vdoc && Array.isArray(vdoc.verdicts) ? vdoc.verdicts : [];
+  const same = list.length === now.size && list.every((v) => v && now.get(v.id) === v.sha)
+    && vdoc.overrides_sha256 === fileSha(path.join(paths.work, 'phase3', 'master-overrides.json'));
+  if (!same) throw new StaleError('candidates or overrides changed after `kit synthesize`; run it again');
+  if (vdoc.pins_sha256 !== fileSha(path.join(paths.work, 'pins.json'))
+    || vdoc.receipts_sha256 !== fileSha(path.join(paths.work, 'phase3', 'receipts', '_index.json'))) {
+    throw new StaleError('pins or evidence receipts changed after `kit synthesize`; run `kit evidence` and `kit synthesize` again');
   }
 }
 
@@ -439,6 +473,7 @@ module.exports = {
   readCandidates,
   readFinal,
   checkFresh,
+  checkSynthesis,
   readInputs,
   sortFindings,
   countBy,

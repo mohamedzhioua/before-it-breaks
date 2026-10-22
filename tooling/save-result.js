@@ -245,7 +245,11 @@ function planVerify(result, ctx) {
     const runsFile = path.join(ctx.paths.work, 'phase3', 'runs.json');
     const runs = fs.existsSync(runsFile) ? readJson(runsFile, 'existing') : null;
     const now = isObj(runs) && typeof runs.plan === 'string' ? runs.plan : null;
-    if (now !== plan) ctx.notes.push(`note: kit batches ran again after this verify run (batch plan ${plan}, now ${now || 'none'}); candidates that changed since will be NEEDS-REVIEW`);
+    if (runs === null) {
+      ctx.notes.push(`note: there is no work/phase3/runs.json, so this run's batch plan ${plan} cannot be compared with the current batches; synthesis still checks each candidate against the sha the run recorded`);
+    } else if (now !== plan) {
+      ctx.notes.push(`note: the batches were cut again after this verify run (batch plan ${plan}, now ${now || 'not recorded'}); candidates that changed since will be NEEDS-REVIEW`);
+    }
   }
   if (fs.existsSync(file) && !sameText(file, text)) {
     const old = readJson(file, 'existing');

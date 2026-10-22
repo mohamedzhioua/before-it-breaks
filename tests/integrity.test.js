@@ -16,6 +16,7 @@ const KIT = path.join(ROOT, 'kit.js');
 const DATA = path.join(__dirname, 'fixtures', 'data');
 const { makeFixtureRepo } = require('./fixtures/make-fixture-repo');
 const { makeFixtureWorkspace } = require('./fixtures/make-fixture-workspace');
+const { writeFixtureVotes, fixtureVotes } = require('./fixtures/fixture-votes');
 const { byVotesName } = require('../tooling/synthesize-verdicts');
 const { canonicalJson, contentSha } = require('../tooling/lib/content-sha');
 const { loadConfig } = require('../tooling/lib/config');
@@ -193,7 +194,7 @@ test('a change and kit batches between the verify run and its save: saved with a
   results.forEach((res, i) => {
     const s = save(ws, root, 'verify', `late-${i}.json`, res, ['--run', String(runs[i].run)]);
     assert.equal(s.code, 0, s.out + s.err);
-    assert.match(s.out, /note: kit batches ran again after this verify run/);
+    assert.match(s.out, /note: the batches were cut again after this verify run/);
   });
   ok(['synthesize', ws]);
   assert.equal(verdicts(p3)[id].verdict, 'NEEDS-REVIEW');
@@ -256,7 +257,7 @@ test('leftover votes from an earlier plan neither count nor conflict with a fres
 
 test('a receipts index from before candidate shas gives a readable error', (t) => {
   const { ws, p3 } = setup(t, 'oldindex');
-  fs.copyFileSync(path.join(DATA, 'fixture-votes-B1.json'), path.join(p3, 'votes-B1.json'));
+  writeFixtureVotes(ws);
   const f = path.join(p3, 'receipts', '_index.json');
   const idx = readJson(f);
   for (const e of idx.candidates) delete e.sha;
@@ -272,9 +273,9 @@ test('votes files are read in number order: votes-2 before votes-10, other names
   assert.deepEqual(names.slice().sort(byVotesName), ['votes-1.json', 'votes-02.json', 'votes-2.json', 'votes-10.json', 'votes-B1.json', 'votes-a.json']);
 });
 
-test('the same vote in two files must agree; identical copies are fine', (t) => {
+test('the same vote in two files must agree on substance; free text never conflicts', (t) => {
   const { ws, p3 } = setup(t, 'conflict');
-  const votes = readJson(path.join(DATA, 'fixture-votes-B1.json'));
+  const votes = fixtureVotes(ws);
   fs.writeFileSync(path.join(p3, 'votes-2.json'), JSON.stringify(votes));
   ok(['synthesize', ws]);
   const one = fs.readFileSync(path.join(p3, 'verdicts.json'));
@@ -282,23 +283,211 @@ test('the same vote in two files must agree; identical copies are fine', (t) => 
   ok(['synthesize', ws]);
   assert.ok(one.equals(fs.readFileSync(path.join(p3, 'verdicts.json'))), 'an identical copy changes nothing');
 
+  // Only the reason, notes and rerun text differ: no conflict, the later file (votes-10) wins on text.
+  const id = votes.results.find((r) => r.kind === 'vote' && r.lens === 'mech').votes[0].id;
+  const wordy = JSON.parse(JSON.stringify(votes));
+  wordy.results.find((r) => r.kind === 'vote' && r.lens === 'mech').votes[0].reason = 'Same vote, said in other words.';
+  wordy.results.find((r) => r.kind === 'verify').checks[0].notes = 'Other notes.';
+  fs.writeFileSync(path.join(p3, 'votes-10.json'), JSON.stringify(wordy));
+  const noted = ok(['synthesize', ws]);
+  assert.match(noted.out, new RegExp(`note: ${id}, lens mech: the text in votes-10\\.json replaces the text in votes-2\\.json \\(same substance\\)`));
+  assert.match(noted.out, new RegExp(`note: ${id}, verifier: the text in votes-10\\.json replaces`));
+  const v = verdicts(p3)[id];
+  assert.equal(v.votes.mech.reason, 'Same vote, said in other words.');
+  assert.equal(v.verifier.notes, 'Other notes.');
+
+  // A different vote or verifier verdict conflicts.
   const other = JSON.parse(JSON.stringify(votes));
-  const set = other.results.find((r) => r.kind === 'vote' && r.lens === 'mech');
-  set.votes[0].vote = 'REFUTED';
+  other.results.find((r) => r.kind === 'vote' && r.lens === 'mech').votes[0].vote = 'REFUTED';
   other.results.find((r) => r.kind === 'verify').checks[0].verdict = 'REFUTED';
   fs.writeFileSync(path.join(p3, 'votes-10.json'), JSON.stringify(other));
-  const r = kit(['synthesize', ws]);
+  const before = fs.readFileSync(path.join(p3, 'verdicts.json'));
+  let r = kit(['synthesize', ws]);
   assert.equal(r.code, 1, r.out + r.err);
   assert.match(r.err, /the votes files disagree on 2 votes/);
-  assert.match(r.err, new RegExp(`${set.votes[0].id}, lens mech: ${votes.results.find((x) => x.lens === 'mech').votes[0].vote} in votes-2\\.json, REFUTED in votes-10\\.json`));
-  assert.match(r.err, /verifier: CONFIRMED in votes-2\.json, REFUTED in votes-10\.json/);
+  const mech = votes.results.find((x) => x.lens === 'mech').votes[0];
+  assert.match(r.err, new RegExp(`${id}, lens mech: vote ${mech.vote} in votes-2\\.json, REFUTED in votes-10\\.json\n`));
+  assert.match(r.err, /verifier: verdict CONFIRMED in votes-2\.json, REFUTED in votes-10\.json/);
   assert.doesNotMatch(r.err, /\n\s+at /, 'no stack trace');
-  assert.ok(one.equals(fs.readFileSync(path.join(p3, 'verdicts.json'))), 'nothing written');
+  assert.ok(before.equals(fs.readFileSync(path.join(p3, 'verdicts.json'))), 'nothing written');
+
+  // A different severity alone conflicts too.
+  const sev = JSON.parse(JSON.stringify(votes));
+  const sv = sev.results.find((x) => x.kind === 'vote' && x.lens === 'mech').votes[0];
+  sv.severity = sv.severity === 'low' ? 'medium' : 'low';
+  fs.writeFileSync(path.join(p3, 'votes-10.json'), JSON.stringify(sev));
+  r = kit(['synthesize', ws]);
+  assert.equal(r.code, 1, r.out + r.err);
+  assert.match(r.err, new RegExp(`disagree on 1 vote .*\\n {2}- ${id}, lens mech: severity ${mech.severity} in votes-2\\.json, ${sv.severity} in votes-10\\.json`));
+
+  // So do a corrected threshold and a gate result.
+  const corr = JSON.parse(JSON.stringify(votes));
+  corr.results.find((x) => x.kind === 'vote' && x.lens === 'mech').votes[0].corrected_threshold = 'About 40k rows, not 100k.';
+  fs.writeFileSync(path.join(p3, 'votes-10.json'), JSON.stringify(corr));
+  r = kit(['synthesize', ws]);
+  assert.equal(r.code, 1, r.out + r.err);
+  assert.match(r.err, new RegExp(`${id}, lens mech: corrected_threshold \\(empty\\) in votes-2\\.json, About 40k rows, not 100k\\. in votes-10\\.json`));
+  const gate = JSON.parse(JSON.stringify(votes));
+  const gv = gate.results.find((x) => x.kind === 'vote' && x.lens === 'mech').votes[0];
+  gv.gates[0].result = gv.gates[0].result === 'FAIL' ? 'PASS' : 'FAIL';
+  fs.writeFileSync(path.join(p3, 'votes-10.json'), JSON.stringify(gate));
+  r = kit(['synthesize', ws]);
+  assert.equal(r.code, 1, r.out + r.err);
+  assert.match(r.err, new RegExp(`${id}, lens mech: gates \\S+ in votes-2\\.json, \\S+ in votes-10\\.json`));
+});
+
+test('an edit to a candidate or to the overrides after kit synthesize makes build log and the builders refuse', (t) => {
+  const { ws, p3 } = setup(t, 'aftersynth');
+  writeFixtureVotes(ws);
+  ok(['synthesize', ws]);
+  const vdoc = readJson(path.join(p3, 'verdicts.json'));
+  assert.equal(vdoc.overrides_sha256, null);
+  const cfile = path.join(ws, 'work', 'candidates.json');
+  const cands = readJson(cfile);
+  for (const v of vdoc.verdicts) assert.equal(v.sha, contentSha(cands.candidates.find((c) => c.id === v.id)));
+  ok(['build', 'log', ws]);
+  ok(['build', 'report', ws]);
+  const STALE = /candidates or overrides changed after `kit synthesize`; run it again/;
+  const refuses = (what) => {
+    for (const args of [['build', 'log', ws], ['build', 'report', ws]]) {
+      const r = kit(args);
+      assert.equal(r.code, 1, `${what}: ${args.join(' ')}\n${r.out}${r.err}`);
+      assert.match(r.err, STALE, what);
+    }
+  };
+  const saved = fs.readFileSync(cfile);
+
+  // A candidate edited after synthesize.
+  const edited = readJson(cfile);
+  edited.candidates[0].title = 'Edited after synthesis';
+  fs.writeFileSync(cfile, JSON.stringify(edited, null, 2));
+  refuses('edited candidate');
+  fs.writeFileSync(cfile, saved);
+  ok(['build', 'report', ws]);
+
+  // A candidate added after synthesize.
+  const added = readJson(cfile);
+  added.candidates.push({ ...added.candidates[0], id: `${added.candidates[0].group}-99`, title: 'Added after synthesis' });
+  fs.writeFileSync(cfile, JSON.stringify(added, null, 2));
+  refuses('added candidate');
+  fs.writeFileSync(cfile, saved);
+
+  // An overrides file written after synthesize.
+  const ofile = path.join(p3, 'master-overrides.json');
+  fs.copyFileSync(path.join(DATA, 'fixture-overrides.json'), ofile);
+  refuses('new overrides');
+  ok(['synthesize', ws]);
+  assert.match(readJson(path.join(p3, 'verdicts.json')).overrides_sha256, /^[0-9a-f]{64}$/);
+  ok(['build', 'log', ws]);
+  ok(['build', 'report', ws]);
+  const o = readJson(ofile);
+  o.overrides[0].reason += ' Edited later.';
+  fs.writeFileSync(ofile, JSON.stringify(o, null, 2));
+  refuses('edited overrides');
+  fs.rmSync(ofile);
+  refuses('removed overrides');
+});
+
+test('a re-pin or a changed receipts index after kit synthesize is stale; a reformatted candidates.json is not', (t) => {
+  const { ws, root, p3 } = setup(t, 'repin');
+  writeFixtureVotes(ws);
+  ok(['synthesize', ws]);
+  const vdoc = readJson(path.join(p3, 'verdicts.json'));
+  assert.match(vdoc.pins_sha256, /^[0-9a-f]{64}$/);
+  assert.match(vdoc.receipts_sha256, /^[0-9a-f]{64}$/);
+  ok(['build', 'log', ws]);
+  ok(['build', 'report', ws]);
+  const STALE = /pins or evidence receipts changed after `kit synthesize`; run `kit evidence` and `kit synthesize` again/;
+  const refuses = (what) => {
+    for (const args of [['build', 'log', ws], ['build', 'report', ws]]) {
+      const r = kit(args);
+      assert.equal(r.code, 1, `${what}: ${args.join(' ')}\n${r.out}${r.err}`);
+      assert.match(r.err, STALE, what);
+    }
+  };
+
+  // Reformatted candidates.json: other whitespace and key order, same canonical JSON.
+  const cfile = path.join(ws, 'work', 'candidates.json');
+  const doc = readJson(cfile);
+  const reordered = { candidates: doc.candidates.map((c) => Object.fromEntries(Object.entries(c).reverse())) };
+  fs.writeFileSync(cfile, JSON.stringify(reordered, null, 4) + '\n\n');
+  ok(['build', 'log', ws]);
+  ok(['build', 'report', ws]);
+
+  // A new commit in the repo and kit pin again.
+  const repo = path.join(root, 'repos', 'notes-api');
+  fs.writeFileSync(path.join(repo, 'NOTES.md'), 'A change after synthesis.\n');
+  const git = (args) => {
+    const r = require('child_process').spawnSync('git', ['-C', repo, '-c', 'user.name=Notes Dev', '-c', `user.email=dev${String.fromCharCode(64)}notes.invalid`, ...args], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+  };
+  git(['add', 'NOTES.md']);
+  git(['commit', '-q', '-m', 'notes']);
+  const pinsBefore = fs.readFileSync(path.join(ws, 'work', 'pins.json'));
+  ok(['pin', ws]);
+  assert.ok(!pinsBefore.equals(fs.readFileSync(path.join(ws, 'work', 'pins.json'))), 'the pin moved');
+  refuses('re-pin');
+
+  // kit evidence again on the new pin: still stale until synthesize runs again.
+  const indexBefore = fs.readFileSync(path.join(p3, 'receipts', '_index.json'));
+  ok(['evidence', ws]);
+  assert.ok(!indexBefore.equals(fs.readFileSync(path.join(p3, 'receipts', '_index.json'))), 'the receipts changed');
+  refuses('re-evidence');
+  ok(['synthesize', ws]);
+  ok(['build', 'log', ws]);
+  ok(['build', 'report', ws]);
+
+  // A receipts index rewritten after synthesize (same pins).
+  const ifile = path.join(p3, 'receipts', '_index.json');
+  fs.writeFileSync(ifile, JSON.stringify(readJson(ifile)));
+  refuses('receipts index');
+});
+
+test('a verifier check on another receipt, or with no receipt at all, is NEEDS-REVIEW', (t) => {
+  const { ws, root, p3 } = setup(t, 'receipt');
+  verifyAll(ws, root, p3);
+  ok(['synthesize', ws]);
+  const file = path.join(p3, 'votes-1.json');
+  const doc = readJson(file);
+  const checks = doc.results.find((r) => r.kind === 'verify').checks;
+  const [a, b] = [checks[0].id, checks[1].id];
+  assert.notEqual(verdicts(p3)[a].verdict, 'NEEDS-REVIEW');
+  checks[0].receipt = 'ffffffffffff';
+  fs.writeFileSync(file, JSON.stringify(doc, null, 2));
+  const ifile = path.join(p3, 'receipts', '_index.json');
+  const idx = readJson(ifile);
+  idx.candidates = idx.candidates.filter((e) => e.id !== b);
+  fs.writeFileSync(ifile, JSON.stringify(idx, null, 2));
+  ok(['synthesize', ws]);
+  const v = verdicts(p3);
+  assert.equal(v[a].verdict, 'NEEDS-REVIEW');
+  assert.match(v[a].why, /^verifier checked a different receipt \(ffffffffffff, the receipt now is [0-9a-f]{12}\)/);
+  assert.equal(v[b].verdict, 'NEEDS-REVIEW');
+  assert.equal(v[b].why, 'no receipt for this candidate; run kit evidence');
+});
+
+test('kit args verify refuses batch files from before candidate shas', (t) => {
+  const { ws, p3 } = setup(t, 'oldbatches');
+  const bfile = path.join(p3, 'batches', 'B1.json');
+  const b1 = readJson(bfile);
+  const { shas: _s, ...noShas } = b1;
+  fs.writeFileSync(bfile, JSON.stringify(noShas, null, 2));
+  let r = kit(['args', 'verify', '--run', '1', ws]);
+  assert.equal(r.code, 1, r.out + r.err);
+  assert.match(r.err, /batch files are from an older version: run `kit batches` again/);
+  ok(['batches', ws]);
+  const rfile = path.join(p3, 'runs.json');
+  const runs = readJson(rfile);
+  delete runs.plan;
+  fs.writeFileSync(rfile, JSON.stringify(runs, null, 2));
+  r = kit(['args', 'verify', '--run', '1', ws]);
+  assert.equal(r.code, 1, r.out + r.err);
+  assert.match(r.err, /batch files are from an older version: run `kit batches` again/);
 });
 
 test('an override after kit build log makes every builder refuse until build log runs again', (t) => {
   const { ws, p3 } = setup(t, 'stale');
-  fs.copyFileSync(path.join(DATA, 'fixture-votes-B1.json'), path.join(p3, 'votes-B1.json'));
+  writeFixtureVotes(ws);
   ok(['synthesize', ws]);
   ok(['build', 'log', ws]);
   const final = readJson(path.join(p3, 'final-verdicts.json'));

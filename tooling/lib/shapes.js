@@ -313,7 +313,7 @@ const GATE_VALUE = { enum: GATE_RESULTS };
 
 const VERDICT = {
   type: 'object',
-  required: ['id', 'title', 'repo', 'group', 'lens', 'source', 'verdict', 'why', 'severity', 'corrected', 'votes', 'verifier', 'receipt', 'gates', 'fp_check'],
+  required: ['id', 'title', 'repo', 'group', 'lens', 'source', 'sha', 'verdict', 'why', 'severity', 'corrected', 'votes', 'verifier', 'receipt', 'gates', 'fp_check'],
   additionalProperties: false,
   properties: {
     id: str('Candidate id.', CANDIDATE_ID),
@@ -323,6 +323,7 @@ const VERDICT = {
     lens: str('Hunt lens.', NAME),
     source: str('As in the candidate.'),
     status: { enum: ['found', 'fixed', 'not_found'] },
+    sha: str('sha256 of the whole candidate object this verdict judged (lib/content-sha.js).', '^[0-9a-f]{64}$'),
     verdict: { enum: VERDICT_VALUES, description: 'Final verdict, after master overrides.' },
     why: str('One line: the rule that decided it.'),
     severity: str('Rubric level or "none".', LEVEL),
@@ -358,7 +359,7 @@ const VERDICT = {
 
 const VERDICTS = {
   type: 'object',
-  required: ['date', 'skeptic_lenses', 'survive_votes', 'missing_agents', 'unknown_ids', 'verdicts'],
+  required: ['date', 'skeptic_lenses', 'survive_votes', 'missing_agents', 'unknown_ids', 'overrides_sha256', 'pins_sha256', 'receipts_sha256', 'verdicts'],
   additionalProperties: false,
   properties: {
     date: str('Audit date.', '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'),
@@ -366,6 +367,9 @@ const VERDICTS = {
     survive_votes: { type: 'integer', minimum: 1 },
     missing_agents: strList('Agents that returned nothing.'),
     unknown_ids: strList('Ids voted on that are not candidates.'),
+    overrides_sha256: { type: ['string', 'null'], pattern: '^[0-9a-f]{64}$', description: 'sha256 of work/phase3/master-overrides.json as synthesis read it; null when there was none.' },
+    pins_sha256: { type: ['string', 'null'], pattern: '^[0-9a-f]{64}$', description: 'sha256 of work/pins.json when synthesis ran; null when there was none.' },
+    receipts_sha256: { type: ['string', 'null'], pattern: '^[0-9a-f]{64}$', description: 'sha256 of work/phase3/receipts/_index.json as synthesis read it; null when there was none.' },
     verdicts: { type: 'array', items: VERDICT },
   },
 };
