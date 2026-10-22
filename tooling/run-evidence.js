@@ -10,8 +10,10 @@
  * Reads <work>/candidates.json ({ "candidates": [...] }, shape in
  * tooling/lib/shapes.js) and <work>/pins.json. For each candidate writes
  * <work>/phase3/receipts/<id>.md and, for all of them,
- * <work>/phase3/receipts/_index.json. --dry-run only prints how each command
- * would be classified and writes nothing. --only re-runs the commands of
+ * <work>/phase3/receipts/_index.json (which also records, per candidate,
+ * the sha of the whole candidate object it ran, from lib/content-sha.js, so
+ * synthesis can tell a receipt of an older version). --dry-run only prints
+ * how each command would be classified and writes nothing. --only re-runs the commands of
  * one candidate (or only its command number n), with the same rules and
  * environment, and prints that receipt on stdout; it writes nothing. The
  * verifier agent uses it to re-check a receipt.
@@ -144,6 +146,7 @@ const crypto = require('crypto');
 const { spawnSync } = require('child_process');
 const { loadConfig, ConfigError } = require('./lib/config');
 const { validateCandidates } = require('./lib/shapes');
+const { contentSha } = require('./lib/content-sha');
 const { readPins } = require('./pin');
 const { buildMasks, mask, detect } = require('./lib/mask');
 const { GIT_PRE, NO_FETCH, gitEnv, gitDirCheck } = require('./lib/git-env');
@@ -1074,7 +1077,7 @@ function receiptFor(c, ctx, only) {
     `pins: ${pinLines.join(', ')}`,
     '',
   ];
-  const entry = { id: c.id, receipt: '', ran: 0, failed: 0, skipped_live: 0, skipped_unsafe: 0, skipped_error: 0, commands: [] };
+  const entry = { id: c.id, receipt: '', sha: contentSha(c), ran: 0, failed: 0, skipped_live: 0, skipped_unsafe: 0, skipped_error: 0, commands: [] };
   c.evidence.forEach((e, idx) => {
     const n = idx + 1;
     if (only && n !== only) return;

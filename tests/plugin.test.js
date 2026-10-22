@@ -205,6 +205,7 @@ test('save verify writes votes-<run>.json and refuses a bad vote', () => {
   const votes = readJson(path.join(DATA, 'fixture-votes-B1.json'));
   let r = run('save-result.js', ['verify', path.join(DATA, 'fixture-votes-B1.json'), '--run', '2', ws]);
   assert.equal(r.code, 0, r.out + r.err);
+  assert.match(r.out, /note: kit batches ran again after this verify run/, 'no batch files here: saved anyway, with a note');
   assert.deepEqual(readJson(path.join(ws, 'work', 'phase3', 'votes-2.json')), votes);
 
   const bad = JSON.parse(JSON.stringify(votes));

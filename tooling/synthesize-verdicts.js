@@ -10,9 +10,17 @@
  *   <work>/candidates.json
  *   <work>/phase3/receipts/_index.json          (from run-evidence.js)
  *   votes files: the saved outputs of the verify workflow runs; default
- *     every <work>/phase3/votes-*.json, read in name order. A file may hold
- *     the output itself or wrap it as { "result": ... }. When the same
- *     candidate gets two votes from one lens, the later file wins.
+ *     every <work>/phase3/votes-*.json, numbered names first in number
+ *     order (votes-2 before votes-10), then the others in name order. A
+ *     file may hold the output itself or wrap it as { "result": ... }.
+ *     The output's bound_to (copied by the verify workflow from its args)
+ *     gives the sha each candidate had when the skeptics saw it. A vote or
+ *     check counts only when that sha is the candidate's current sha; the
+ *     others are set aside and their files named on the console. A file
+ *     without bound_to (hand-written, or saved before candidate shas
+ *     existed) has all its votes set aside. Two counted votes from one
+ *     lens on the same candidate (or two verifier checks) must give the
+ *     same answer; different answers stop the run with exit 1.
  *   <work>/phase3/master-overrides.json         (optional)
  * Output: <work>/phase3/verdicts.json, then tallies on the console.
  *
@@ -23,6 +31,11 @@
  *   candidate status "fixed" (true before, fixed at the pin) -> REFUTED
  *   candidate status "not_found" (cited code gone)  -> REFUTED
  *       (these two are not batched for voting, so they need no votes)
+ *   a lens (or the verifier) has only set-aside votes
+ *       -> NEEDS-REVIEW: "changed after batching" when one was bound to an
+ *          earlier sha, else "votes not saved with kit save verify"
+ *   its receipt index entry has another sha        -> NEEDS-REVIEW (changed after receipt)
+ *       (the sha is lib/content-sha.js of the whole candidate object)
  *   fewer than n votes, or no verifier check      -> NEEDS-REVIEW (incomplete)
  *   OUT_OF_SCOPE votes >= majority                 -> OUT-OF-SCOPE
  *   REFUTED votes >= majority                      -> REFUTED
@@ -56,15 +69,19 @@
  * and nothing is written. Severity order is the key order of
  * severity_rubric (most severe first), then "none".
  *
- * Exit codes: 0 written, 2 usage, config or input error.
+ * Exit codes: 0 written, 1 two votes files disagree on the same vote, 2
+ * usage, config or input error.
  */
 
 const fs = require('fs');
 const path = require('path');
 const { loadConfig, ConfigError } = require('./lib/config');
 const { validateCandidates, validateRunOutput, validateReceiptIndex, validateVerdicts } = require('./lib/shapes');
+const { canonicalJson, contentSha } = require('./lib/content-sha');
 
 class CliError extends Error {}
+// Two votes files give different answers for the same vote: exit 1.
+class ConflictError extends Error {}
 
 const ACTIONS = ['remove', 'merge', 're-scope', 'hold'];
 
@@ -84,12 +101,28 @@ function problems(label, errs) {
   throw new CliError(`${label} has ${errs.length} problem${errs.length === 1 ? '' : 's'}:\n${shown.join('\n')}`);
 }
 
+// votes-<number>.json in number order first, then the other names in plain
+// code-point order.
+function byVotesName(a, b) {
+  const num = (f) => { const m = /^votes-([0-9]+)\.json$/.exec(f); return m ? Number(m[1]) : null; };
+  const x = num(a);
+  const y = num(b);
+  if (x !== null && y !== null && x !== y) return x - y;
+  if (x !== null && y === null) return -1;
+  if (x === null && y !== null) return 1;
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 function votesFiles(paths, given) {
   if (given.length) return given.map((f) => path.resolve(f));
   const dir = path.join(paths.work, 'phase3');
-  const names = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /^votes-.*\.json$/.test(f)).sort() : [];
+  const names = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /^votes-.*\.json$/.test(f)).sort(byVotesName) : [];
   if (!names.length) throw new CliError('no votes files: save each verify run as work/phase3/votes-<name>.json');
   return names.map((f) => path.join(dir, f));
+}
+
+function isPlainObject(v) {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
 function readOverrides(paths) {
@@ -160,7 +193,10 @@ function both(a, b) {
   return a === 'PASS' && b === 'PASS' ? 'PASS' : 'UNKNOWN';
 }
 
-function synthesize(config, candidates, outputs, receipts) {
+// names (optional, one per output): the file each output came from, for
+// messages. A vote or check counts only when the output's bound_to binds it
+// to the candidate's current sha; the others are set aside (see run()).
+function synthesize(config, candidates, outputs, receipts, names) {
   const lenses = config.verify.skeptic_lenses;
   const need = config.verify.survive_votes;
   const majority = Math.floor(lenses.length / 2) + 1;
@@ -170,17 +206,55 @@ function synthesize(config, candidates, outputs, receipts) {
   const missing = [];
   const unknown = new Set();
   const ids = new Set(candidates.map((c) => c.id));
-  for (const out of outputs) {
+  const current = new Map(candidates.map((c) => [c.id, contentSha(c)]));
+  const first = new Map(); // "id lens" -> { value, file } of a vote on the current candidate
+  const setAside = new Map(); // "id lens" -> ['unbound' | 'changed', ...]
+  const ignored = new Map(); // file -> Set of ids whose votes there were set aside
+  const conflicts = [];
+  outputs.forEach((out, i) => {
+    const file = (names && names[i]) || `output ${i + 1}`;
+    const shas = isPlainObject(out.bound_to) && isPlainObject(out.bound_to.shas) ? out.bound_to.shas : null;
     missing.push(...(out.missing || []));
     for (const r of out.results) {
       const list = r.kind === 'vote' ? r.votes : r.checks;
+      const lens = r.kind === 'vote' ? r.lens : null;
       for (const v of list) {
         if (!ids.has(v.id)) { unknown.add(v.id); continue; }
-        if (r.kind === 'vote') (votes[v.id] = votes[v.id] || {})[r.lens] = v;
-        else checks[v.id] = v;
+        const key = `${v.id} ${lens || '(verifier)'}`;
+        if (!shas || shas[v.id] !== current.get(v.id)) {
+          if (!setAside.has(key)) setAside.set(key, []);
+          setAside.get(key).push(shas ? 'changed' : 'unbound');
+          if (!ignored.has(file)) ignored.set(file, new Set());
+          ignored.get(file).add(v.id);
+          continue;
+        }
+        const prev = first.get(key);
+        if (prev) {
+          if (canonicalJson(prev.value) !== canonicalJson(v)) {
+            const what = lens ? `lens ${lens}: ${prev.value.vote} in ${prev.file}, ${v.vote} in ${file}` : `verifier: ${prev.value.verdict} in ${prev.file}, ${v.verdict} in ${file}`;
+            conflicts.push(`${v.id}, ${what}${prev.value.vote === v.vote && prev.value.verdict === v.verdict ? ' (other fields differ)' : ''}`);
+          }
+        } else {
+          first.set(key, { value: v, file });
+          if (lens) (votes[v.id] = votes[v.id] || {})[lens] = v;
+          else checks[v.id] = v;
+        }
       }
     }
+  });
+  if (conflicts.length) {
+    throw new ConflictError(`the votes files disagree on ${conflicts.length} vote${conflicts.length === 1 ? '' : 's'} cast on the same version of a candidate; keep the file of the run you trust and remove or re-save the other:\n${conflicts.map((m) => `  - ${m}`).join('\n')}`);
   }
+  // Why a candidate is set aside: some lens (or the verifier) has only votes
+  // that were not cast on its current version.
+  const setAsideWhy = (id) => {
+    const kinds = lenses.map((l) => `${id} ${l}`).concat(`${id} (verifier)`)
+      .filter((k) => !first.has(k) && setAside.has(k)).flatMap((k) => setAside.get(k));
+    if (!kinds.length) return null;
+    return kinds.includes('changed')
+      ? 'changed after batching: the candidate is not the one the skeptics and the verifier saw; run kit batches and verify it again'
+      : 'votes not saved with `kit save verify` (no bound_to); verify again';
+  };
   const receiptById = new Map(receipts.candidates.map((x) => [x.id, x]));
 
   const verdicts = candidates.map((c) => {
@@ -212,6 +286,8 @@ function synthesize(config, candidates, outputs, receipts) {
       environment: gates.g5_no_mitigation,
     };
 
+    const sha = contentSha(c);
+    const rec = receiptById.get(c.id);
     let verdict;
     let why;
     if (c.status === 'fixed') {
@@ -220,6 +296,12 @@ function synthesize(config, candidates, outputs, receipts) {
     } else if (c.status === 'not_found') {
       verdict = 'REFUTED';
       why = 'the cited code does not exist at the pinned commit';
+    } else if (setAsideWhy(c.id)) {
+      verdict = 'NEEDS-REVIEW';
+      why = setAsideWhy(c.id);
+    } else if (rec && rec.sha !== sha) {
+      verdict = 'NEEDS-REVIEW';
+      why = 'changed after receipt: the evidence receipt is from an earlier version of the candidate; run kit evidence again';
     } else if (cast.length < lenses.length || !chk) {
       verdict = 'NEEDS-REVIEW';
       why = `incomplete: ${cast.length}/${lenses.length} votes, verifier ${chk ? 'present' : 'missing'}`;
@@ -267,7 +349,7 @@ function synthesize(config, candidates, outputs, receipts) {
       fp_check,
     };
   });
-  return { verdicts, missing, unknown: [...unknown].sort() };
+  return { verdicts, missing, unknown: [...unknown].sort(), ignored: [...ignored].map(([file, set]) => ({ file, ids: [...set].sort() })) };
 }
 
 // Applies overrides already checked by overrideProblems.
@@ -301,14 +383,17 @@ function run(opts, io) {
     'work/phase3/receipts/_index.json (run `kit evidence` first)');
   problems('work/phase3/receipts/_index.json', validateReceiptIndex(receipts));
 
+  const names = [];
   const outputs = votesFiles(paths, opts.files).map((f) => {
-    const raw = readJson(f, path.basename(f));
+    const name = path.basename(f);
+    const raw = readJson(f, name);
     const out = raw && raw.result && !raw.results ? raw.result : raw;
-    problems(path.basename(f), validateRunOutput(out, config));
+    problems(name, validateRunOutput(out, config));
+    names.push(name);
     return out;
   });
   const overrides = readOverrides(paths);
-  const res = synthesize(config, candidates, outputs, receipts);
+  const res = synthesize(config, candidates, outputs, receipts, names);
   problems('work/phase3/master-overrides.json', overrideProblems(res.verdicts, overrides, config));
   applyOverrides(res.verdicts, overrides);
   const doc = {
@@ -329,6 +414,7 @@ function run(opts, io) {
   io.out(`verdicts: ${Object.keys(tally).sort().map((k) => `${k} ${tally[k]}`).join(', ')}`);
   io.out(`missing agents: ${res.missing.join(', ') || 'none'}`);
   if (res.unknown.length) io.out(`votes for unknown ids (ignored): ${res.unknown.join(', ')}`);
+  for (const x of res.ignored) io.out(`ignored in ${x.file} (not cast on the current version of the candidate, or not saved with kit save verify): ${x.ids.join(', ')}`);
   io.out(`NEEDS-REVIEW: ${res.verdicts.filter((v) => v.verdict === 'NEEDS-REVIEW').map((v) => `${v.id} (${v.why})`).join('; ') || 'none'}`);
   const dups = res.verdicts.filter((v) => Object.values(v.votes).some((x) => x && x.duplicate_of))
     .map((v) => `${v.id}->${Object.values(v.votes).map((x) => x && x.duplicate_of).filter(Boolean)[0]}`);
@@ -351,6 +437,11 @@ function main(argv, io) {
     }
     return run({ workspace: pos[0] || '.', files: pos.slice(1) }, io);
   } catch (e) {
+    if (e instanceof ConflictError) {
+      io.err(`synthesize: ${e.message}`);
+      io.err('nothing was written');
+      return 1;
+    }
     if (e instanceof CliError || e instanceof ConfigError) {
       io.err(`synthesize: ${e.message}`);
       if (e instanceof ConfigError && e.errors.length > 1) e.errors.forEach((m) => io.err(`  - ${m}`));
@@ -360,7 +451,7 @@ function main(argv, io) {
   }
 }
 
-module.exports = { main, synthesize, overrideProblems, applyOverrides, ACTIONS };
+module.exports = { main, synthesize, overrideProblems, applyOverrides, byVotesName, ConflictError, ACTIONS };
 
 if (require.main === module) {
   process.exitCode = main(process.argv.slice(2));

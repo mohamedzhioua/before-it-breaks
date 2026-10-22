@@ -5,7 +5,7 @@
  * lives only in a chat session.
  *
  * Usage:
- *   node tooling/save-result.js <phase> <result-json-file> [--run N] [<workspace>]
+ *   node tooling/save-result.js <phase> <result-json-file> [--run N] [--force] [<workspace>]
  *   phase: map | hunt | verify | report-inputs | recommend
  *
  * What each phase accepts and where it goes (paths under the config's
@@ -25,15 +25,20 @@
  *                  outer shape (see checkHuntSummary); `kit build log` reads
  *                  it for unsettled claims and hunter notes.
  *   verify         RUN_OUTPUT, checked with shapes.validateRunOutput and the
- *                  config. Written to phase3/votes-<N>.json (N from --run,
- *                  default 1).
+ *                  config. Written as it is to phase3/votes-<N>.json. Its
+ *                  bound_to (the batch-plan id and candidate shas the
+ *                  workflow copied from its args) ties the votes to the
+ *                  candidates the skeptics saw; a result without it is
+ *                  saved, with a note, but synthesis trusts none of its
+ *                  votes. When the batches were cut again since the run,
+ *                  the result is still saved, with a note.
  *   report-inputs  { items: [REPORT_INPUT...] } (other top-level keys are
  *                  kept), checked with shapes.validateReportInputs and the
  *                  config, again after a merge. Run 1 writes
  *                  phase5/report-inputs.json; a later run merges into it:
  *                  arrays are joined (items with the same "id" replaced),
  *                  other keys take the new value.
- *   recommend      { recs, cross_cutting }. recs is an array of
+ *   recommend     { recs, cross_cutting }. recs is an array of
  *                  MODULE_PLAN, or an object of name -> plan (the plan's
  *                  "module" is set to the name, and must equal it when
  *                  given); each plan is checked with
@@ -43,11 +48,23 @@
  *                  phase6/cross-cutting.json; {} (a run without the
  *                  cross-cutting architect) leaves that file as it was.
  *
+ * The run N: --run when given; otherwise, for hunt, the run the workflow
+ * wrote into its summary (summary.run); otherwise 1. A save that would
+ * replace a file of another run is refused unless --force:
+ *   hunt           phase2/hunt-<N>.json exists with other content (a --run
+ *                  that disagrees with the result's summary.run only gets a
+ *                  note);
+ *   verify         phase3/votes-<N>.json exists with another batch-plan id
+ *                  or other batches;
+ *   report-inputs  run 1 when phase5/report-inputs.json exists (run 1
+ *                  replaces the whole file; later runs merge).
+ * Saving exactly the same content again is always allowed.
+ *
  * Nothing is written when the result is invalid. Files are written to a
  * temporary name first and then renamed.
  *
- * Exit codes: 0 saved, 1 the result is invalid, 2 usage, config, pins or
- * unreadable input.
+ * Exit codes: 0 saved, 1 the result is invalid or the save would overwrite
+ * a file of another run, 2 usage, config, pins or unreadable input.
  *
  * Exports: main(argv, io), saveResult(phase, result, opts) -> { written,
  *   notes }   (throws ResultError with .errors when invalid)
@@ -66,6 +83,8 @@ class ResultError extends Error {
     this.errors = errors;
   }
 }
+// The save would overwrite a file of another run; --force allows it.
+class RefuseError extends Error {}
 
 const PHASES = ['map', 'hunt', 'verify', 'report-inputs', 'recommend'];
 const RUN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
@@ -98,6 +117,20 @@ function readJson(file, what) {
   } catch (e) {
     throw new CliError(`${what} ${file} is not valid JSON (${e.message})`);
   }
+}
+
+function sameText(file, text) {
+  try {
+    return fs.readFileSync(file, 'utf8') === text;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Refuses an overwrite of another run's file, unless --force.
+function refuse(ctx, why) {
+  if (ctx.force) { ctx.notes.push(`--force: ${why}; replaced`); return; }
+  throw new RefuseError(`${why}. Give the right --run, or add --force to replace it`);
 }
 
 // ---------- phases ----------
@@ -147,6 +180,8 @@ function checkHuntSummary(sum) {
   });
   list('hunters').forEach((h, i) => { if (!isObj(h)) errs.push(`summary.hunters[${i}]: must be an object`); });
   list('hunters_failed').forEach((h, i) => { if (typeof h !== 'string') errs.push(`summary.hunters_failed[${i}]: must be a string`); });
+  const runOk = ['number', 'string'].includes(typeof sum.run) && RUN.test(String(sum.run));
+  if (sum.run !== undefined && !runOk) errs.push('summary.run: must be a run name such as 1 or 2');
   if (sum.rule_writer !== undefined && typeof sum.rule_writer !== 'string') errs.push('summary.rule_writer: must be a string');
   if (sum.rules !== undefined && sum.rules !== null && !isObj(sum.rules)) errs.push('summary.rules: must be an object or null');
   return errs;
@@ -179,15 +214,52 @@ function planHunt(result, ctx) {
   if (summary !== undefined) {
     const unresolved = Array.isArray(summary.claims_not_resolved) ? summary.claims_not_resolved.length : 0;
     ctx.notes.push(`hunt summary: ${unresolved} claim${unresolved === 1 ? '' : 's'} not resolved, saved as phase2/hunt-${ctx.run}.json`);
-    writes.push({ file: path.join(ctx.paths.work, 'phase2', `hunt-${ctx.run}.json`), text: json({ run: ctx.run, source: ctx.source, failed: isObj(result) && Array.isArray(result.failed) ? result.failed : [], summary }) });
+    const huntFile = path.join(ctx.paths.work, 'phase2', `hunt-${ctx.run}.json`);
+    const text = json({ run: ctx.run, source: ctx.source, failed: isObj(result) && Array.isArray(result.failed) ? result.failed : [], summary });
+    if (fs.existsSync(huntFile) && !sameText(huntFile, text)) {
+      const old = readJson(huntFile, 'existing');
+      const was = isObj(old) && isObj(old.summary) && old.summary.run !== undefined ? ` (hunt run ${old.summary.run})` : '';
+      refuse(ctx, `phase2/hunt-${ctx.run}.json already holds another hunt summary${was}`);
+    }
+    writes.push({ file: huntFile, text });
   } else ctx.notes.push('no hunt summary in the result: phase2/hunt-<N>.json not written');
   return writes;
+}
+
+// Batch names a verify result covers: its batches list plus every result's batch.
+function batchNames(out) {
+  const names = new Set(isObj(out) && Array.isArray(out.batches) ? out.batches : []);
+  for (const r of isObj(out) && Array.isArray(out.results) ? out.results : []) if (isObj(r) && typeof r.batch === 'string') names.add(r.batch);
+  return [...names].sort();
 }
 
 function planVerify(result, ctx) {
   const errs = validateRunOutput(result, ctx.config);
   if (errs.length) throw new ResultError(errs);
-  return [{ file: path.join(ctx.paths.work, 'phase3', `votes-${ctx.run}.json`), text: json(result) }];
+  const file = path.join(ctx.paths.work, 'phase3', `votes-${ctx.run}.json`);
+  const text = json(result);
+  const plan = isObj(result.bound_to) ? result.bound_to.plan : undefined;
+  if (plan === undefined) {
+    ctx.notes.push('note: the result has no bound_to (it did not come from the verify workflow), so synthesis will mark every candidate it votes on NEEDS-REVIEW; verify again to fix that');
+  } else {
+    const runsFile = path.join(ctx.paths.work, 'phase3', 'runs.json');
+    const runs = fs.existsSync(runsFile) ? readJson(runsFile, 'existing') : null;
+    const now = isObj(runs) && typeof runs.plan === 'string' ? runs.plan : null;
+    if (now !== plan) ctx.notes.push(`note: kit batches ran again after this verify run (batch plan ${plan}, now ${now || 'none'}); candidates that changed since will be NEEDS-REVIEW`);
+  }
+  if (fs.existsSync(file) && !sameText(file, text)) {
+    const old = readJson(file, 'existing');
+    const oldOut = isObj(old) && old.result && !old.results ? old.result : old;
+    const oldPlan = isObj(oldOut) && isObj(oldOut.bound_to) ? oldOut.bound_to.plan : undefined;
+    const was = batchNames(oldOut);
+    const now = batchNames(result);
+    if (oldPlan !== plan) {
+      refuse(ctx, `phase3/votes-${ctx.run}.json holds votes cast on batch plan ${oldPlan || '(none recorded)'}, and this result is from batch plan ${plan || '(none recorded)'}: it looks like another run`);
+    } else if (was.join(',') !== now.join(',')) {
+      refuse(ctx, `phase3/votes-${ctx.run}.json holds the votes of batches ${was.join(', ') || 'none'}, and this result is for batches ${now.join(', ') || 'none'}: it looks like another run`);
+    }
+  }
+  return [{ file, text }];
 }
 
 function mergeObjects(old, next) {
@@ -212,6 +284,9 @@ function planReport(result, ctx) {
   if (errs.length) throw new ResultError(errs);
   const file = path.join(ctx.paths.work, 'phase5', 'report-inputs.json');
   let value = result;
+  if (ctx.run === '1' && fs.existsSync(file) && !sameText(file, json(result))) {
+    refuse(ctx, 'phase5/report-inputs.json exists, and run 1 would replace all of it (later runs merge into it)');
+  }
   if (ctx.run !== '1' && fs.existsSync(file)) {
     const old = readJson(file, 'existing');
     if (!isObj(old)) throw new CliError(`${file} is not a JSON object; fix or move it first`);
@@ -261,17 +336,29 @@ const PLAN = { map: planMap, hunt: planHunt, verify: planVerify, 'report-inputs'
 function saveResult(phase, result, opts) {
   if (!PHASES.includes(phase)) throw new CliError(`unknown phase "${phase}" (one of ${PHASES.join(', ')})`);
   const { config, paths } = loadConfig(opts.workspace || '.');
-  const ctx = { config, paths, run: String(opts.run || '1'), source: opts.source || 'result', notes: [] };
+  const ctx = { config, paths, run: '1', force: opts.force === true, source: opts.source || 'result', notes: [] };
+  // The run a hunt result names itself; checked by checkHuntSummary in planHunt.
+  const own = phase === 'hunt' && isObj(result) && isObj(result.summary) && ['number', 'string'].includes(typeof result.summary.run)
+    && RUN.test(String(result.summary.run)) ? String(result.summary.run) : null;
+  if (opts.run) {
+    if (!RUN.test(String(opts.run))) throw new CliError('--run needs a run name such as 1, 2 or B1');
+    ctx.run = String(opts.run);
+    if (own !== null && own !== ctx.run) ctx.notes.push(`note: --run ${ctx.run} was given, but the result says hunt run ${own}; saved as run ${ctx.run}`);
+  } else if (own !== null) {
+    ctx.run = own;
+    ctx.notes.push(`run ${own}, from the result (summary.run)`);
+  }
   const writes = PLAN[phase](result, ctx);
   for (const w of writes) writeAtomic(w.file, w.text);
   return { written: writes.map((w) => w.file), notes: ctx.notes };
 }
 
 function parseArgs(argv) {
-  const opts = { phase: null, file: null, workspace: null, run: '1', help: false };
+  const opts = { phase: null, file: null, workspace: null, run: null, force: false, help: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--help' || a === '-h') opts.help = true;
+    else if (a === '--force') opts.force = true;
     else if (a === '--run') {
       const v = argv[++i];
       if (v === undefined || !RUN.test(v)) throw new CliError('--run needs a run name such as 1, 2 or B1');
@@ -285,7 +372,7 @@ function parseArgs(argv) {
   return opts;
 }
 
-const USAGE = `usage: node tooling/save-result.js <${PHASES.join('|')}> <result-json-file> [--run N] [<workspace>]`;
+const USAGE = `usage: node tooling/save-result.js <${PHASES.join('|')}> <result-json-file> [--run N] [--force] [<workspace>]`;
 
 function main(argv, io) {
   io = io || { out: (s) => process.stdout.write(s + '\n'), err: (s) => process.stderr.write(s + '\n') };
@@ -300,6 +387,10 @@ function main(argv, io) {
     written.forEach((f) => io.out(`saved ${f}`));
     return 0;
   } catch (e) {
+    if (e instanceof RefuseError) {
+      io.err(`save: ${e.message}; nothing was saved`);
+      return 1;
+    }
     if (e instanceof ResultError) {
       io.err(`save: ${e.message}; nothing was saved`);
       e.errors.forEach((m) => io.err(`  - ${m}`));
@@ -314,7 +405,7 @@ function main(argv, io) {
   }
 }
 
-module.exports = { main, saveResult, checkHuntSummary, ResultError, PHASES };
+module.exports = { main, saveResult, checkHuntSummary, ResultError, RefuseError, PHASES };
 
 if (require.main === module) {
   process.exitCode = main(process.argv.slice(2));

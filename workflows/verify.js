@@ -9,8 +9,9 @@ export const meta = {
 };
 
 // Phase 3 of the audit. Input: the args from `kit args verify`. Output, for
-// `kit save verify`: { batches, missing, results: [VOTE_SET | VERIFIER_SET] }
-// (RUN_OUTPUT in tooling/lib/shapes.js). The vote and check schemas below
+// `kit save verify`: { batches, missing, results: [VOTE_SET | VERIFIER_SET],
+// bound_to? } (RUN_OUTPUT in tooling/lib/shapes.js); bound_to is copied from
+// the args (plan and each batch's shas) when they carry them. The vote and check schemas below
 // are inline copies of VOTE and CHECK there; keep them in step.
 
 // ---------------------------------------------------------------------------
@@ -252,6 +253,8 @@ function joinPath(dir, name) {
 const PHASE = 'verify';
 const ROLES = ['skeptic', 'verifier'];
 const BATCH = /^B[0-9]+$/;
+const SHA = /^[0-9a-f]{64}$/;
+const PLAN_ID = /^[0-9a-f]{12}$/;
 
 function votesSchema(a, b) {
   return {
@@ -345,6 +348,7 @@ function validateArgs(raw) {
   if (Array.isArray(lenses) && isObj(briefs)) {
     for (const l of lenses) c.needIn(briefs, 'args.skeptic_briefs', l, STR);
   }
+  if (a.plan !== undefined && !(typeof a.plan === 'string' && PLAN_ID.test(a.plan))) c.fail('args.plan: must be a batch-plan id (12 hex characters)');
   const batches = c.need('batches', FULL);
   if (Array.isArray(batches)) {
     batches.forEach((b, i) => {
@@ -355,6 +359,7 @@ function validateArgs(raw) {
       c.needIn(b, w, 'ids', FULL);
       checkIds(c, b.ids, `${w}.ids`);
       if (typeof b.batch === 'string' && !BATCH.test(b.batch)) c.fail(`${w}.batch: "${b.batch}" is not a batch name such as B1`);
+      if (b.shas !== undefined && !(isObj(b.shas) && Object.values(b.shas).every((s) => typeof s === 'string' && SHA.test(s)))) c.fail(`${w}.shas: must map candidate ids to sha256 values`);
     });
     if (Array.isArray(lenses) && isObj(a.concurrency)) {
       const total = batches.length * (lenses.length + 1);
@@ -463,4 +468,8 @@ tasks.forEach((t, i) => {
   else missing.push(t.opts.label);
 });
 if (missing.length) say(`${PHASE}: no result from ${missing.join(', ')}`);
-return { batches: A.batches.map((b) => b.batch), missing, results: out };
+// The batch-plan id and candidate shas from the args, copied as they are, so
+// kit synthesize can tell when a candidate changed after this run.
+const bound = typeof A.plan === 'string' && A.batches.every((b) => isObj(b.shas))
+  ? { plan: A.plan, shas: Object.assign({}, ...A.batches.map((b) => b.shas)) } : null;
+return { batches: A.batches.map((b) => b.batch), missing, results: out, ...(bound ? { bound_to: bound } : {}) };

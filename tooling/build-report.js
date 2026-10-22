@@ -15,7 +15,8 @@
  * and not size-driven last), then id. Tables: by severity, by tier (the
  * ladder of tiers.js), by area (config.areas, with the maturity rule of
  * tiers.js), and an index. A finding without report inputs is still listed,
- * with its title and "not drafted yet"; their ids are printed on stdout.
+ * with its title and "not drafted yet"; their ids are printed on stdout,
+ * also as a `check:` line, and each counts as a check under --strict.
  *
  * Size check: when a report input and the verified candidate disagree on
  * whether the finding is size-driven (a breaking size or "any size" on one
@@ -26,7 +27,8 @@
  * exit 1 (the page is still written).
  *
  * Exit codes: 0 written, 1 written but --strict and at least one `check:`
- * line, 2 usage, config or input error.
+ * line, or final-verdicts.json is older than verdicts.json (nothing
+ * written; see tiers.readFinal), 2 usage, config or input error.
  */
 
 const path = require('path');
@@ -190,8 +192,9 @@ function build(ws, io, strict) {
   const counts = levels.map((l, i) => `${l} ${row(findings)[i]}`).join(', ');
   io.out(`findings ${findings.length} (${counts}); not drafted: ${missing.join(', ') || 'none'}`);
   for (const p of conflicts) io.out(`check: ${p}`);
+  if (missing.length) io.out(`check: no report input drafted yet for ${missing.join(", ")}`);
   io.out(`wrote ${file}`);
-  return T.strictExit(strict, conflicts.length, io);
+  return T.strictExit(strict, conflicts.length + missing.length, io);
 }
 
 function main(argv, io) {

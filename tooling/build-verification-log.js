@@ -14,8 +14,12 @@
  * Writes:
  *   <outputs.log>                    the verification log page
  *   phase3/final-verdicts.json       one entry per candidate, with its
- *                                    citations and whether it is reported;
- *                                    every other builder reads this file
+ *                                    citations and whether it is reported,
+ *                                    plus verdicts_sha256, the sha256 of
+ *                                    phase3/verdicts.json as read; every
+ *                                    other builder reads this file and
+ *                                    refuses it (exit 1) once verdicts.json
+ *                                    has changed (tiers.readFinal)
  *   phase3/claim-verdicts.json       one verdict per claim
  *
  * A claim takes the best verdict of the candidates that name it in their
@@ -304,9 +308,10 @@ function notesForTeam(hunts, claimsIn) {
 }
 
 function build(ws, io) {
-  const { config, paths, pins, full } = T.loadWorkspace(ws);
+  const { config, paths, pins, full } = T.loadWorkspace(ws, { fresh: false });
   const cands = T.readCandidates(paths);
-  const vdoc = T.readJson(path.join(paths.work, 'phase3', 'verdicts.json'), 'work/phase3/verdicts.json (run `kit synthesize` first)');
+  const verdictsFile = path.join(paths.work, 'phase3', 'verdicts.json');
+  const { value: vdoc, sha: verdictsSha } = T.readJsonSha(verdictsFile, 'work/phase3/verdicts.json (run `kit synthesize` first)');
   T.problems('work/phase3/verdicts.json', validateVerdicts(vdoc));
   const indexFile = path.join(paths.work, 'phase3', 'receipts', '_index.json');
   const index = T.readOptional(indexFile, 'work/phase3/receipts/_index.json', null);
@@ -323,7 +328,7 @@ function build(ws, io) {
   vdoc.byId = new Map(vdoc.verdicts.map((v) => [v.id, v]));
   const md = render({ config, paths, pins, final, claims, verdictsDoc: vdoc, cands, index, runLog, teamNotes });
 
-  T.writeFile(T.FINAL_FILE(paths), JSON.stringify({ date: config.audit.date, generated_by: GENERATOR, pins, findings: final }, null, 2) + '\n');
+  T.writeFile(T.FINAL_FILE(paths), JSON.stringify({ date: config.audit.date, generated_by: GENERATOR, verdicts_sha256: verdictsSha, pins, findings: final }, null, 2) + '\n');
   const claimFile = path.join(paths.work, 'phase3', 'claim-verdicts.json');
   if (claims) T.writeFile(claimFile, JSON.stringify({ date: config.audit.date, claims }, null, 2) + '\n');
   else if (fs.existsSync(claimFile)) fs.unlinkSync(claimFile);

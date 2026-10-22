@@ -22,7 +22,8 @@
  *   VERIFIER_SET    { kind: "verify", batch, checks: [CHECK...] }.
  *   RUN_OUTPUT      what a verify workflow run returns and the lead saves
  *                   as work/phase3/votes-<name>.json:
- *                   { batches, missing, results: [VOTE_SET | VERIFIER_SET] }.
+ *                   { batches, missing, results: [VOTE_SET | VERIFIER_SET],
+ *                   bound_to?: { plan, shas } }.
  *   RECEIPT_INDEX   work/phase3/receipts/_index.json, written by
  *                   run-evidence.js.
  *   PINS            work/pins.json, written by pin.js.
@@ -214,9 +215,19 @@ const RUN_OUTPUT = {
   required: ['results'],
   additionalProperties: false,
   properties: {
-    batches: strList('Batches of this run.'),
+    batches: { type: 'array', description: 'Batches of this run.', items: { type: 'string', pattern: '^B[0-9]+$' } },
     missing: strList('Labels of agents that returned nothing.'),
     results: { type: 'array', items: { type: 'object' } },
+    bound_to: {
+      type: 'object',
+      description: 'Copied by the verify workflow from its args, never written by an agent: the batch-plan id and the sha of each candidate the skeptics were given.',
+      required: ['plan', 'shas'],
+      additionalProperties: false,
+      properties: {
+        plan: str('Batch-plan id from kit batches.', '^[0-9a-f]{12}$'),
+        shas: { type: 'object', additionalProperties: { type: 'string', pattern: '^[0-9a-f]{64}$' } },
+      },
+    },
   },
 };
 
@@ -240,11 +251,12 @@ const RECEIPT_INDEX = {
       type: 'array',
       items: {
         type: 'object',
-        required: ['id', 'receipt', 'commands', ...Object.keys(COUNTS)],
+        required: ['id', 'receipt', 'sha', 'commands', ...Object.keys(COUNTS)],
         additionalProperties: false,
         properties: {
           id: str('Candidate id.', CANDIDATE_ID),
           receipt: str('sha256 of the receipt body, first 12 hex characters.', '^[0-9a-f]{12}$'),
+          sha: str('sha256 of the whole candidate object the commands came from (lib/content-sha.js).', '^[0-9a-f]{64}$'),
           ...COUNTS,
           commands: {
             type: 'array',
@@ -572,6 +584,8 @@ function validateRunOutput(obj, config, at) {
 }
 
 function validateReceiptIndex(obj) {
+  const list = isObj(obj) && Array.isArray(obj.candidates) ? obj.candidates : [];
+  if (list.some((e) => isObj(e) && e.sha === undefined)) return ['receipts from before this version (no candidate sha): run `kit evidence` again'];
   return check(RECEIPT_INDEX, obj, 'receipts');
 }
 

@@ -7,7 +7,8 @@
  *   node tooling/split-batches.js [<workspace>]
  *
  * Reads <work>/candidates.json. Writes:
- *   <work>/phase3/batches/B<n>.json  { batch, groups, candidates } with at
+ *   <work>/phase3/batches/B<n>.json  { batch, plan, groups, shas,
+ *       candidates } with at
  *       most verify.batch_size candidates each. Candidates with status
  *       "fixed" or "not_found" are left out (synthesis refutes them without
  *       votes), and severity_guess is removed from each candidate so the
@@ -15,8 +16,14 @@
  *       order and kept together: a group joins the current batch while it
  *       fits, otherwise it starts a new one; a group larger than the batch
  *       size is cut into near-equal parts. Old B<n>.json files are removed.
+ *       shas maps each candidate id of the batch to the sha of the whole
+ *       candidate (lib/content-sha.js, severity_guess included); kit save
+ *       verify binds the votes to these, and synthesis marks a candidate
+ *       that changed since as NEEDS-REVIEW. plan is the batch-plan id: the
+ *       first 12 hex characters of the sha of every batch's name, groups
+ *       and shas, so the same candidates always give the same plan.
  *   <work>/phase3/runs.json  { agents_per_batch, max_agents_per_workflow,
- *       runs: [{ run, batches, agents }] }. Each batch needs one skeptic per
+ *       plan, runs: [{ run, batches, agents }] }. Each batch needs one skeptic per
  *       skeptic lens plus one verifier; each run holds as many batches as
  *       fit in concurrency.max_agents_per_workflow.
  *
@@ -31,6 +38,7 @@ const fs = require('fs');
 const path = require('path');
 const { loadConfig, ConfigError } = require('./lib/config');
 const { validateCandidates } = require('./lib/shapes');
+const { contentSha } = require('./lib/content-sha');
 
 class CliError extends Error {}
 
@@ -114,16 +122,19 @@ function run(opts, io) {
   if (!candidates.length) throw new CliError('work/candidates.json has no candidates');
   const p = plan(config, candidates);
 
+  const shas = p.batches.map((b) => Object.fromEntries(b.candidates.map((c) => [c.id, contentSha(c)])));
+  const planId = contentSha(p.batches.map((b, i) => ({ batch: b.batch, groups: b.groups, shas: shas[i] }))).slice(0, 12);
   const dir = path.join(paths.work, 'phase3', 'batches');
   fs.mkdirSync(dir, { recursive: true });
   for (const f of fs.readdirSync(dir)) if (/^B[0-9]+\.json$/.test(f)) fs.rmSync(path.join(dir, f));
-  for (const b of p.batches) {
+  p.batches.forEach((b, i) => {
     fs.writeFileSync(path.join(dir, `${b.batch}.json`),
-      JSON.stringify({ batch: b.batch, groups: b.groups, candidates: b.candidates.map(forSkeptics) }, null, 2) + '\n');
-  }
+      JSON.stringify({ batch: b.batch, plan: planId, groups: b.groups, shas: shas[i], candidates: b.candidates.map(forSkeptics) }, null, 2) + '\n');
+  });
   const runsDoc = {
     agents_per_batch: p.agentsPerBatch,
     max_agents_per_workflow: config.concurrency.max_agents_per_workflow,
+    plan: planId,
     runs: p.runs,
   };
   fs.writeFileSync(path.join(paths.work, 'phase3', 'runs.json'), JSON.stringify(runsDoc, null, 2) + '\n');
@@ -131,7 +142,7 @@ function run(opts, io) {
   for (const r of p.runs) io.out(`run ${r.run}: ${r.batches.join(', ')} = ${r.agents} agents`);
   const skipped = candidates.filter((c) => NOT_VOTED.includes(c.status));
   if (skipped.length) io.out(`not batched (status fixed or not_found; synthesis refutes them): ${skipped.map((c) => c.id).join(', ')}`);
-  io.out(`${candidates.length - skipped.length} candidates in ${p.batches.length} batches and ${p.runs.length} run${p.runs.length === 1 ? '' : 's'}`);
+  io.out(`${candidates.length - skipped.length} candidates in ${p.batches.length} batches and ${p.runs.length} run${p.runs.length === 1 ? '' : 's'} (batch plan ${planId})`);
   return 0;
 }
 

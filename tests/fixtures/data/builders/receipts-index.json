@@ -15,6 +15,7 @@
     {
       "id": "SVC-JOBS-01",
       "receipt": "86de9aa1a2cb",
+      "sha": "4084ef8224da85d635c89b2773e861f99b3cc0a24ec41dba2452b066a9c12040",
       "commands": [
         {
           "n": 1,
@@ -32,6 +33,7 @@
     {
       "id": "SVC-JOBS-02",
       "receipt": "caaa7450f55f",
+      "sha": "549cdb35532550ef355639374b5d1f258470973cdd7f07919c4df676752739ad",
       "commands": [
         {
           "n": 1,
@@ -55,6 +57,7 @@
     {
       "id": "SVC-JOBS-03",
       "receipt": "d0c17f17e513",
+      "sha": "4bbe9bbc5b2e03c43d73f3426014cfe483002b75833c7873a76011bd588ad7ee",
       "commands": [
         {
           "n": 1,
@@ -72,6 +75,7 @@
     {
       "id": "SVC-IMPORT-01",
       "receipt": "69100cb9b269",
+      "sha": "e4615a361570556ee50fd7549b4fecae250198aa6a3a86abb00315e047390572",
       "commands": [
         {
           "n": 1,
@@ -95,6 +99,7 @@
     {
       "id": "SVC-IMPORT-02",
       "receipt": "b8495921a9b8",
+      "sha": "6a155c24f00dd52bc8c7bb6d62bc5672678ab183074405cb3fee127bc0ad65a0",
       "commands": [
         {
           "n": 1,
@@ -112,6 +117,7 @@
     {
       "id": "SVC-IMPORT-03",
       "receipt": "3540086550f8",
+      "sha": "deb5b3499bd4cb7f6961e7fb59a6253f49be8df5d032c75a44aa416b7ebe74c0",
       "commands": [
         {
           "n": 1,
@@ -129,6 +135,7 @@
     {
       "id": "DATA-INDEX-01",
       "receipt": "959ceed64265",
+      "sha": "7af36e620550fc874548f6397a39cb34da20d901cc7ba76666c96231319b9468",
       "commands": [
         {
           "n": 1,
@@ -152,6 +159,7 @@
     {
       "id": "DATA-INDEX-02",
       "receipt": "958c0484fae0",
+      "sha": "61f57e5d3a9c304cf824124d3ba9911457ecc6efa98a57d440bc08f689a52d5a",
       "commands": [
         {
           "n": 1,
@@ -169,6 +177,7 @@
     {
       "id": "DATA-INDEX-03",
       "receipt": "24f645ed304f",
+      "sha": "e232bb329a9bbc5e07ba7c384aa50996451002817c2a76b4cadf60bddca40e0b",
       "commands": [
         {
           "n": 1,
@@ -192,6 +201,7 @@
     {
       "id": "DATA-INDEX-04",
       "receipt": "3c898fe98d4c",
+      "sha": "b3b9e6f779548bf68c3247e541567751c8c6b420412f060d47dbcb82503a2d6a",
       "commands": [
         {
           "n": 1,
@@ -215,6 +225,7 @@
     {
       "id": "DATA-INDEX-05",
       "receipt": "3339636a9226",
+      "sha": "840308a45be8f3e71783be8e9a22870e2a42aa75635cda853fb6ba3031ffbb0e",
       "commands": [
         {
           "n": 1,
@@ -232,6 +243,7 @@
     {
       "id": "OPS-RUNTIME-01",
       "receipt": "fd1fd1f94e83",
+      "sha": "cf757918e13870f3f03c456d453abe7c3940be31b406a8a0f14f8e8bc9b26b61",
       "commands": [
         {
           "n": 1,
@@ -255,6 +267,7 @@
     {
       "id": "OPS-RUNTIME-02",
       "receipt": "4b091c5ab83b",
+      "sha": "21d65dcfc582e70e7ca50dcabf9f0b0070145c5a2aa8d0f2cf53c0bcc8c21d9b",
       "commands": [
         {
           "n": 1,
@@ -272,6 +285,7 @@
     {
       "id": "OPS-RUNTIME-03",
       "receipt": "4511c743a355",
+      "sha": "1e013922b89fd188a9037f3b4677b6b78c42794520fc57c039b8e3a0e9d1055e",
       "commands": [
         {
           "n": 1,
@@ -289,6 +303,7 @@
     {
       "id": "WEB-LISTS-01",
       "receipt": "24a93682c5c1",
+      "sha": "3fb21b3ff805df2ee4356c5403b5a66bcf31141d034bdec34dd7291a1af9af7d",
       "commands": [
         {
           "n": 1,
@@ -312,6 +327,7 @@
     {
       "id": "WEB-LISTS-02",
       "receipt": "e401bed84cf5",
+      "sha": "5c7292f5c02560bc4cdd242e406293664a74c2a93e7d5143f150848a80463829",
       "commands": [
         {
           "n": 1,
@@ -329,6 +345,7 @@
     {
       "id": "WEB-LISTS-03",
       "receipt": "886b21128176",
+      "sha": "9c2bb63363b9a6f5d99bff7326a09f418664d37988e9c2e1ea732a490f4df9e7",
       "commands": [
         {
           "n": 1,
@@ -346,6 +363,7 @@
     {
       "id": "SVC-JOBS-04",
       "receipt": "0002c1a28360",
+      "sha": "949f2c5b75d600d15a5cc5993db3765e856f85943ced9abf9a899d24dc257e35",
       "commands": [
         {
           "n": 1,

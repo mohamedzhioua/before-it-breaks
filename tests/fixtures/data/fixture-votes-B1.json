@@ -609,5 +609,19 @@
         }
       ]
     }
-  ]
+  ],
+  "bound_to": {
+    "plan": "9be4ea466e41",
+    "shas": {
+      "SVC-JOBS-01": "8739855793b50af6dc4f980ee34af0a3f2d8ff916c19cc1ebe88fafa50af6442",
+      "DATA-INDEX-01": "7e239d99eec3de9204751dfdcfd4995c271c48999503b4384c3af67e925102fc",
+      "SVC-IMPORT-01": "f857521745d17b07160239fad011411b68f2f423caed3a2ac5e90e5c3fa444b6",
+      "SVC-IMPORT-02": "c4a60554fa4bb571850deef6dc03a8af7ff208c0d036932f42e8dc93049c62a1",
+      "DATA-INDEX-02": "5f3e46b221b8c0335a2535af7720fb99953965a55983a9f68c3b7b246a3b2c89",
+      "OPS-RUNTIME-01": "f7b3eab73334bb94f20af867222d6d9224f5036a8c68c52c66ead98d76e344e0",
+      "SVC-JOBS-02": "fa39431aec49e9df1c4b91f42db1e374bfcb28b17ec4eaaf55b8b0594d96798b",
+      "SVC-IMPORT-03": "26279b278104ce8ff9636dfd3c907ec96df7be3ab06c09ab2383b7ff995967e8",
+      "DATA-INDEX-03": "ee543390c0e4b753d793d6fdf5b4f23864fdc9d242df9a46de196dbbf9a1d3f7"
+    }
+  }
 }

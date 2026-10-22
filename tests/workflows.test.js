@@ -599,7 +599,9 @@ test('stubbed runs return the documented shapes, and kit save accepts every one'
   assert.deepEqual(Object.keys(results.hunt).sort(), ['candidates', 'failed', 'summary']);
   assert.equal(results.hunt.candidates.length, ARGS.hunt.groups.length);
   assert.equal(results.hunt.summary.rule_writer, 'returned');
-  assert.deepEqual(Object.keys(results.verify).sort(), ['batches', 'missing', 'results']);
+  assert.deepEqual(Object.keys(results.verify).sort(), ['batches', 'bound_to', 'missing', 'results']);
+  assert.equal(results.verify.bound_to.plan, ARGS.verify.plan, 'the batch-plan id is copied from the args');
+  assert.deepEqual(results.verify.bound_to.shas, Object.assign({}, ...ARGS.verify.batches.map((b) => b.shas)), 'the candidate shas are copied from the args');
   assert.equal(results.verify.results.filter((x) => x.kind === 'vote').length, ARGS.verify.batches.length * ARGS.verify.verify.skeptic_lenses.length);
   const items = results['report-inputs'].items;
   assert.deepEqual(items.map((i) => i.id), ARGS['report-inputs'].report_batches.flatMap((b) => b.ids));

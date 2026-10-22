@@ -30,10 +30,10 @@
  *   -> tier id, maturity(counts, levels), fmtN(n), breaksText(item),
  *   levelsOf(config); text helpers cap, one, prose, cell, code, rel(from, to,
  *   anchor); pageTop(opts), legend(), trustLine(measured, total, link),
- *   kitDocUrl(page); workspace helpers loadWorkspace(ws), readCandidates,
- *   readFinal, readInputs, sortFindings, countBy, readJson, readOptional,
- *   problems, writeFile, byStr; runCli(argv, io, spec, fn), strictExit(strict,
- *   warnings, io); BuildError,
+ *   kitDocUrl(page); workspace helpers loadWorkspace(ws, opts?),
+ *   readCandidates, readFinal, checkFresh, readInputs, sortFindings,
+ *   countBy, readJson, readJsonSha, readOptional, problems, writeFile,
+ *   byStr; runCli(argv, io, spec, fn), strictExit(strict, warnings, io); BuildError, StaleError (exit 1 from runCli),
  *   REPORTED, NOT_SIZE_DRIVEN, VERDICT_MEANING; main(argv) prints the
  *   tier ladder of a workspace.
  */
@@ -61,6 +61,8 @@ const VERDICT_MEANING = {
 };
 
 class BuildError extends Error {}
+// The builder's input is out of date (runCli exits 1, not 2).
+class StaleError extends BuildError {}
 
 // ---------- tiers and maturity ----------
 
@@ -225,13 +227,24 @@ function maskText(s) {
 }
 
 function readJson(file, label) {
-  let text;
+  return readJsonSha(file, label).value;
+}
+
+// { value, sha }: the parsed (and masked) JSON and the sha256 of the very
+// bytes it was parsed from.
+function readJsonSha(file, label) {
+  let bytes;
   try {
-    text = fs.readFileSync(file, 'utf8');
+    bytes = fs.readFileSync(file);
   } catch (e) {
     if (e.code === 'ENOENT') throw new BuildError(`${label} is missing (${file})`);
     throw new BuildError(`cannot read ${label} (${e.code || e.message})`);
   }
+  const sha = require('crypto').createHash('sha256').update(bytes).digest('hex');
+  return { value: parseJson(bytes.toString('utf8'), label), sha };
+}
+
+function parseJson(text, label) {
   try {
     const value = JSON.parse(text.replace(/^\uFEFF/, ''));
     return activeMasks ? scrub(value, activeMasks) : value;
@@ -262,8 +275,11 @@ const byStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
 // ---------- workspace data shared by the builders ----------
 
-// { config, paths, pins: { repo: short }, full: { repo: sha } }
-function loadWorkspace(ws) {
+// { config, paths, pins: { repo: short }, full: { repo: sha } }. When
+// final-verdicts.json exists, it must still match verdicts.json (see
+// checkFresh); only `kit build log`, which rewrites it, passes
+// { fresh: false }.
+function loadWorkspace(ws, opts) {
   const { loadConfig } = require('./lib/config');
   const { readPins } = require('./pin');
   const { config, paths } = loadConfig(ws);
@@ -272,6 +288,7 @@ function loadWorkspace(ws) {
   const pins = {};
   const full = {};
   for (const [name, r] of Object.entries(p.repos)) { pins[name] = r.short; full[name] = r.sha; }
+  if (!(opts && opts.fresh === false) && fs.existsSync(FINAL_FILE(paths))) checkFresh(paths);
   return { config, paths, pins, full };
 }
 
@@ -289,9 +306,32 @@ function readCandidates(paths) {
 
 const FINAL_FILE = (paths) => path.join(paths.work, 'phase3', 'final-verdicts.json');
 
+// Throws StaleError (exit 1) when phase3/verdicts.json is no longer the
+// file `kit build log` read: its sha256 must equal the verdicts_sha256 that
+// build log recorded in final-verdicts.json.
+function checkFresh(paths) {
+  const { fileSha } = require('./lib/content-sha');
+  let recorded;
+  try {
+    // The recorded sha, read without masking.
+    recorded = JSON.parse(fs.readFileSync(FINAL_FILE(paths), 'utf8').replace(/^\uFEFF/, '')).verdicts_sha256;
+  } catch (e) {
+    throw new BuildError(`cannot read work/phase3/final-verdicts.json (${e.code || e.message}); run \`kit build log\` again`);
+  }
+  const now = fileSha(path.join(paths.work, 'phase3', 'verdicts.json'));
+  if (now === null) throw new StaleError('work/phase3/verdicts.json is missing, but final-verdicts.json was built from it; run `kit synthesize` and `kit build log` again');
+  if (recorded !== now) {
+    throw new StaleError(typeof recorded === 'string'
+      ? 'work/phase3/verdicts.json changed after `kit build log`; re-run it'
+      : 'work/phase3/final-verdicts.json does not record which verdicts.json it was built from; re-run `kit build log`');
+  }
+}
+
+// final-verdicts.json, after checkFresh.
 function readFinal(paths) {
   const doc = readJson(FINAL_FILE(paths), 'work/phase3/final-verdicts.json (run `kit build log` first)');
   if (!doc || !Array.isArray(doc.findings)) throw new BuildError('work/phase3/final-verdicts.json has no "findings" array; run `kit build log` again');
+  checkFresh(paths);
   return doc;
 }
 
@@ -321,8 +361,8 @@ function countBy(list, fn) {
 
 // Runs a builder: parses [<workspace>] plus the given value options
 // (spec.options: flag -> key) and boolean flags (spec.flags: flag -> key),
-// maps errors to exit codes (BuildError/ConfigError -> 2, a returned number
-// otherwise). fn(ws, opts, io) returns an exit code.
+// maps errors to exit codes (StaleError -> 1, other BuildError/ConfigError
+// -> 2, a returned number otherwise). fn(ws, opts, io) returns an exit code.
 function runCli(argv, io, spec, fn) {
   io = io || { out: (s) => process.stdout.write(s + '\n'), err: (s) => process.stderr.write(s + '\n') };
   const opts = {};
@@ -348,7 +388,7 @@ function runCli(argv, io, spec, fn) {
     if (e instanceof BuildError || e instanceof ConfigError) {
       io.err(`${spec.name}: ${e.message}`);
       if (e instanceof ConfigError && e.errors && e.errors.length > 1) e.errors.forEach((m) => io.err(`  - ${m}`));
-      return 2;
+      return e instanceof StaleError ? 1 : 2;
     }
     throw e;
   }
@@ -368,6 +408,7 @@ module.exports = {
   REPORTED,
   VERDICT_MEANING,
   BuildError,
+  StaleError,
   fmtN,
   buildTiers,
   tierOf,
@@ -385,6 +426,7 @@ module.exports = {
   trustLine,
   pageTop,
   readJson,
+  readJsonSha,
   readOptional,
   scrub,
   maskText,
@@ -396,6 +438,7 @@ module.exports = {
   pinList,
   readCandidates,
   readFinal,
+  checkFresh,
   readInputs,
   sortFindings,
   countBy,

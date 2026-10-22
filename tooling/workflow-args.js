@@ -28,10 +28,13 @@
  *                  work/phase1 and its lens_file), lens_files, claims_file,
  *                  map_dir, rule_writer (true on the last run when
  *                  rules.enabled; the rule writer counts as one agent).
- *   verify         batches of run N as [{ batch, file, groups, size, ids }]:
- *                  file is the absolute path of work/phase3/batches/B<n>.json
- *                  (from `kit batches`), which the agents read themselves, so
- *                  candidate texts are not copied into args; verify, pool
+ *   verify         batches of run N as [{ batch, file, groups, size, ids,
+ *                  shas }]: file is the absolute path of
+ *                  work/phase3/batches/B<n>.json (from `kit batches`), which
+ *                  the agents read themselves, so candidate texts are not
+ *                  copied into args; shas (the batch file's candidate shas)
+ *                  and plan (the batch-plan id of runs.json) are given when
+ *                  present, and the workflow returns them as bound_to; verify, pool
  *                  (concurrency.verify_pool), skeptic_briefs, receipts_dir.
  *                  Args stay small enough to paste into a Workflow call:
  *                  hunt carries only the config's group entries, report-inputs
@@ -208,10 +211,14 @@ function verifyPart(config, paths, n) {
   const batches = runPlan.batches.map((b) => {
     const data = readJson(path.join(dir, 'batches', `${b}.json`), `work/phase3/batches/${b}.json is missing: run \`kit batches\` again`);
     const ids = (data.candidates || []).map((c) => c.id);
-    return { batch: b, file: path.join(dir, 'batches', `${b}.json`), groups: data.groups || [], size: ids.length, ids };
+    // The candidate shas of the batch file travel with the args, so the
+    // verify run can return them with its votes (bound_to).
+    const shas = data && data.shas !== null && typeof data.shas === 'object' && !Array.isArray(data.shas) ? { shas: data.shas } : {};
+    return { batch: b, file: path.join(dir, 'batches', `${b}.json`), groups: data.groups || [], size: ids.length, ids, ...shas };
   });
   return {
     runs_total: plan.runs.length,
+    ...(typeof plan.plan === 'string' ? { plan: plan.plan } : {}),
     batches,
     verify: config.verify,
     pool: config.concurrency.verify_pool,
