@@ -398,6 +398,8 @@ function denyRules(prefixes) {
   for (const raw of prefixes) {
     const p = raw.trim().replace(/\s+/g, ' ');
     if (!p) continue;
+    // "node --eval=": the value is glued to the option, so no space before *.
+    if (p.endsWith('=')) { out.push(`Bash(${p}*)`); continue; }
     out.push(`Bash(${p})`, `Bash(${p} *)`);
     const m = /^git (\S.*)$/.exec(p);
     if (m) out.push(`Bash(git * ${m[1]})`, `Bash(git * ${m[1]} *)`);

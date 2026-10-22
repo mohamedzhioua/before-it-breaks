@@ -104,6 +104,20 @@ test('plain read-only pipelines are accepted and become argument lists', (t) => 
     'git -C {repo:notes-api} blame -L 1,3 {pin:notes-api} -- package.json',
     "grep -rn --include='*.ts' -e removeOnFail {repo:notes-api}/src",
     'git -C {repo:notes-api} ls-tree -r --name-only {pin:notes-api} | wc -l',
+    // .env in a search pattern or a sed script is text to find, not a file to read
+    "rg 'process\\.env' {repo:notes-api}/src",
+    "rg -n 'process\\.env\\.NOTES_URL' {repo:notes-api}/src",
+    "git -C {repo:notes-api} grep -e '\\.env' {pin:notes-api}",
+    "git -C {repo:notes-api} grep -n '\\.env' {pin:notes-api} -- src",
+    "git -C {repo:notes-api} log -S '.env' --oneline {pin:notes-api}",
+    "grep -rn -e '\\.env' {repo:notes-api}/src",
+    "sed -n '/\\.env/p' {repo:notes-api}/src/x.ts",
+    // broad file patterns run; the runner's excludes keep .env out
+    "rg -n -g 'src/**/*.ts' x {repo:notes-api}/src",
+    "grep -rn --include='*/x.ts' -e x {repo:notes-api}/src",
+    "grep -rn --include='*.e2e.ts' -e x {repo:notes-api}/src",
+    "rg -n -g '.envrc' x {repo:notes-api}/src",
+    'grep .env {repo:notes-api}/src/a.ts',
     // literal rev:path with brackets, safe include and exclude patterns
     "git -C {repo:notes-api} show '{pin:notes-api}:app/[id]/page.tsx'",
     "rg -n -g '*.ts' -g '!.env*' removeOnFail {repo:notes-api}/src",
@@ -197,23 +211,32 @@ test('every refused class is refused with its reason (classified only)', (t) => 
     [`${G} grep -n -e x ${P} -- '.en[v]'`, /wildcards .* git pathspecs/],
     [`${G} log -p ${P} -- 'config/*'`, /wildcards .* git pathspecs/],
     [`${G} grep -n -e x ${P} -- ':(glob)**/.e*'`, /wildcards|pathspec magic/],
-    [`grep -rn --include='.env*' -e x ${R}/src`, /could match an \.env file/],
-    [`grep -rn --include='*' -e x ${R}/src`, /could match an \.env file/],
-    [`grep -rn --include='config/.e?v' -e x ${R}/src`, /could match an \.env file/],
-    [`rg -n -g '*' x ${R}/src`, /could match an \.env file/],
-    [`rg -n --glob='.{env,cfg}' x ${R}/src`, /could match an \.env file/],
-    [`rg -n -g '.EN[V]*' x ${R}/src`, /could match an \.env file/],
+    [`grep -rn --include='.env*' -e x ${R}/src`, /could match an \.env file|reads an \.env file/],
+    [`grep -rn --include='*' -e x ${R}/src`, /could match an \.env file|reads an \.env file/],
+    [`grep -rn --include='config/.e?v' -e x ${R}/src`, /could match an \.env file|reads an \.env file/],
+    [`rg -n -g '*' x ${R}/src`, /could match an \.env file|reads an \.env file/],
+    [`rg -n --glob='.{env,cfg}' x ${R}/src`, /could match an \.env file|reads an \.env file/],
+    [`rg -n -g '.EN[V]*' x ${R}/src`, /could match an \.env file|reads an \.env file/],
     // values glued to an option, .env folders, and globs that could start with ".e"
     [`grep -rn --include=.env.staging -e x ${R}/src`, /reads an \.env file/],
-    [`grep -rn --include='.env.st?ging' -e x ${R}/src`, /could match an \.env file/],
+    [`grep -rn --include='.env.st?ging' -e x ${R}/src`, /reads an \.env file/],
+    [`rg -n -g '.env*' x ${R}/src`, /reads an \.env file/],
+    [`rg -n -g '.env.local' x ${R}/src`, /reads an \.env file/],
+    [`grep -e x ${R}/.env`, /reads an \.env file/],
     [`rg -n -g.env.staging x ${R}/src`, /reads an \.env file/],
     [`rg -n --glob=.env.staging x ${R}/src`, /reads an \.env file/],
-    [`rg -n -g '.?nv' x ${R}/src`, /could match an \.env file/],
-    [`grep -rn --include='.[eE]*' -e x ${R}/src`, /could match an \.env file/],
-    [`grep -rn --include='?*' -e x ${R}/src`, /could match an \.env file/],
+    [`rg -n -g '.?nv' x ${R}/src`, /could match an \.env file|reads an \.env file/],
+    [`grep -rn --include='.[eE]*' -e x ${R}/src`, /could match an \.env file|reads an \.env file/],
+    [`grep -rn --include='?*' -e x ${R}/src`, /could match an \.env file|reads an \.env file/],
     [`cat ${R}/.env/x`, /reads an \.env file/],
     [`cat ${R}/config/.ENV.d/settings.json`, /reads an \.env file/],
     [`${G} show ${P}:config/.env/x`, /reads an \.env file/],
+    [`rg -n -g '.env' x ${R}/src`, /could match an \.env file|reads an \.env file/],
+    [`grep -rn --include=.env.staging -e x ${R}/src`, /reads an \.env file|could match/],
+    // file patterns after a path
+    [`grep -rn -e x ${R}/src --include='*.ts'`, /--include comes after the pattern or a path: put file patterns before the paths/],
+    [`grep -rn x ${R}/src --exclude='*.md'`, /put file patterns before the paths/],
+    [`rg -n x ${R}/src -g '*.ts'`, /-g comes after the pattern or a path: put file patterns before the paths/],
     // git structure
     [`git -C ${'/elsewhere'} log`, /-C must be followed by \{repo/],
     [`git -C ${R}/src log`, /-C must be followed by \{repo/],
@@ -407,6 +430,8 @@ test('.env files and folders never reach a receipt through a folder search; user
     assert.deepEqual(c.args.slice(at, at + 2), GREP_ENV_EXCLUDE);
     const userOpts = c.args.map((a, i) => (a.startsWith('-') && !GREP_ENV_EXCLUDE.includes(a) ? i : -1)).filter((i) => i >= 0);
     assert.ok(userOpts.every((i) => i < at), `kit excludes come last: ${JSON.stringify(c.args)}`);
+    // ... and right before the first operand: only the path follows (the pattern is an -e value).
+    assert.deepEqual(c.args.slice(at + 2).map((x) => x.replace(/\\/g, '/').endsWith('/config')), [true], JSON.stringify(c.args));
   }
   const inc = greps.find((c) => c.args.includes('--include=*.ts'));
   assert.ok(inc && inc.args.indexOf('--include=*.ts') < inc.args.indexOf(GREP_ENV_EXCLUDE[0]));
@@ -423,15 +448,23 @@ test('the kit puts its excludes after the step options, never inside an option v
   assert.equal(optionsEnd(['--regexp', '--', 'p'], TABLES.grep), -1);
   assert.equal(optionsEnd(['-g', '--', 'x'], TABLES.rg), -1);
   assert.equal(optionsEnd(['-n', 'x', '--', 'p'], TABLES.rg), 2);
+  const { beforeFirstOperand } = require('../tooling/run-evidence');
+  const K = ['KIT'];
+  // After the user's own file patterns, right before the first operand (pattern or path).
+  assert.deepEqual(beforeFirstOperand(['-rn', '--include=*.ts', 'pat', '/r/src'], TABLES.grep, K), ['-rn', '--include=*.ts', 'KIT', 'pat', '/r/src']);
+  assert.deepEqual(beforeFirstOperand(['-rn', '--include', '*.ts', '-e', 'x', '/r/src'], TABLES.grep, K), ['-rn', '--include', '*.ts', '-e', 'x', 'KIT', '/r/src']);
+  assert.deepEqual(beforeFirstOperand(['-rn', '-e', '--', '/r/src'], TABLES.grep, K), ['-rn', '-e', '--', 'KIT', '/r/src'], 'an -e value is not an operand');
+  assert.deepEqual(beforeFirstOperand(['-rn', '--', 'pat', '/r'], TABLES.grep, K), ['-rn', 'KIT', '--', 'pat', '/r']);
+  assert.deepEqual(beforeFirstOperand(['-n', '-g', '*.ts', 'pat', '/r'], TABLES.rg, K), ['-n', '-g', '*.ts', 'KIT', 'pat', '/r']);
 });
 
-test('include patterns that could match an .env file or folder are refused', () => {
+test('include patterns that name an .env file are refused; broad patterns run', () => {
   const { globCouldMatchEnv } = require('../tooling/run-evidence');
-  for (const g of ['.env.staging', '.en?', '*.env*', '.en[v]', '.?nv', '.[eE]*', '*', '?*', '.E*', 'config/*', '.{env,cfg}',
-    '.EN[V]*', 'src/**', '*env*', '{*.ts,.e*}', '.env/*.ts']) {
+  for (const g of ['.env', '.env.local', '.env*', '.env.staging', '.env.st?ging', '.en?', '*.env*', '.en[v]', '.?nv', '*', '?*',
+    '.{env,cfg}', '.EN[V]*', '*env*', '.env/*.ts']) {
     assert.equal(globCouldMatchEnv(g), true, g);
   }
-  for (const g of ['*.ts', '*.json', 'src/*.ts', '!.env*', '?', '*.{ts,tsx}', 'app.config', 'environment.ts']) {
+  for (const g of ['*.ts', '*.json', 'src/*.ts', 'src/**/*.ts', '*/x.ts', '*.e2e.ts', '.envrc', '!.env*', '?', '*.{ts,tsx}', 'app.config', 'environment.ts']) {
     assert.equal(globCouldMatchEnv(g), false, g);
   }
 });

@@ -5,17 +5,20 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Only for the manual macos job below (macOS minutes bill 10x).
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   checks:
     name: checks (${{ matrix.os }}, node ${{ matrix.node }})
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -37,6 +40,7 @@ jobs:
 
   semgrep-rules:
     name: semgrep rule tests
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
@@ -48,3 +52,20 @@ jobs:
         run: |
           command -v bash >/dev/null 2>&1 || apk add --no-cache bash
           bash rules/semgrep/run-tests.sh
+
+  checks-macos:
+    name: checks (macos-latest, node 22, manual)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Git identity for tests that create repos
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci.invalid"
+      - name: Run every check
+        run: node tests/run-all.js

@@ -163,6 +163,29 @@ test('gitDirCheck refuses fetch, transport and credential settings', (t) => {
   assert.doesNotMatch(p, /remote\.origin\.url/);
 });
 
+test('gitDirCheck refuses diff.external and trace2 settings', (t) => {
+  const repo = makeFixtureRepo(path.join(tmp(t, 'trace'), 'r')).path;
+  appendConfig(repo, ['[diff]', '\texternal = x', '[trace2]', '\teventTarget = x', ''].join('\n'));
+  const p = gitDirCheck(repo).problems.join('\n');
+  assert.match(p, /diff\.external/);
+  assert.match(p, /trace2\.eventtarget/);
+});
+
+test('core.autocrlf and core.eol are carried from global config too; global wins over system', (t) => {
+  const home = tmp(t, 'home');
+  fs.writeFileSync(path.join(home, '.gitconfig'), '[core]\n\tautocrlf = input\n\teol = lf\n\teditor = x\n');
+  const code = "const { systemCarry, gitEnv } = require(process.argv[1]); const e = systemCarry(gitEnv());"
+    + " process.stdout.write(e.GIT_CONFIG_SYSTEM ? require('fs').readFileSync(e.GIT_CONFIG_SYSTEM, 'utf8') : '');";
+  const env = { ...process.env, HOME: home, USERPROFILE: home };
+  for (const k of Object.keys(env)) if (/^GIT_/i.test(k)) delete env[k];
+  const res = spawnSync(process.execPath, ['-e', code, path.join(__dirname, '..', 'tooling', 'lib', 'git-env.js')], { encoding: 'utf8', env });
+  assert.equal(res.status, 0, res.stderr);
+  const keys = Object.fromEntries(configKeys(res.stdout).map((k) => [k.name, true]));
+  assert.ok(keys['core.autocrlf'] && keys['core.eol'], res.stdout);
+  assert.match(res.stdout, /autocrlf = input/, 'the global value wins');
+  assert.doesNotMatch(res.stdout, /editor/, 'only the two carried keys');
+});
+
 test('gitDirCheck reads a CRLF config like git', (t) => {
   assert.deepEqual(configKeys('[core]\r\n\tbare = false\r\n[GPG]\r\n\tprogram = x\r\n').map((k) => k.name), ['core.bare', 'gpg.program']);
   const repo = makeFixtureRepo(path.join(tmp(t, 'crlf'), 'r')).path;

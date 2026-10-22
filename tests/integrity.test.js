@@ -571,14 +571,19 @@ test('kit save refuses to overwrite another run\'s file unless --force', (t) => 
   assert.equal(r.code, 1, r.out + r.err);
   assert.match(r.err, /hunt-1\.json already holds another hunt summary \(hunt run 1\)/);
   assert.equal(save(ws, root, 'hunt', 'h2.json', hunt(2), ['--run', '1', '--force']).code, 0);
-  // Neither side names a run: different content still needs --force.
+  // A same-run re-save with other content (a hunt re-run) is replaced with a note.
   const bare = (note) => ({ candidates: [cand], summary: { hunters: [], claims_not_resolved: [], notes: [{ group: 'SVC-JOBS', notes: note }] } });
   assert.equal(save(ws, root, 'hunt', 'h5.json', bare('first'), ['--run', '5']).code, 0);
   assert.equal(save(ws, root, 'hunt', 'h5.json', bare('first'), ['--run', '5']).code, 0, 'the same content again is fine');
   r = save(ws, root, 'hunt', 'h5b.json', bare('second'), ['--run', '5']);
-  assert.equal(r.code, 1, r.out + r.err);
-  assert.match(r.err, /hunt-5\.json already holds another hunt summary\. Give the right --run, or add --force/);
-  assert.equal(save(ws, root, 'hunt', 'h5b.json', bare('second'), ['--run', '5', '--force']).code, 0);
+  assert.equal(r.code, 0, r.out + r.err);
+  assert.match(r.out, /note: phase2\/hunt-5\.json held a different summary of the same run; replaced/);
+  assert.equal(readJson(path.join(ws, 'work', 'phase2', 'hunt-5.json')).summary.notes[0].notes, 'second');
+  const named = (run, note) => ({ candidates: [cand], summary: { run, hunters: [], claims_not_resolved: [], notes: [{ group: 'SVC-JOBS', notes: note }] } });
+  assert.equal(save(ws, root, 'hunt', 'h6.json', named(6, 'first')).code, 0);
+  r = save(ws, root, 'hunt', 'h6b.json', named(6, 'second'));
+  assert.equal(r.code, 0, r.out + r.err);
+  assert.match(r.out, /same run; replaced/);
 
   // report-inputs: run 1 replaces the whole file, so it needs --force once the file exists.
   const item = (plain) => ({ items: [{ id: cand.id, plain, threshold: 'n/a: not size-driven', breaks_at: null, breaks_at_basis: 'not size-driven', fix_direction: 'Bound it.', effort: 'S', area: loadConfig(ws).config.areas[0] }] });

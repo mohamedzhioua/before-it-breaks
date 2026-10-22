@@ -51,9 +51,11 @@
  * The run N: --run when given; otherwise, for hunt, the run the workflow
  * wrote into its summary (summary.run); otherwise 1. A save that would
  * replace a file of another run is refused unless --force:
- *   hunt           phase2/hunt-<N>.json exists with other content (a --run
- *                  that disagrees with the result's summary.run only gets a
- *                  note);
+ *   hunt           phase2/hunt-<N>.json holds the summary of another hunt
+ *                  run (both summaries name a run and they differ); other
+ *                  content of the same run is replaced with a note (a --run
+ *                  that disagrees with the result's summary.run also only
+ *                  gets a note);
  *   verify         phase3/votes-<N>.json exists with another batch-plan id
  *                  or other batches;
  *   report-inputs  run 1 when phase5/report-inputs.json exists (run 1
@@ -218,8 +220,12 @@ function planHunt(result, ctx) {
     const text = json({ run: ctx.run, source: ctx.source, failed: isObj(result) && Array.isArray(result.failed) ? result.failed : [], summary });
     if (fs.existsSync(huntFile) && !sameText(huntFile, text)) {
       const old = readJson(huntFile, 'existing');
-      const was = isObj(old) && isObj(old.summary) && old.summary.run !== undefined ? ` (hunt run ${old.summary.run})` : '';
-      refuse(ctx, `phase2/hunt-${ctx.run}.json already holds another hunt summary${was}`);
+      const oldRun = isObj(old) && isObj(old.summary) ? old.summary.run : undefined;
+      // Another run only when both summaries name a run and they differ; a
+      // re-save of the same run (a hunt re-run) replaces it with a note.
+      if (oldRun !== undefined && summary.run !== undefined && String(oldRun) !== String(summary.run)) {
+        refuse(ctx, `phase2/hunt-${ctx.run}.json already holds another hunt summary (hunt run ${oldRun})`);
+      } else ctx.notes.push(`note: phase2/hunt-${ctx.run}.json held a different summary of the same run; replaced`);
     }
     writes.push({ file: huntFile, text });
   } else ctx.notes.push('no hunt summary in the result: phase2/hunt-<N>.json not written');

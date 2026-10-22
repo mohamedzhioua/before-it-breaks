@@ -6,10 +6,9 @@
  *   node tooling/doctor.js [<workspace>] [--no-optional]
  *
  * Prints one line per check, "ok" or "FAIL" (required) / "--" (optional):
- *   required  Node >= 20, git >= 2.44 (the evidence runner sets
+ *   required  Node >= 20, git >= 2.40 (the evidence runner sets
  *             GIT_ATTR_SOURCE so a repo's .gitattributes cannot name filter
- *             or diff programs, and the kit sets GIT_NO_LAZY_FETCH so a
- *             partial clone cannot fetch; older git ignores them), the
+ *             or diff programs; older git ignores it), the
  *             config is valid, every repo
  *             folder exists and is a git repo whose .git folder passes the
  *             check of `kit pin` (lib/git-env.js gitDirCheck, done before
@@ -20,8 +19,10 @@
  *             it. It is found from evidence.shell: "auto" means Git Bash on
  *             Windows and "bash" elsewhere; or give a full path. (The evidence
  *             runner itself starts no shell.)
- *   optional  bash when rules are off, semgrep (rules stage), claude (the
- *             Claude Code CLI). Skip semgrep and claude with --no-optional.
+ *   optional  git >= 2.44 (GIT_NO_LAZY_FETCH; partial clones are refused by
+ *             kit pin either way), bash when rules are off, semgrep (rules
+ *             stage), claude (the Claude Code CLI). Skip semgrep and claude
+ *             with --no-optional.
  * Also required: every configured lens and skeptic lens has its method file
  * (the check of `kit check workflows --workspace`).
  * Prints a WARNING (not a failure) for each value kit init filled with a
@@ -88,16 +89,25 @@ function atLeast(text, min) {
   return maj > min[0] || (maj === min[0] && minr >= min[1]);
 }
 
+// The git version rows: 2.40 is required (GIT_ATTR_SOURCE stops a repo's
+// .gitattributes from naming filter or diff programs); 2.44 is optional
+// (GIT_NO_LAZY_FETCH; a repo with a promisor remote is refused anyway).
+function gitChecks(git) {
+  const need = atLeast(git, [2, 40]);
+  const lazy = atLeast(git, [2, 44]);
+  return [
+    { required: true, ok: need, name: 'git >= 2.40', detail: !git ? 'git not found' : need ? git : `${git}: too old; 2.40 or later is needed so the kit can stop a repo's .gitattributes from naming filter or diff programs (GIT_ATTR_SOURCE)` },
+    { required: false, ok: lazy, name: 'git >= 2.44', detail: !git ? 'git not found' : lazy ? `${git} (GIT_NO_LAZY_FETCH is honoured)` : `${git}: GIT_NO_LAZY_FETCH is ignored before 2.44; fetch still blocked by GIT_ALLOW_PROTOCOL, and repos with a promisor remote (partial clones) are refused by kit pin either way` },
+  ];
+}
+
 function run(opts, io) {
   if (!fs.existsSync(opts.workspace)) throw new CliError(`workspace not found: ${opts.workspace}`);
   const checks = [];
   const add = (required, ok, name, detail) => checks.push({ required, ok, name, detail });
 
   add(true, atLeast(process.versions.node, [20, 0]), 'node >= 20', `node ${process.versions.node}`);
-  const git = version('git', ['--version']);
-  const gitOk = atLeast(git, [2, 44]);
-  add(true, gitOk, 'git >= 2.44', !git ? 'git not found'
-    : gitOk ? git : `${git}: too old; 2.44 or later is needed so the kit can stop a repo's .gitattributes from naming filter or diff programs (GIT_ATTR_SOURCE) and stop lazy fetches (GIT_NO_LAZY_FETCH)`);
+  for (const c of gitChecks(version('git', ['--version']))) add(c.required, c.ok, c.name, c.detail);
 
   let config = null;
   let paths = null;
@@ -226,7 +236,7 @@ function main(argv, io) {
   }
 }
 
-module.exports = { main };
+module.exports = { main, gitChecks };
 
 if (require.main === module) {
   process.exitCode = main(process.argv.slice(2));

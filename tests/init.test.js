@@ -126,6 +126,21 @@ test('the tools use the running kit; doctor warns when kit.root names another fo
   assert.doesNotMatch(kit(['init', ws, '--refresh-prompts']).out, /kit\.root updated/, 'nothing to record the second time');
 });
 
+test('doctor needs git 2.40; 2.44 (GIT_NO_LAZY_FETCH) is optional and reported', () => {
+  const { gitChecks } = require('../tooling/doctor');
+  const rows = (v) => gitChecks(v);
+  const at243 = rows('git version 2.43.0');
+  assert.ok(at243.filter((c) => c.required).every((c) => c.ok), 'git 2.43 passes every required check');
+  const opt = at243.find((c) => !c.required);
+  assert.equal(opt.ok, false);
+  assert.match(opt.detail, /GIT_NO_LAZY_FETCH is ignored before 2\.44/);
+  assert.ok(rows('git version 2.44.1.windows.1').every((c) => c.ok));
+  const old = rows('git version 2.39.5').find((c) => c.required);
+  assert.equal(old.ok, false);
+  assert.match(old.detail, /2\.40 or later is needed/);
+  assert.equal(rows(null).find((c) => c.required).detail, 'git not found');
+});
+
 test('doctor fails only on pins before Phase 0, and passes after pin', (t) => {
   const { ws, res } = setup(t, 'init-doctor');
   assert.equal(res.code, 0, res.out + res.err);
@@ -193,6 +208,8 @@ test('.claude/settings.json also denies network tools, shells, script runners an
     'npm exec', 'npm x', 'pnpm dlx', 'pnpm exec', 'yarn dlx', 'bunx', 'bun x', 'bun run', 'curl.exe', 'wget.exe', 'py']) {
     assert.ok(deny.includes(`Bash(${p})`) && deny.includes(`Bash(${p} *)`), `missing Bash(${p}) forms`);
   }
+  assert.ok(deny.includes('Bash(node --eval=*)') && deny.includes('Bash(node --print=*)'), 'the = forms');
+  assert.deepEqual(denyRules(['node --eval=']), ['Bash(node --eval=*)']);
   for (const sub of ['fetch', 'clone', 'remote', 'config', 'submodule']) {
     for (const rule of [`Bash(git ${sub})`, `Bash(git ${sub} *)`, `Bash(git * ${sub})`, `Bash(git * ${sub} *)`]) {
       assert.ok(deny.includes(rule), `missing ${rule}`);
@@ -206,6 +223,7 @@ test('.claude/settings.json also denies network tools, shells, script runners an
     `git -C ${r} submodule update`, 'git fetch origin',
     'npm exec left-pad', 'npm x left-pad', 'pnpm dlx left-pad', 'pnpm exec x', 'yarn dlx left-pad', 'bunx left-pad', 'bun x left-pad',
     'bun run build', 'curl.exe https://notes.example', 'wget.exe https://notes.example', 'py -c "print(1)"',
+    'node --eval=console.log(1)', 'node --print=process.version',
     // Collateral of the "git * <sub>" form: an unquoted search word that is a git subcommand.
     `git -C ${r} grep -n config abc123 -- src`]) {
     assert.ok(denies(deny, cmd), `should deny: ${cmd}`);

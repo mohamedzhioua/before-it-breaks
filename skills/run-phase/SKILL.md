@@ -63,7 +63,7 @@ As soon as a run returns, write its result to a file (for example `<ws>/work/res
 node "${CLAUDE_PLUGIN_ROOT}/kit.js" save <phase> <result-file> --run <N> <ws>
 ```
 
-It checks the result against the kit's data shapes and writes it to the step's file (see the table). If it reports errors, nothing is saved: fix the cause (usually re-run the agent that returned a malformed answer); never edit the result by hand to make it pass. Never put a verify result together or edit it by hand; save exactly what the workflow returned. If it refuses because the step's file already holds another run, check the run number first; add `--force` only when the user confirms that the other run's file should be replaced. Save each run before starting the next; a result kept only in the conversation is lost when the session ends.
+It checks the result against the kit's data shapes and writes it to the step's file (see the table). If it reports errors, nothing is saved: fix the cause (usually re-run the agent that returned a malformed answer); never edit the result by hand to make it pass. Never put a verify result together or edit it by hand; save exactly what the workflow returned. `--force` only replaces another run's file, or report-inputs run 1 (which is replaced whole); a same-run hunt re-save is noted. Save each run before starting the next; a result kept only in the conversation is lost when the session ends.
 
 **Never paste large results into the conversation.** Report counts and the file path; open a single entry only when you need it.
 

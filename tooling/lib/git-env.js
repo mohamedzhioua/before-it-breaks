@@ -18,8 +18,9 @@
  *                    (GIT_CONFIG_GLOBAL=/dev/null, GIT_CONFIG_NOSYSTEM=1,
  *                    GIT_ATTR_NOSYSTEM=1), NO_FETCH, no prompt, no optional
  *                    locks, LC_ALL=C.
- *   systemCarry(env) env with the settings carried over from the system git
- *                    config: only core.autocrlf and core.eol (they decide
+ *   systemCarry(env) env with the settings carried over from the system and
+ *                    global git config (global wins, as in plain git):
+ *                    only core.autocrlf and core.eol (they decide
  *                    how the working tree compares to the index). Read once
  *                    per process, outside any repo, and given to git as a
  *                    system config file of their own, so a repo's own
@@ -89,11 +90,18 @@ function carryFile() {
   env.GIT_DIR = path.join(os.tmpdir(), `kit-no-repo-${process.pid}`); // never look for a repo
   const lines = [];
   for (const [key, ok] of CARRY) {
-    const res = spawnSync('git', ['config', '--system', '--get', key], {
-      cwd: os.tmpdir(), env, encoding: 'utf8', input: '', timeout: 20000, windowsHide: true,
-    });
-    const v = res.status === 0 ? String(res.stdout).trim() : '';
-    if (ok.test(v)) lines.push(`\t${key.slice('core.'.length)} = ${v}`);
+    // Global over system, as plain git reads them (no includes either way).
+    let value = null;
+    for (const scope of ['--system', '--global']) {
+      const scopeEnv = { ...env };
+      if (scope === '--global') delete scopeEnv.GIT_CONFIG_GLOBAL; // the user's own ~/.gitconfig
+      const res = spawnSync('git', ['config', scope, '--get', key], {
+        cwd: os.tmpdir(), env: scopeEnv, encoding: 'utf8', input: '', timeout: 20000, windowsHide: true,
+      });
+      const v = res.status === 0 ? String(res.stdout).trim() : '';
+      if (ok.test(v)) value = v;
+    }
+    if (value !== null) lines.push(`\t${key.slice('core.'.length)} = ${value}`);
   }
   if (!lines.length) return carried;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-git-'));
@@ -173,6 +181,8 @@ const KEY_RULES = [
   [/^core\.(worktree|hookspath|sshcommand|fsmonitor|askpass|gitproxy)$/, 'runs a program or moves the work tree'],
   [/^filter\./, 'a filter driver runs a program'],
   [/^diff\..+\.(command|textconv)$/, 'a diff driver runs a program'],
+  [/^diff\.external$/, 'an external diff program runs'],
+  [/^trace2\./, 'trace2 can write to files or sockets'],
   [/^gpg\./, 'gpg settings name a program'],
   [/^include\./, 'includes another config file (not followed)'],
   [/^includeif\./, 'includes another config file (not followed)'],

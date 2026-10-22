@@ -67,10 +67,12 @@
  *     = q Q { } s y and no s///w or s///e flag, and sed runs with --sandbox
  *     when the installed sed supports it (checked once per run; --dry-run
  *     says when it does not); .env files and folders (any case, any
- *     suffix, also as rev:path or glued to an option) are refused by name,
- *     git pathspecs after -- take no wildcards, grep --include and rg -g
- *     patterns that could match .env are refused, and grep, rg and git grep
- *     always get .env excludes as their last include/exclude rule;
+ *     suffix, also as rev:path or glued to an option) are refused as file
+ *     operands and option values (search patterns and sed scripts may name
+ *     .env), git pathspecs after -- take no wildcards, grep --include and
+ *     rg -g patterns that name an .env file are refused, file patterns
+ *     after the first path are refused, and grep and rg get .env excludes
+ *     right before their first operand (git grep: exclude pathspecs);
  *     git --format/--pretty takes
  *     a built-in format name (oneline short medium full fuller reference
  *     raw; git ignores a pretty.* alias with those names) or a string with
@@ -570,8 +572,10 @@ function operandProblem(head, table, parsed, roots) {
     return `${head} takes at most ${table.maxOperands} file (a second one would be written to)`;
   }
   for (const o of opts) {
-    // A value glued to its option (-g.env.x) is not a word of its own.
-    if (typeof o.value === 'string' && ENV_NAME.test(o.value)) return 'reads an .env file';
+    // .env names count in file operands and option values, but not in search
+    // patterns or sed scripts (they read no file), nor in exclusions.
+    const exclusion = ['exclude', 'exclude-dir'].includes(o.name) || (['g', 'glob'].includes(o.name) && String(o.value).startsWith('!'));
+    if (typeof o.value === 'string' && !SEARCH_OPTS.includes(o.name) && !exclusion && ENV_GLOB.test(o.value)) return 'reads an .env file';
     if (['include', 'g', 'glob'].includes(o.name) && globCouldMatchEnv(String(o.value))) {
       return `"${o.value}": this file pattern could match an .env file; name the file types you need (for example *.ts)`;
     }
@@ -580,6 +584,7 @@ function operandProblem(head, table, parsed, roots) {
     }
   }
   for (const f of files) {
+    if (ENV_NAME.test(f)) return 'reads an .env file';
     if (GLOB.test(f)) return `"${f}": glob characters (* ? [) are not allowed in file operands`;
     const p = pathProblem(f, roots);
     if (p) return p;
@@ -588,6 +593,9 @@ function operandProblem(head, table, parsed, roots) {
 }
 
 const GLOB = /[*?[]/;
+// Options whose value is a search pattern or a sed script, not a file.
+const SEARCH_OPTS = ['e', 'regexp', 'expression'];
+const GIT_SEARCH_OPTS = ['e', 'S', 'G', 'grep'];
 
 const REV = /^[A-Za-z0-9._/@{}^~-]+$/;
 const COMMIT_REV = /^[0-9a-f]{7,40}(?:[~^][0-9]*)*$/;
@@ -596,6 +604,9 @@ const COMMIT_REV = /^[0-9a-f]{7,40}(?:[~^][0-9]*)*$/;
 // "/", "\", ":" (git rev:path, e.g. HEAD:.env) or "=" (--include=.env.x),
 // and as a file or a folder (.env/x).
 const ENV_NAME = /(^|[/\\:=])\.env(\.[\w-]+)*(?=$|[/\\])/i;
+// The same in a glob or an option value, where the suffix may hold glob
+// characters (.env*, .env.st?ging, .env.[lp]*); .envrc is another name.
+const ENV_GLOB = /(^|[/\\:=])\.env([.*?[][\w.*?[\]!-]*)?(?=$|[/\\])/i;
 const ENV_SAMPLES = ['.env', '.ENV', '.Env', '.env.local', '.env.production.local', '.env.local.bak'];
 
 // Brace alternatives of a glob, expanded ({a,b}c -> ac, bc); null when
@@ -652,51 +663,26 @@ function globTokens(seg) {
   return out;
 }
 
-// True when a name matched by these tokens could start with ".e" or ".E".
-// A "*" that is followed by more than wildcards stands for nothing here
-// ("*.ts" is allowed); a run of wildcards at the end stands for anything.
-function couldStartWithDotE(tokens) {
-  let tail = tokens.length;
-  while (tail > 0 && ['star', 'any'].includes(tokens[tail - 1].t)) tail--;
-  const open = tokens.slice(tail).some((x) => x.t === 'star');
-  const close = (set) => {
-    const out = new Set(set);
-    for (const s of out) if (s < tokens.length && tokens[s].t === 'star') out.add(s + 1);
-    return out;
-  };
-  const eats = (tok, chars) => tok.t === 'any' || (tok.t === 'lit' && chars.includes(tok.c)) || (tok.t === 'cls' && chars.some((ch) => tok.re.test(ch)));
-  let states = new Set([0]);
-  for (const chars of [['.'], ['e', 'E']]) {
-    const next = new Set();
-    for (const s of close(states)) {
-      if (open && s >= tail) return true;
-      if (s < tokens.length && eats(tokens[s], chars)) next.add(s + 1);
-    }
-    states = next;
-    if (!states.size) return false;
-  }
-  return true;
-}
-
 function tokensRegExp(tokens) {
   const src = tokens.map((x) => (x.t === 'star' ? '.*' : x.t === 'any' ? '.' : x.t === 'cls' ? x.re.source.slice(1, -1) : escapeRe(x.c))).join('');
   try { return new RegExp('^' + src + '$', 'i'); } catch (e) { return null; }
 }
 
-// True when an include glob (grep --include, rg -g/--glob) could match an
-// .env file or folder: any segment that could start with ".e", or that
-// matches an .env name. rg exclusions ("!...") are allowed.
+// True when an include glob (grep --include, rg -g/--glob) names an .env
+// file: its last segment (braces expanded) matches one of ENV_SAMPLES, or
+// the value itself holds an .env name, glob suffixes too (.env*, .env/*.ts).
+// Broad globs such as *.ts or src/**/*.ts pass; the excludes the runner
+// adds keep .env out.
+// rg exclusions ("!...") are allowed.
 function globCouldMatchEnv(glob) {
   if (glob.startsWith('!')) return false;
+  if (ENV_GLOB.test(glob)) return true;
   const alts = expandBraces(glob);
   if (!alts) return true;
   for (const alt of alts) {
-    for (const seg of alt.split('/')) {
-      const tokens = globTokens(seg);
-      if (couldStartWithDotE(tokens)) return true;
-      const rx = tokensRegExp(tokens);
-      if (!rx || ENV_SAMPLES.some((s) => rx.test(s))) return true;
-    }
+    const last = alt.split('/').pop();
+    const rx = tokensRegExp(globTokens(last));
+    if (!rx || ENV_SAMPLES.some((s) => rx.test(s))) return true;
   }
   return false;
 }
@@ -744,9 +730,12 @@ function gitProblem(words, ev, roots) {
     if (!revs.length) return 'git grep needs a pattern';
     revs = revs.slice(1);
   }
+  // .env names count in paths, rev:path and option values, but not in
+  // search patterns (-e, and log's -S, -G, --grep).
   for (const o of parsed.opts) {
-    if (typeof o.value === 'string' && ENV_NAME.test(o.value)) return 'reads an .env file';
+    if (typeof o.value === 'string' && !GIT_SEARCH_OPTS.includes(o.name) && ENV_GLOB.test(o.value)) return 'reads an .env file';
   }
+  if (revs.concat(paths).some((r) => ENV_NAME.test(r))) return 'reads an .env file';
   // -L <range>:<file> carries a path of its own.
   for (const o of parsed.opts) {
     if (o.name === 'L' && typeof o.value === 'string' && o.value.includes(':')) {
@@ -789,12 +778,13 @@ function stepProblem(words, ev, roots) {
   if (words[0].repo || /[/\\]/.test(head)) return `"${head}": give the program name only, not a path`;
   if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(head)) return 'setting variables before a command (VAR=value) is not allowed';
   if (!ev.allowed_heads.includes(head)) return `"${head}" is not in evidence.allowed_heads`;
-  if (words.some((w) => ENV_NAME.test(w.v))) return 'reads an .env file';
   if (head === 'git') return gitProblem(words.slice(1), ev, roots);
   const table = TABLES[head];
   if (!table) return `"${head}" has no option list in this kit, so it is not run`;
   const parsed = parseOptions(head, words.slice(1).map((w) => w.v), table);
   if (parsed.error) return parsed.error;
+  const late = filePatternLate(head, words.slice(1).map((w) => w.v));
+  if (late) return `${late.length === 1 ? '-' : '--'}${late} comes after the pattern or a path: put file patterns before the paths`;
   return operandProblem(head, table, parsed, roots);
 }
 
@@ -901,24 +891,33 @@ function probeSed(dirs) {
 const SED_NO_SANDBOX = 'note: the installed sed does not support --sandbox; the kit\'s own sed script check is the only guard';
 
 // Added to every searching step so a folder read never shows an .env file
-// or anything in an .env folder. grep and rg let the LAST matching
-// include/exclude decide, so these go after the step's own options (and
-// before a "--"); the step's own include patterns that could match .env
-// are refused by the classifier as well. git grep gets exclude pathspecs.
+// or anything in an .env folder. GNU grep's first file pattern decides what
+// an unmatched file does and the last matching one wins; BSD grep stops
+// reading options at the first operand. So these go after the step's own
+// options and right before its first operand (the step may not give file
+// patterns after its paths, see filePatternLate). git grep gets exclude
+// pathspecs after "--".
 const GREP_ENV_EXCLUDE = ['--exclude=.[eE][nN][vV]*', '--exclude-dir=.[eE][nN][vV]*'];
 const RG_ENV_EXCLUDE = ['--iglob=!.env*'];
 const GIT_ENV_EXCLUDE = [':(exclude,icase,glob)**/.env*', ':(exclude,icase,glob)**/.env*/**'];
+const FILE_PATTERN_OPTS = { grep: ['include', 'exclude', 'exclude-dir'], rg: ['g', 'glob', 'iglob'] };
 
-// Index of the "--" that ends the options of args (read with the same table
-// as parseOptions, so a "--" given as an option value does not count), or -1.
-function optionsEnd(args, table) {
+// How args are laid out, read with the same table as parseOptions (so an
+// option value, such as an -e pattern or a "--" given to -e, is not an
+// operand): sep = index of the "--" that ends the options, first = index of
+// the first operand (-1 when none), late = names of options given after it.
+function argLayout(args, table) {
+  const out = { sep: -1, first: -1, late: [] };
+  const seen = (name) => { if (out.first >= 0) out.late.push(name); };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a === '--') return i;
-    if (a === '-' || !a.startsWith('-')) continue;
+    if (a === '--') { out.sep = i; if (out.first < 0 && i + 1 < args.length) out.first = i + 1; break; }
+    if (a === '-' || !a.startsWith('-')) { if (out.first < 0) out.first = i; continue; }
     if (a.startsWith('--')) {
       const eq = a.indexOf('=');
-      const type = table.long[eq < 0 ? a.slice(2) : a.slice(2, eq)];
+      const name = eq < 0 ? a.slice(2) : a.slice(2, eq);
+      const type = table.long[name];
+      seen(name);
       if (eq < 0 && type === 'v2') i += 2;
       else if (eq < 0 && type && !['f', 'o'].includes(type)) i++;
       continue;
@@ -926,19 +925,33 @@ function optionsEnd(args, table) {
     if (table.numeric && /^-[0-9]+$/.test(a)) continue;
     for (let k = 1; k < a.length; k++) {
       const type = table.short[a[k]];
+      seen(a[k]);
       if (!type || type === 'f') continue;
       if (k === a.length - 1) i++;
       break;
     }
   }
-  return -1;
+  return out;
 }
 
-// Puts extra options after the step's own options: before the "--" that
-// ends them, or at the end (grep and rg read options after operands too).
-function withLastOptions(args, table, extra) {
-  const end = optionsEnd(args, table);
-  return end < 0 ? [...args, ...extra] : [...args.slice(0, end), ...extra, ...args.slice(end)];
+// Index of the "--" that ends the options of args, or -1.
+function optionsEnd(args, table) {
+  return argLayout(args, table).sep;
+}
+
+// The step's own file pattern given after its first operand, or null.
+function filePatternLate(head, args) {
+  const names = FILE_PATTERN_OPTS[head];
+  if (!names) return null;
+  return argLayout(args, TABLES[head]).late.find((n) => names.includes(n)) || null;
+}
+
+// Puts extra options right before the first operand (or the "--"), so they
+// follow every option the step gave itself.
+function beforeFirstOperand(args, table, extra) {
+  const { sep, first } = argLayout(args, table);
+  const at = first >= 0 && (sep < 0 || first < sep) ? first : sep >= 0 ? sep : args.length;
+  return [...args.slice(0, at), ...extra, ...args.slice(at)];
 }
 
 // Detectors and masks (buildMasks, mask, detect) live in lib/mask.js, shared
@@ -1015,8 +1028,8 @@ function execute(steps, ctx, ev) {
         args = [...GIT_PRE, ...args.slice(0, sub + 1), ...fixed, ...rest];
         if (root && ctx.emptyTree[root.name]) env.GIT_ATTR_SOURCE = ctx.emptyTree[root.name];
       }
-      if (s.head === 'grep') args = withLastOptions(args, TABLES.grep, GREP_ENV_EXCLUDE);
-      if (s.head === 'rg') args = withLastOptions(args, TABLES.rg, RG_ENV_EXCLUDE);
+      if (s.head === 'grep') args = beforeFirstOperand(args, TABLES.grep, GREP_ENV_EXCLUDE);
+      if (s.head === 'rg') args = beforeFirstOperand(args, TABLES.rg, RG_ENV_EXCLUDE);
       if (s.head === 'sed') {
         if (ctx.sedSandbox === undefined) ctx.sedSandbox = sedSandbox(bins[k], env, cwd);
         if (ctx.sedSandbox) args = [...SED_FIXED, ...args];
@@ -1282,7 +1295,7 @@ function main(argv, io) {
   }
 }
 
-module.exports = { main, classify, lex, buildMasks, mask, detect, sedScriptProblem, sedSandbox, probeSed, globCouldMatchEnv, optionsEnd, makeRoots, TABLES, GIT, SED_FIXED, GREP_ENV_EXCLUDE, RG_ENV_EXCLUDE, GIT_ENV_EXCLUDE };
+module.exports = { main, classify, lex, buildMasks, mask, detect, sedScriptProblem, sedSandbox, probeSed, globCouldMatchEnv, optionsEnd, argLayout, beforeFirstOperand, makeRoots, TABLES, GIT, SED_FIXED, GREP_ENV_EXCLUDE, RG_ENV_EXCLUDE, GIT_ENV_EXCLUDE };
 
 if (require.main === module) {
   process.exitCode = main(process.argv.slice(2));
