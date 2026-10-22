@@ -15,6 +15,7 @@ This is a project maintained on a best-effort basis: there is no guaranteed resp
 ## In scope
 
 - **Bypasses of the evidence runner's allowlist**: any way to get `kit evidence` to start a program or option it should refuse, to run anything through a shell, to write a file, or to read outside the pinned repos.
+- **Bypasses of the `.git` folder check**: a repo's `.git` folder that makes `kit pin`, `kit doctor` or `kit evidence` run a program, fetch, or send git to another folder without `--trust-git-dir`. With `--trust-git-dir` the check is skipped entirely on purpose (a .git file, commondir, alternates, core.worktree, includes, filter and diff drivers are then all allowed; the isolated git environment still applies), so that case is not a bypass.
 - **Prompt-injection paths that make an agent write or execute**: text in audited code, or in a workspace file, that gets one of the kit's agents or workflows to change files, run commands, or act outside the read-only role its instructions give it.
 - **Leaks into published outputs**: secrets, home folders, email addresses or other private paths that reach a report, a receipt or another generated file despite the masking and the `kit check secrets` record.
 - Flaws in the kit's own leak gate (`tooling/check-clean.js`) that let a must-zero pattern through.
@@ -28,4 +29,4 @@ This is a project maintained on a best-effort basis: there is no guaranteed resp
 
 ## Threat model and safe use
 
-What the kit trusts, what it does not, and how to run it safely (read-only agents, the evidence dry-run, containers for untrusted repos, private workspaces) are in [docs/security.md](docs/security.md).
+What the kit trusts (including a repo's `.git` folder), what it does not, and how to run it safely (read-only agents, the evidence dry-run, a trusted clone, containers or Claude Code's sandbox for untrusted repos, private workspaces) are in [docs/security.md](docs/security.md).

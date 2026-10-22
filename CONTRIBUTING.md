@@ -37,7 +37,7 @@ The gates, the skeptic votes, the verifier check and verdict synthesis (`tooling
 node tests/run-all.js
 ```
 
-It runs `node --check` on every script, the unit tests, the workflow and plugin checks, the example configs, the link check and the leak check (`check-clean` with its generic patterns), an `e2e (builders --strict)` step, plus the Semgrep rule tests and the Semgrep fixture test (`tests/semgrep.test.js`, skipped without Semgrep) when Semgrep is installed and `claude plugin validate` when Claude Code is. All of it must pass. Tests that build small git repos need a git identity (`git config --global user.name` and `user.email`).
+It runs `node --check` on every script, the unit tests, the workflow and plugin checks, the example configs, the link check and the leak check (`check-clean` with its generic patterns), an `e2e (builders --strict)` step, plus the Semgrep rule tests and the Semgrep fixture test (`tests/semgrep.test.js`, skipped without Semgrep) when Semgrep is installed and `claude plugin validate` when Claude Code is. All of it must pass. CI runs it on Ubuntu and Windows (Node 20 and 22) for pushes to `main` and pull requests into `main`, and has a `macos-latest` job that runs only when started by hand. Tests that build small git repos need a git identity (`git config --global user.name` and `user.email`).
 
 Keep to the house rules of the code: Node 20 or later, CommonJS, no npm dependencies, every tool with a `main(argv)` and exit codes 0 (ok), 1 (check failed) and 2 (usage or config error).
 

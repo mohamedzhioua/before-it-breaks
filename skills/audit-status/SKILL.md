@@ -27,7 +27,7 @@ This table is also what `run-phase` checks before it starts a step: the gate of 
 | hunt | `work/candidates.json`, with every hunt run saved (one run-log entry per run) | run the read-only `evidence --dry-run` (that run is the gate check), show the user the list of what would run and what is refused, and get their OK (HANDOFF) before the real evidence step |
 | evidence | `work/phase3/receipts/_index.json` | the user has seen the ran / skipped summary |
 | batches | `work/phase3/runs.json` | — |
-| verify | `work/phase3/votes-<N>.json` for every run in `runs.json` | every candidate has a vote from every configured skeptic lens and one verifier check (`synthesize` lists the incomplete ones) |
+| verify | `work/phase3/votes-<N>.json` for every run in `runs.json` | every candidate has a vote from every configured skeptic lens and one verifier check, saved with `kit save verify` so each is bound to the candidate's current content (votes without `bound_to`, or cast on an earlier version of the candidate, do not count; `synthesize` lists the incomplete and set-aside ones) |
 | synthesize | `work/phase3/verdicts.json` | — |
 | overrides | an overrides review entry in the HANDOFF: who approved the list in `work/phase3/master-overrides.json` (an empty list is fine) and when. The file alone does not mean the step is done | every override has a reason and an `approved_by`, the approver's OK is in the HANDOFF, and `synthesize` ran again after the last change |
 | build log | `03-verification-log.md` | — |

@@ -83,7 +83,7 @@ Every required line should say `ok`. Before Phase 0 the pin check fails because 
 node "${CLAUDE_PLUGIN_ROOT}/kit.js" pin <workspace>
 ```
 
-It records the exact commit of every repo. It refuses a repo with uncommitted changes: ask the user to commit or stash in that repo themselves, or, only if they agree, re-run with `--allow-dirty` (which is recorded). Never change the repos yourself. Then run `doctor` again: now every required line must be `ok`.
+It records the exact commit of every repo. It refuses a repo with uncommitted changes: ask the user to commit or stash in that repo themselves, or, only if they agree, re-run with `--allow-dirty` (which is recorded). It also refuses a repo whose `.git` folder can start a program or fetch, or that is a worktree or submodule checkout, and prints the reasons: ask the user to clone the repo again from a remote they trust. Never add `--trust-git-dir` without the user's explicit yes: it is recorded and skips the .git-folder check entirely (a .git file, commondir, alternates, core.worktree, includes, filter and diff drivers are then all allowed); the isolated git environment still applies. Never change the repos yourself. Then run `doctor` again: now every required line must be `ok`.
 
 ## 7. First HANDOFF entry
 

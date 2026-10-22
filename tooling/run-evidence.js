@@ -67,13 +67,13 @@
  *     = q Q { } s y and no s///w or s///e flag, and sed runs with --sandbox
  *     when the installed sed supports it (checked once per run; --dry-run
  *     says when it does not).
- *   - A file or folder named .env, or .env followed by '.', '-' or '_' (any case), is never read or searched; other names such as .envrc are read normally and rely on the output detectors.
+ *   - A file or folder named .env, or .env followed by '.', '-' or '_' (any case), is never read by name and is excluded from folder searches (grep, rg, git grep). History and diff output (git show, git log -p, git diff) and links under other names rely on the output detectors. The kit never promises that a secret cannot reach a receipt: the output detectors are the last line, and a withheld output is the signal to look.
  *     Such names are refused as file operands, rev:path and option values
  *     (also glued to an option; search patterns and sed scripts may name
  *     .env), git pathspecs after -- may hold wildcards unless they could
  *     match an .env file (as rg -g), grep --include and
  *     rg -g patterns that name an .env file are refused, file patterns
- *     after the first path are refused, and grep and rg get .env excludes
+ *     after the first operand are refused, and grep and rg get .env excludes
  *     right before their first operand (git grep: exclude pathspecs);
  *     git --format/--pretty takes
  *     a built-in format name (oneline short medium full fuller reference
@@ -105,8 +105,9 @@
  *     capped at 4 MiB while it is produced (the step is killed at the cap).
  *     The steps run one after another, so a step sees all of the previous
  *     step's (capped) output at once.
- * What it does NOT guarantee: that a program has no bug, that the repo's
- * own .git/config is harmless (it is read as usual), or that reading inside
+ * What it does NOT guarantee: that a program has no bug, that a repo pinned
+ * with --trust-git-dir has a harmless .git folder (its filter and diff
+ * drivers can then run; lib/git-env.js gitDirCheck), or that reading inside
  * the repo folders is free of secrets. For code you do not trust, run the
  * kit in a container or VM with the repos mounted read-only, and review
  * candidates.json (or use --dry-run) first. Ways around these rules are
@@ -124,7 +125,8 @@
  * spelling, Git Bash /c/... form included) are written back as
  * {repo:<name>} and <tmp>. If the output or the error text of a command
  * then matches any built-in must-zero pattern of check-clean.js (home
- * paths, credentialed connection strings, cloud keys, private keys, token
+ * paths, credentialed connection strings and http(s)://user:pass@ URLs, JWTs,
+ * live payment keys, Google API keys, cloud keys, private keys, token
  * prefixes, email addresses) or evidence.secret_patterns, the WHOLE output
  * of that command is replaced by "[output withheld: <pattern>]". Use git
  * --format without author emails to keep git log output. The command text

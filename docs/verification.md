@@ -43,6 +43,12 @@ The verifier does not judge whether a problem matters. For each candidate it:
 
 It returns **CONFIRMED** (the output supports the facts), **REFUTED** (it contradicts them) or **UNVERIFIABLE** (the commands need live access, were skipped or withheld, or show nothing decisive). By default it runs on `sonnet` while the skeptics inherit the session model, so it is less likely to share their blind spots; see [models and effort](models-and-effort.md).
 
+## Batches and the batch plan
+
+`kit batches` cuts the candidates into batches for the skeptics and writes a **batch plan**: a short id (the first 12 hex characters of a hash of every batch's name, groups and candidate hashes) that names exactly which candidates, in which batches, the skeptics were given. The same candidates always give the same plan.
+
+Each candidate also has a content hash, taken over the whole candidate object, including `severity_guess`. The verify workflow copies the plan and these hashes into its result (`bound_to`), and `kit save verify` keeps them in `votes-<N>.json`. This is how a vote is tied to the version of the candidate the skeptics actually read.
+
 ## Synthesis rules
 
 `kit synthesize` applies these in order. *n* is the number of skeptic lenses, the majority is more than half of *n*, "survive" counts REAL plus PARTIAL votes, and *need* is `verify.survive_votes` (default 2).
@@ -51,6 +57,11 @@ It returns **CONFIRMED** (the output supports the facts), **REFUTED** (it contra
 |---|---|
 | The hunter marked it `fixed` (true before, fixed at the pin) | REFUTED ("fixed at pin"), no votes needed |
 | The hunter marked it `not_found` (the cited code is gone) | REFUTED, no votes needed |
+| A lens, or the verifier, has only votes cast on a different version of the candidate (compared by content hash, not by date) | NEEDS-REVIEW ("changed after batching") |
+| A lens, or the verifier, has only votes that are not bound to any version (hand-written, or not saved with `kit save verify`) | NEEDS-REVIEW ("votes not saved with `kit save verify`") |
+| A verifier check but no receipt for the candidate | NEEDS-REVIEW ("no receipt") |
+| The receipt was made for a different version of the candidate (compared by content hash) | NEEDS-REVIEW ("changed after receipt") |
+| The verifier checked a receipt other than the current one | NEEDS-REVIEW ("different receipt") |
 | Fewer than *n* votes, or no verifier check | NEEDS-REVIEW (incomplete) |
 | OUT_OF_SCOPE votes reach a majority | OUT-OF-SCOPE |
 | REFUTED votes reach a majority | REFUTED |
@@ -61,6 +72,14 @@ It returns **CONFIRMED** (the output supports the facts), **REFUTED** (it contra
 **Severity** is the median of the skeptics' recommended levels, ignoring "none" when at least two gave a real level; a candidate that did not survive gets "none". Severity levels and their order come from `severity_rubric` ([severity and sizes](severity-and-sizes.md)).
 
 The output depends only on the input files, so running it twice gives the same `verdicts.json`.
+
+**Votes count only when they are bound to the candidate's current content.** A vote or check whose recorded hash is not the candidate's hash today is set aside, and `kit synthesize` names the file and the ids. Because the hash covers the whole candidate, even an edit to `severity_guess` alone gives NEEDS-REVIEW; this is strict by design.
+
+**When two files disagree.** If two votes files hold a counted vote from the same lens on the same candidate (or two verifier checks), they conflict only on substance: the vote, the severity, each gate's result, the corrected threshold, `duplicate_of`, and the verifier's verdict. A difference there stops `kit synthesize` with exit 1 and names both files; keep the file of the run you trust and remove or re-save the other. A difference in free text only (reasons, notes, rerun text, key citations) never conflicts: the later file (votes files are read in run-number order, so `votes-2` before `votes-10`) wins, and a note says so.
+
+### When a verdict goes stale
+
+`kit synthesize` records the hashes of the candidates, `master-overrides.json`, `pins.json` and the receipts index in `verdicts.json`. `kit build log` and every other builder refuse to run (exit 1) when any of them has changed since, and say what to re-run. After any change to the candidates, the overrides, the pins or the receipts, run `kit synthesize` and then `kit build log` again; a changed candidate or pin also needs `kit evidence` again, and a changed candidate needs batches and verify again before its votes count. Run `kit evidence` once, before verify, and re-run it only on purpose.
 
 ## Verdicts
 
@@ -92,7 +111,7 @@ After synthesis, the lead writes `work/phase3/master-overrides.json` as `{ "over
 | `re-scope` | Keeps the verdict; only for a finding that survived | `title` and/or `severity`; severity may only stay or go down |
 | `hold` | Verdict HELD, held back from the report | — |
 
-Every override needs an existing candidate id and a non-empty `reason`; `approved_by` names who approved it and is copied into the verdicts and the log; synthesis refuses an override without it. There is **no add action**: anything else, or any broken rule, stops synthesis with exit code 2 and nothing is written. A problem the lead noticed personally goes back through hunt and verify like any other. Run `kit synthesize` again after every change to the file.
+Every override needs an existing candidate id and a non-empty `reason`; `approved_by` names who approved it and is copied into the verdicts and the log; synthesis refuses an override without it. There is **no add action**: anything else, or any broken rule, stops synthesis with exit code 2 and nothing is written. A problem the lead noticed personally goes back through hunt and verify like any other. Run `kit synthesize` again after every change to the file, and then `kit build log` (the builders exit 1 until you do).
 
 ## How the gates map onto fp-check
 

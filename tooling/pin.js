@@ -196,8 +196,9 @@ function run(opts, io) {
       io.err(`  ${name}:`);
       for (const p of problems) io.err(`    - ${p}`);
     }
-    io.err('Clone the repo again from a remote you trust, or pin anyway with --trust-git-dir (recorded). The kit still');
-    io.err('turns off signature checks, gpg, fsmonitor and fetching, but a filter or diff driver in .git/config can still run.');
+    io.err('Clone the repo again from a remote you trust, or pin anyway with --trust-git-dir (recorded). That skips this');
+    io.err('check entirely, so everything listed above is allowed; the isolated git environment (no signature checks, gpg,');
+    io.err('fsmonitor or fetching) still applies.');
     return 2;
   }
   const dirty = [];

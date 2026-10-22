@@ -60,7 +60,7 @@ Answer, with evidence that anyone can re-run: **{{config.audit.question}}** The 
 7. **Overrides take away, never add.** An override may remove, merge, re-scope or hold a finding, each with a reason and the name of the person who approved it. A problem you notice yourself goes through hunt and verify like any other.
 8. **Claim only what a record shows.** A tool, agent, model, count or check goes into a deliverable only if a work file or the run log records it; otherwise write "not recorded".
 9. **Stop rule.** When an agent or a step fails the same task three times, stop that leg, keep its output and errors, and record it as failed in `HANDOFF.md` and the run log, with the reason. Do not hide the gap.
-10. **Ask me before:** raising your own effort mid-session; any advisor call (see `{{kit_root}}/prompts/advisor.md`; say why); writing anything outside the workspace; installing or downloading anything; pinning with `--allow-dirty`; changing the scope (repos, groups, out-of-scope list); anything touching a shared environment; publishing, pushing or sharing anything.
+10. **Ask me before:** raising your own effort mid-session; any advisor call (see `{{kit_root}}/prompts/advisor.md`; say why); writing anything outside the workspace; installing or downloading anything; pinning with `--allow-dirty` or `--trust-git-dir`; changing the scope (repos, groups, out-of-scope list); anything touching a shared environment; publishing, pushing or sharing anything.
 
 ### 4. Model and effort per role
 

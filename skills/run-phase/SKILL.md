@@ -22,7 +22,7 @@ The workspace is the current folder unless the user names another; call it `<ws>
 | pin | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" pin <ws>` | `work/pins.json` |
 | map | agents | workflow `map` | `work/phase1/<repo>-map.md` |
 | hunt | agents | workflow `hunt` (one run per `--run N`) | `work/candidates.json` |
-| evidence | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" evidence <ws> --dry-run` for the review, then `node "${CLAUDE_PLUGIN_ROOT}/kit.js" evidence <ws>` | `work/phase3/receipts/` |
+| evidence | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" evidence <ws> --dry-run` for the review, then `node "${CLAUDE_PLUGIN_ROOT}/kit.js" evidence <ws>` (once, before verify; run it again only on purpose) | `work/phase3/receipts/` |
 | batches | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" batches <ws>` | `work/phase3/runs.json`, `batches/` |
 | verify | agents | workflow `verify` (one run per `--run N`) | `work/phase3/votes-<N>.json` |
 | synthesize | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" synthesize <ws>` | `work/phase3/verdicts.json` |
@@ -77,14 +77,14 @@ Record the **model and effort the agents actually ran on**, as the harness repor
 
 ## 6. Update the HANDOFF
 
-Append a dated entry to `<ws>/HANDOFF.md`: the step and run, what was saved where, counts, failures, gate confirmations, decisions taken with the user, and the next step. Rewrite the "next step" line so a fresh session can resume from the file alone.
+Append a dated entry to `<ws>/HANDOFF.md`: the step and run, what was saved where, counts, failures, gate confirmations, decisions taken with the user, and the next step. Rewrite the "next step" line so a fresh session can resume from the file alone. A run ends complete, or `incomplete` with the reason written here (and in the run log); never stop silently in the middle of a phase.
 
 ## 7. The overrides step (after synthesize, before build log)
 
 1. Read the synthesize summary and the verdicts that need a decision (incomplete, duplicates, findings the person who knows the system disputes).
 2. Write `<ws>/work/phase3/master-overrides.json` as `{ "overrides": [ ... ] }`, one entry per candidate, each with `id`, `action`, `reason` and `approved_by` (the name of the person who approves it). The only actions are `remove`, `merge` (with `into`), `re-scope` (with the corrected fields) and `hold`. **Never add a finding through an override**: a problem you noticed yourself goes back through hunt and verify like any other. With nothing to override, write an empty list.
 3. Show the list to each named approver and get their OK. Record who approved what, and when, in the HANDOFF.
-4. Run `node "${CLAUDE_PLUGIN_ROOT}/kit.js" synthesize <ws>` again so the verdicts include the overrides. Re-run it after every later change to the file.
+4. Run `node "${CLAUDE_PLUGIN_ROOT}/kit.js" synthesize <ws>` again so the verdicts include the overrides. Re-run it after every later change to the file, then run `build log` again if it was already built. The same holds after any change to the candidates, the pins or the receipts: `synthesize`, then `build log`, or the builders exit 1.
 
 ## Rules for the lead (you)
 

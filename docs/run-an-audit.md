@@ -19,7 +19,7 @@ kit validate <ws>
 kit doctor <ws>
 ```
 
-`doctor` prints one line per check (Node, git, config, repos, pins, clean trees, optional Semgrep and `claude`) and then the `claude --add-dir ...` line that opens a session with read access to every repo. Before Phase 0 only the pins check may fail.
+`doctor` prints one line per check (Node, git 2.40 or newer, optional git 2.44, config, repos and their `.git` folders, pins, clean trees, optional Semgrep and `claude`) and then the `claude --add-dir ...` line that opens a session with read access to every repo. Before Phase 0 only the pins check may fail.
 
 **No plugin?** Run `kit install-agents <ws>` and set `"agents": { "namespace": "" }` in the config.
 
@@ -31,14 +31,14 @@ Run the line `doctor` printed from inside the workspace, then `/hooks` (check th
 
 | Step | Command | Writes |
 |---|---|---|
-| pin | `kit pin <ws>` (`--allow-dirty` only if the user agrees; it is recorded) | `work/pins.json`, `work/phase0-baseline.md` |
+| pin | `kit pin <ws>` (`--allow-dirty` only if the user agrees; it is recorded. `--trust-git-dir` only if the user agrees: see below) | `work/pins.json`, `work/phase0-baseline.md` |
 | map | agent phase `map` | `work/phase1/<repo>-map.md` |
 | hunt | agent phase `hunt`, one run per `--run N` | `work/candidates.json` |
-| evidence | `kit evidence <ws> --dry-run`, show it to the user, then `kit evidence <ws>` | `work/phase3/receipts/` |
-| batches | `kit batches <ws>` | `work/phase3/batches/`, `work/phase3/runs.json` |
-| verify | agent phase `verify`, one run per entry in `runs.json` | `work/phase3/votes-<N>.json` |
+| evidence | `kit evidence <ws> --dry-run`, show it to the user, then `kit evidence <ws>` once, before verify | `work/phase3/receipts/` |
+| batches | `kit batches <ws>` (cuts the candidates into batches and writes the batch plan) | `work/phase3/batches/`, `work/phase3/runs.json` |
+| verify | agent phase `verify`, one run per entry in `runs.json`; save each result with `kit save verify` | `work/phase3/votes-<N>.json` |
 | synthesize | `kit synthesize <ws>` | `work/phase3/verdicts.json` |
-| overrides | write `work/phase3/master-overrides.json`, get approval, `kit synthesize <ws>` again | the same |
+| overrides | write `work/phase3/master-overrides.json`, get approval, `kit synthesize <ws>` again, then `kit build log <ws>` again if it was already built | the same |
 | build log | `kit build log <ws>` | `03-verification-log.md`, plus `claim-verdicts.json` and `final-verdicts.json` in `work/phase3/` |
 | report-inputs | agent phase `report-inputs` | `work/phase5/report-inputs.json` |
 | build report | `kit build report <ws>` | `02-audit-report.md` |
@@ -46,6 +46,13 @@ Run the line `doctor` printed from inside the workspace, then `/hooks` (check th
 | build recommendations | `kit build recommendations <ws>`, then as wanted `kit build issues <ws>` and `kit build explorer <ws>` (both read `work/phase6/finding-modules.json`, which this step writes) | `05-recommendations.md`, the target-architecture page, `work/phase6/issues.*`, `work/explorer-data.json` |
 | measure (optional) | `kit build measurements <ws>`; run only the checks access was agreed for | `04-measurements.md`, `work/phase4/` |
 | closing checks | `kit check secrets <ws>`, `kit check unchanged <ws>`, `kit check links <ws>` | `work/secrets-scan.json` and `.md` |
+
+Run order matters, because the kit ties votes and verdicts to the exact content of each candidate, the pins and the receipts:
+
+- Run `kit evidence` once, before verify; run it again only on purpose (after a candidate or a pin changed). A receipt made for a different version of the candidate (compared by content hash, not by date) makes its verdict NEEDS-REVIEW.
+- After any change to the candidates (a new hunt run, an edit), the overrides, the pins or the receipts, re-run `kit synthesize` and then `kit build log`. The builders (`build log`, `build report` and the rest) exit 1 and say what to re-run when those inputs have changed since `verdicts.json` was made (compared by content hash, not by date); a changed candidate also needs `kit evidence`, `kit batches` and verify again before its votes count. See [verification](verification.md#when-a-verdict-goes-stale).
+- If `kit args verify` says "batch files are from an older version: run `kit batches` again", do that; the same goes for receipts that say "run `kit evidence` again".
+- A phase run ends complete, or `incomplete` with a reason written in `HANDOFF.md` and the run log; never leave it silently half done.
 
 Run `kit build issues` after `kit build recommendations`: it reads the roadmap and the finding-to-module file that step writes. `kit build explorer` needs that file too. A person, not the kit, writes `01-executive-summary.md`.
 
@@ -62,7 +69,7 @@ kit args <phase> --run <N> <ws> > <ws>/work/args/<phase>-<N>.json
    kit save <phase> <result-file> --run <N> <ws>
    ```
 
-   `save` checks the result against the kit's data shapes and refuses a malformed one; re-run the agent rather than editing the result by hand.
+   `save` checks the result against the kit's data shapes and refuses a malformed one; re-run the agent rather than editing the result by hand. Save a verify result exactly as the workflow returned it: it carries `bound_to`, which ties the votes to the candidates the skeptics saw, and a file without it is saved with a note but none of its votes count. `--run` may be left out for a hunt when the result names its run. `--force` only replaces another run's file, or report-inputs run 1 (which is replaced whole); a same-run hunt re-save is noted, not refused.
 3. Record what actually ran:
 
    ```
@@ -71,9 +78,11 @@ kit args <phase> --run <N> <ws> > <ws>/work/args/<phase>-<N>.json
 
 4. Append a dated entry to `HANDOFF.md` with the next step.
 
-Script notes: `kit init` writes one default module rule per repo (check it); `check secrets` applies the home-path and email rules to the published files only and the secret patterns to everything; `doctor` warns when `kit.root` is stale, so run `init <ws> --refresh-prompts` after a plugin update; `check mermaid` needs `--modules <dir>`; `build report` and `build recommendations` take `--strict`, which exits 1 on `check:` warnings; hunt summaries are saved to `work/phase2/hunt-<N>.json`.
+Script notes: `kit init` writes one default module rule per repo (check it); `check secrets` applies the home-path and email rules to the published files only and the secret patterns to everything; `doctor` warns when `kit.root` is stale, so run `init <ws> --refresh-prompts` after a plugin update; `check mermaid` needs `--modules <dir>`; `build report` and `build recommendations` take `--strict`, which exits 1 on any `check:` warning (for `build report`, that includes a finding whose report input is not drafted yet); hunt summaries are saved to `work/phase2/hunt-<N>.json`.
 
 `kit args recommend` needs `kit synthesize` to have run first; it starts one planner per module that holds surviving findings, and finding ids that map to no module go to the cross-cutting agent. `doctor` has a required "method files" line: every lens and skeptic brief in use must exist.
+
+`kit pin` refuses a repo whose `.git` folder can start a program or fetch, and a repo that is a `git worktree` or submodule checkout (`.git` is a file); the reasons are printed. The refusal list is in [security](security.md). Clone the repo again from a remote you trust, or, only if the user agrees, pin with `--trust-git-dir` (recorded in `pins.json` and the baseline; it skips the .git-folder check entirely: a .git file, commondir, alternates, core.worktree, includes, filter and diff drivers are then all allowed, and the isolated git environment still applies).
 
 `args` for verify reads `runs.json`; `args report-inputs` accepts `--target-design <file>`; `--date YYYY-MM-DD` overrides the audit date.
 

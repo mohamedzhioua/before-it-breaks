@@ -66,7 +66,7 @@ _Filled after Phase 0 from `{{config.outputs.work_dir}}/phase0-baseline.md`: rep
 
 ## Keeping it true
 
-- `.claude/settings.json` denies the session git commands that change a repo (commit, push, checkout, reset, stash, also after `git -C <dir>`), package installs, and edits or writes inside the audited repos. These rules reduce accidents; they are not a security boundary. A read-only git search for one of those words as a bare argument is blocked too: quote the word (`git log -S 'push'`).
+- `.claude/settings.json` denies the session git commands that change a repo (commit, push, checkout, reset, stash, also after `git -C <dir>`), package installs, download tools, interpreters and shells (bare `node` cannot be denied), package runners, git commands that reach out or change config, and edits or writes inside the audited repos. These rules are a layer that reduces accidents; they are not a security boundary. A read-only git search for one of those words as a bare argument is blocked too: quote the word (`git log -S 'push'`).
 - After editing `audit.config.json`, render the prompts again: `kit init . --refresh-prompts` (here `kit` means `node <kit folder>/kit.js`, run from this folder).
 
 - Do not edit generated files by hand. Change the data in `{{config.outputs.work_dir}}/` and rebuild with `kit build <log|report|recommendations|...> .`.

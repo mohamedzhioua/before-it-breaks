@@ -18,7 +18,7 @@ For the person who runs an audit, and for anyone who wants to know why each step
 - **Input:** the repos named in `audit.config.json`.
 - **Output:** `work/pins.json` and `work/phase0-baseline.md` (commit, branch, commit date, uncommitted-change count per repo).
 - **Gate before:** `doctor` passes everything except the pins check.
-- **Why:** a finding has to point at code anyone can check out later. A repo with uncommitted changes is refused unless `--allow-dirty` is given, and that choice is recorded.
+- **Why:** a finding has to point at code anyone can check out later. A repo with uncommitted changes is refused unless `--allow-dirty` is given, and that choice is recorded. A repo's `.git` folder is trusted input, so before git runs the kit reads it as text and refuses one that can start a program or fetch (including worktree and submodule checkouts) unless `--trust-git-dir` is given; that choice is recorded too and skips the .git-folder check entirely (see [security](security.md)).
 
 ### Phase 1: map
 
@@ -36,14 +36,14 @@ For the person who runs an audit, and for anyone who wants to know why each step
 
 ### Phase 3: verify
 
-1. **Evidence.** `kit evidence` re-runs every evidence command at the pins through an allowlist and keeps a receipt per candidate. Gate before it: the user has reviewed the `--dry-run` list of what would run and what is refused.
+1. **Evidence.** `kit evidence` re-runs every evidence command at the pins through an allowlist and keeps a receipt per candidate; run it once, before verify. Gate before it: the user has reviewed the `--dry-run` list of what would run and what is refused.
 2. **Batches.** `kit batches` cuts the candidates into batches and plans workflow runs within the agent cap.
 3. **Skeptics and verifier.** Per batch, one skeptic per lens (`reach`, `mech`, `math`) tries to refute each candidate; a verifier checks the receipts.
 4. **Synthesis.** `kit synthesize` turns votes, checks and receipts into verdicts by fixed rules.
-5. **Overrides.** The lead and the person who knows the system decide what the rules could not; each override has a reason and an approver; synthesis runs again.
+5. **Overrides.** The lead and the person who knows the system decide what the rules could not; each override has a reason and an approver; synthesis runs again, then `kit build log`.
 
 - **Output:** `work/phase3/verdicts.json`, then `03-verification-log.md` and `final-verdicts.json` from `kit build log`.
-- **Gate after:** every candidate has three votes and one verifier check (or is explained), and every override is approved.
+- **Gate after:** every candidate has three votes and one verifier check, each bound to the candidate's current content (or the gap is explained as NEEDS-REVIEW), and every override is approved.
 - **Why:** this is the trust core. See [Verification](verification.md).
 
 ### Phase 4: measure (optional; designed, not yet proven)

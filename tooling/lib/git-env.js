@@ -41,7 +41,7 @@
  *                    - a config key core.worktree, core.hooksPath,
  *                      core.sshCommand, core.fsmonitor, core.askpass,
  *                      core.gitProxy, filter.*, diff.<driver>.command,
- *                      diff.<driver>.textconv, gpg.*, include.*,
+ *                      diff.<driver>.textconv, diff.external, trace2.*, gpg.*, include.*,
  *                      includeIf.*, alias.*, extensions.*, protocol.*,
  *                      credential.*, remote.<name>.promisor, .uploadpack,
  *                      .receivepack or .vcs;
