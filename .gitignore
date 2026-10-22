@@ -6,3 +6,4 @@ examples/*/repos/
 node_modules/
 .DS_Store
 *.log
+run-all-logs/

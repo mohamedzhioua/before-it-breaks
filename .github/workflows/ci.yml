@@ -36,7 +36,16 @@ jobs:
           git config --global user.name "CI"
           git config --global user.email "ci.invalid"
       - name: Run every check
+        env:
+          RUN_ALL_LOG_DIR: run-all-logs
         run: node tests/run-all.js
+      - name: Keep the full output of failed steps
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-all-logs-${{ matrix.os }}-node${{ matrix.node }}
+          path: run-all-logs/
+          if-no-files-found: ignore
 
   semgrep-rules:
     name: semgrep rule tests
@@ -68,4 +77,13 @@ jobs:
           git config --global user.name "CI"
           git config --global user.email "ci.invalid"
       - name: Run every check
+        env:
+          RUN_ALL_LOG_DIR: run-all-logs
         run: node tests/run-all.js
+      - name: Keep the full output of failed steps
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-all-logs-macos
+          path: run-all-logs/
+          if-no-files-found: ignore

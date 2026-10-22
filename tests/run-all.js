@@ -7,8 +7,12 @@
  * Usage:
  *   node tests/run-all.js [--verbose]
  *
- *   --verbose  print the full output of every step (by default only the
- *              last lines of a step that failed are printed).
+ *   --verbose  print the full output of every step (by default a step
+ *              that failed prints each failing test with its error block,
+ *              then its last lines).
+ *
+ *   RUN_ALL_LOG_DIR=<dir> also writes the full output of each failed
+ *   step to <dir>/<step>.log (CI uploads that folder when a run fails).
  *
  * Steps, in order (each runs from the kit root, with stdin closed and a
  * time limit):
@@ -139,6 +143,34 @@ function tail(text, n) {
   return (lines.length > n ? ['...', ...lines.slice(-n)] : lines).join('\n');
 }
 
+// Every TAP `not ok` line in a step's output with its YAML block (the
+// error, expected and actual), at most BLOCK_LINES lines each, so a long
+// failing step still names its failing tests above the tail.
+const BLOCK_LINES = 20;
+function failures(text) {
+  const lines = text.split(/\r?\n/);
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!/^\s*not ok\b/.test(lines[i])) continue;
+    const block = [lines[i]];
+    for (let j = i + 1; j < lines.length && block.length < BLOCK_LINES; j++) {
+      block.push(lines[j]);
+      if (/^\s*\.\.\.\s*$/.test(lines[j])) break;
+    }
+    out.push(block.join('\n'));
+  }
+  return out;
+}
+
+// With RUN_ALL_LOG_DIR set (CI uploads it on failure), the full output of
+// each failed step is written there as <step>.log.
+function saveLog(name, output) {
+  const dir = process.env.RUN_ALL_LOG_DIR;
+  if (!dir) return;
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, `${name.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '')}.log`), output);
+}
+
 function main(argv, io = { out: (s) => process.stdout.write(s + '\n') }) {
   let verbose = false;
   for (const a of argv) {
@@ -154,7 +186,12 @@ function main(argv, io = { out: (s) => process.stdout.write(s + '\n') }) {
     const status = r.ok ? 'PASS' : 'FAIL';
     rows.push({ name: step.name, status, secs: (r.ms / 1000).toFixed(1), note: r.note || (r.ok ? '' : `exit ${r.code === null || r.code === undefined ? '-' : r.code}`) });
     if (verbose) io.out(r.output.replace(/\s+$/, ''));
-    else if (!r.ok) io.out(tail(r.output, TAIL_LINES));
+    else if (!r.ok) {
+      const failed = failures(r.output);
+      if (failed.length) io.out(`-- ${step.name}: ${failed.length} failing test(s)\n${failed.join('\n')}\n-- last lines:`);
+      io.out(tail(r.output, TAIL_LINES));
+    }
+    if (!r.ok) saveLog(step.name, r.output);
     io.out(`-- ${step.name}: ${status}`);
   }
   const w = Math.max(4, ...rows.map((r) => r.name.length));
@@ -168,7 +205,7 @@ function main(argv, io = { out: (s) => process.stdout.write(s + '\n') }) {
   return failed ? 1 : 0;
 }
 
-module.exports = { main, which };
+module.exports = { main, which, failures };
 
 if (require.main === module) {
   process.exitCode = main(process.argv.slice(2));
