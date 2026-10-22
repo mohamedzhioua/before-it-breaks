@@ -21,7 +21,7 @@ kit doctor <ws>
 
 `doctor` prints one line per check (Node, git 2.40 or newer, optional git 2.44, config, repos and their `.git` folders, pins, clean trees, optional Semgrep and `claude`) and then the `claude --add-dir ...` line that opens a session with read access to every repo. Before Phase 0 only the pins check may fail.
 
-**No plugin?** Run `kit install-agents <ws>` and set `"agents": { "namespace": "" }` in the config.
+**No plugin?** Run `kit install-agents <ws>` (it copies the agent definitions into the workspace's `.claude/agents/`), set `"agents": { "namespace": "" }` in the config, and run `kit init <ws> --refresh-prompts` again. Without the plugin the workflows are not registered, so each agent phase starts its agents one at a time (see "Without the Workflow tool" in [run-phase](../skills/run-phase/SKILL.md)).
 
 ## 2. Open the audit session
 

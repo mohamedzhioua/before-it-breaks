@@ -132,6 +132,7 @@ function answer(args, prompt, opts) {
       claims_not_resolved: group === 'SVC-REL'
         ? [{ claim_id: 'PRIOR-01', reason: 'Whether failed digests are retried depends on the live queue settings.', command_to_resolve: 'LIVE redis-cli --scan --pattern bull:notifications:failed' }]
         : [],
+      reviewed: [CANDS[group].path],
       notes: group === 'SVC-OPS' ? STEER_NOTE : 'Read the whole scope.',
     };
   }

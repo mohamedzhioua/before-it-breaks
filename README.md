@@ -101,7 +101,7 @@ node before-it-breaks/kit.js install-agents ../audits/notes-growth
 node before-it-breaks/kit.js doctor ../audits/notes-growth
 ```
 
-`install-agents` copies the agent definitions into the workspace's `.claude/agents/`; then set `"agents": { "namespace": "" }` in its `audit.config.json` and run `node before-it-breaks/kit.js init ../audits/notes-growth --refresh-prompts`. Without the plugin the workflows are not registered, so each agent phase runs by dispatching its agents one at a time (see "Without the Workflow tool" in [run-phase](skills/run-phase/SKILL.md)). `init` writes one default module rule per repo (check it), and `doctor` warns when `kit.root` is stale (run `--refresh-prompts` after a plugin update). `check secrets` applies home-path and email rules to the published files only and secret patterns to everything; `check mermaid` needs `--modules <dir>`; `build report` and `build recommendations` take `--strict`, which exits 1 on any `check:` warning (for `build report`, that includes a finding whose report input is not drafted yet); hunt summaries are saved to `work/phase2/hunt-<N>.json`. `kit args recommend` needs `kit synthesize` to have run first; it starts one planner per module that holds surviving findings, and finding ids that map to no module go to the cross-cutting agent. `doctor` has a required "method files" line (lens and skeptic briefs exist). Every step after that is in [Run an audit](docs/run-an-audit.md); `node kit.js help` lists all commands.
+`install-agents` copies the kit's agents into the workspace, so an audit session can start them without the plugin. Every step after that, including the one config change this needs, is in [Run an audit](docs/run-an-audit.md).
 
 ## Requirements
 
@@ -139,9 +139,10 @@ The agents read code nobody has vetted, so instructions hidden in that code can 
 
 ## Credits
 
-Methods adapted, text not copied. This project is not affiliated with or endorsed by Trail of Bits.
+Methods adapted, text not copied. This project is not affiliated with or endorsed by Trail of Bits or Cloudflare.
 
 - [Trail of Bits](https://github.com/trailofbits/skills): the **fp-check** false-positive protocol (its gates are recast for performance and reliability claims, see [verification](docs/verification.md#how-the-gates-map-onto-fp-check)) and the **semgrep-rule-creator** test-first way of writing rules.
+- [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT): ideas only, reworked for growth and reliability rather than security. From it come the lens items on poison records, detached work, unsafe recovery or replay, aggregate against per-item limits, cache stampedes, key cardinality and superlinear parsing; the skeptic rule that a missing limit with no breaking size is hardening, not a finding; and the caution that a single run does not find everything.
 - Documentation conventions: [C4](https://c4model.com/) (diagram levels and naming), [arc42](https://arc42.org/) (system-doc sections), [MADR](https://adr.github.io/madr/) (decision records) and [Diátaxis](https://diataxis.fr/) (how these docs are split).
 
 External tools, used but not bundled: [Semgrep](https://semgrep.dev/) and [Mermaid](https://mermaid.js.org/).

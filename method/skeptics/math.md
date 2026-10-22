@@ -24,6 +24,8 @@ Common sums: items × bytes per item against a size limit; items × round trips 
 - Does the library behave as the assumption says, for the version in the lockfile? Check the package source or documentation you can read, and name it. A `library_assumptions` entry is not proof; if the number rests on it and you could not check it, say so and the gate is UNKNOWN.
 - Is the threshold reached within the target size or the tiers at all?
 
+**Hardening, not a finding.** A missing limit (no page size, no timeout, no cap) is a finding only when it breaks something at a size that can be worked out. REFUTE it as hardening, with gate 4 as FAIL and a `reason` that starts `hardening:`, when after your own attempt no breaking size at all can be derived from the code, the config or documented limits. A size you can derive but that sits above the target is `beyond target:` (below), not hardening. A size that only a measurement could give is gate 4 UNKNOWN (the UNPROVEN path), never `hardening:`. If the hunter left the arithmetic out but you can re-derive it, vote PARTIAL with the corrected threshold instead. A mechanism chain that ends in "any size" (one retry is enough, one request can send the input) counts as computed.
+
 PASS: your sum agrees with the candidate within the same order of magnitude, and the break is at or below the target size. FAIL: the sum is off by a factor of ten or more, or the break is never reached within the target size. UNKNOWN: a number the sum needs can only be measured; say which number and how to measure it.
 
 ## How to vote

@@ -33,6 +33,8 @@ Each skeptic votes **REAL** (holds as stated), **PARTIAL** (real, but with a cor
 
 **Beyond-target rule.** A failure that only appears above the audit's target size is REFUTED for this audit, with the gate that shows it as FAIL, and a reason that starts `beyond target:` with the size where it would start. The lead can keep it as a note for a later, larger target. It is never softened into a low-severity finding.
 
+**Hardening rule.** A missing limit is REFUTED as hardening (gate 4 FAIL, a reason that starts `hardening:`) when, after the arithmetic skeptic's own attempt, no breaking size at all can be derived from the code, the config or documented limits (a size derived above the target is `beyond target:`; one that only a measurement could give leaves gate 4 UNKNOWN, never `hardening:`); arithmetic the hunter left out but the skeptic can re-derive gives PARTIAL with the corrected threshold, and a chain that ends in "any size" counts as computed. A gap in a second line of defence, behind a guard that already holds at the target size, is also REFUTED as `hardening:` (gate 5 for mech, gate 2 for reach).
+
 ## The verifier
 
 The verifier does not judge whether a problem matters. For each candidate it:
@@ -88,7 +90,7 @@ The output depends only on the input files, so running it twice gives the same `
 | PROVEN | Measured on a running system | yes |
 | PROVEN-STATIC | Code re-read at the pin, evidence re-run and confirmed, skeptics failed to refute it. Not measured | yes |
 | UNPROVEN | The skeptics accept the mechanism, but the evidence could not be re-run here (for example, it needs a live system) | yes |
-| REFUTED | The skeptics or the evidence showed it does not hold (including "fixed at pin" and beyond target) | no |
+| REFUTED | The skeptics or the evidence showed it does not hold (including "fixed at pin", beyond target and hardening) | no |
 | OUT-OF-SCOPE | Real or not, outside this audit's question | no |
 | NEEDS-REVIEW | The rules could not settle it; a person must decide | no, listed as open |
 | HELD | Held back by the audit owner, with a recorded reason | no |

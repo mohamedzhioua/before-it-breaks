@@ -149,6 +149,7 @@ function cannedAnswer(prompt, opts) {
         notes: '',
       }],
       claims_not_resolved: [],
+      reviewed: ['src/modules/notes/notes.repository.ts', 'src/jobs/notify.queue.ts'],
       notes: 'stub',
     };
   }
@@ -661,6 +662,45 @@ test('kit save hunt keeps the hunt summary in work/phase2/hunt-<N>.json and chec
   }
   assert.ok(!fs.existsSync(path.join(WS, 'work', 'phase2', 'hunt-H3.json')), 'nothing written for an invalid summary');
   fs.rmSync(file);
+});
+
+test('each hunter lists the files it read as reviewed, and kit save hunt keeps the list', async () => {
+  const { result, calls } = await run('hunt', copy(ARGS.hunt), cannedAnswer);
+  const hunts = calls.filter((c) => c.opts.label.startsWith('hunt:'));
+  assert.ok(hunts.length > 0);
+  for (const c of hunts) {
+    assert.ok(c.opts.schema.properties.reviewed, 'the hunter schema has a reviewed field');
+    assert.ok(!c.opts.schema.required.includes('reviewed'), 'reviewed is optional');
+    assert.match(c.prompt, /"reviewed": every file you actually opened and read/);
+  }
+  assert.equal(result.summary.hunters.length, hunts.length);
+  for (const h of result.summary.hunters) assert.deepEqual(h.reviewed, ['src/modules/notes/notes.repository.ts', 'src/jobs/notify.queue.ts']);
+
+  const file = path.join(scratch, 'hunt-reviewed.json');
+  fs.writeFileSync(file, JSON.stringify(result, null, 2));
+  const s = kit(['save', 'hunt', file, '--run', 'H4', WS]);
+  assert.equal(s.code, 0, `save hunt: ${s.out}${s.err}`);
+  const saved = path.join(WS, 'work', 'phase2', 'hunt-H4.json');
+  const doc = JSON.parse(fs.readFileSync(saved, 'utf8'));
+  assert.deepEqual(doc.summary.hunters.map((h) => h.reviewed), result.summary.hunters.map((h) => h.reviewed));
+  fs.rmSync(saved);
+});
+
+test('a hunter answer without reviewed is accepted, and its summary entry gets an empty list', async () => {
+  const noReviewed = (prompt, opts) => {
+    const r = cannedAnswer(prompt, opts);
+    if (opts.label.startsWith('hunt:')) delete r.reviewed;
+    return r;
+  };
+  const { result } = await run('hunt', copy(ARGS.hunt), noReviewed);
+  assert.deepEqual(result.failed, []);
+  assert.ok(result.summary.hunters.length > 0);
+  for (const h of result.summary.hunters) assert.deepEqual(h.reviewed, []);
+  const file = path.join(scratch, 'hunt-no-reviewed.json');
+  fs.writeFileSync(file, JSON.stringify(result, null, 2));
+  const s = kit(['save', 'hunt', file, '--run', 'H5', WS]);
+  assert.equal(s.code, 0, `save hunt: ${s.out}${s.err}`);
+  fs.rmSync(path.join(WS, 'work', 'phase2', 'hunt-H5.json'));
 });
 
 test('the verify workflow returns bound_to only when every batch carries its candidate shas', async () => {

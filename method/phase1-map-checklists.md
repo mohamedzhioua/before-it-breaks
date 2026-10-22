@@ -16,6 +16,7 @@ The map describes; it does not judge. No severities, no recommendations. Its rea
 ## backend
 
 - **Entry points.** HTTP routes (method, path, handler, guards), queue processors (queue name, concurrency), scheduled jobs (interval or cron, what they select), event listeners (event name, who emits it).
+- **What grows per entry point.** For each entry point, the input that grows (items in a body, files in an upload, rows a job selects, distinct values that end up in a key) and the resource it consumes (memory, connections, worker or queue slots, event-loop time, an upstream rate budget).
 - **Data model.** Every collection or table the code declares: fields that grow with the audit's size unit, embedded arrays, indexes declared in code, expiry (TTL), and where documents are created and updated.
 - **Queries on hot paths.** For each frequent route or job: the query's filter, sort, projection and limit, and whether a declared index matches.
 - **Queues.** Name, producers, processor, concurrency, attempts and backoff, job id scheme, retention of completed and failed jobs, and where the queue's store lives.

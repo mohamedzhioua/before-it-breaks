@@ -31,6 +31,10 @@ Look for the guard the hunter says is missing, beyond the cited lines:
 
 PASS: you searched and found no mitigation; list what you searched. FAIL: a mitigation exists and works at the target size; cite it. UNKNOWN: a mitigation may exist outside the repos (in the hosting console, the database itself); say where.
 
+## Hardening is not a finding
+
+A gap in a second line of defence is not a finding. If one guard already stops the failure at the target size (a validator, the body limit, the queue's concurrency), the absence of a second guard behind it is defence in depth. Gate 5 is FAIL; vote `REFUTED` with a `reason` that starts `hardening:`, cite the guard that holds, and the lead can keep it as a note. (Whether a missing limit has a breaking size at all is the arithmetic skeptic's call, under gate 4.)
+
 ## How to vote
 
 - `REAL`: the mechanism holds as written and nothing mitigates it.

@@ -39,7 +39,7 @@ Only report a candidate when you believe it passes all six. The skeptics will ch
 
 ## What you return
 
-Return **only the structured result your prompt's schema asks for**: the candidates (each with id, repo, group, lens, title, claim, locations, mechanism, arithmetic, breaks_at, evidence, mitigations_searched, source, and the optional fields) plus your notes. No prose around it. An empty candidate list with a short note is a valid answer when you found nothing that passes the gates.
+Return **only the structured result your prompt's schema asks for**: the candidates (each with id, repo, group, lens, title, claim, locations, mechanism, arithmetic, breaks_at, evidence, mitigations_searched, source, and the optional fields), `reviewed` (the repo-relative path of every file you actually opened and read, not the files a search only listed; `[]` if you read nothing; the workflow copies it into your entry in the hunt summary) and your notes. No prose around it. An empty candidate list with a short note is a valid answer when you found nothing that passes the gates.
 
 ## Safety rules (always)
 

@@ -33,6 +33,10 @@ PASS: the trigger and its volume occur at or below the target size. FAIL: they d
 - `REFUTED`: gate 1 or gate 2 fails. Say exactly what you found (the missing registration, the flag, the bound on the input).
 - `OUT_OF_SCOPE`: the only path to it is in something the config excludes.
 
+## Hardening is not a finding
+
+A gap in a second line of defence is not a finding. When another layer on the path already keeps the triggering volume from arriving at the target size (an edge body limit, a guard that lets only internal callers in, a validator that caps the list), a missing inner guard behind it is defence in depth. Gate 2 is FAIL; vote `REFUTED` with a `reason` that starts `hardening:`, cite the layer that holds, and the lead can keep it as a note. (Whether a missing limit has a breaking size at all is the arithmetic skeptic's call, under gate 4.)
+
 ## Beyond target
 
 One rule, shared by every skeptic lens: a failure that only appears above the audit's target size is `REFUTED` for this audit, with the gate that shows it as FAIL. Start the `reason` with `beyond target:` and give the size where it would start, so the lead can keep it as a note for a later, larger target. Do not soften it into a low severity instead.

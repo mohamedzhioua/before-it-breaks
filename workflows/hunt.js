@@ -336,6 +336,11 @@ function hunterSchema(a, g) {
     additionalProperties: false,
     properties: {
       candidates: { type: 'array', items: candidateSchema(a, g) },
+      reviewed: {
+        type: 'array',
+        description: 'Optional. Every file you actually opened and read, as a repo-relative path; not the files a search only listed. [] if you read none.',
+        items: { type: 'string' },
+      },
       claims_not_resolved: {
         type: 'array',
         description: 'Prior claims you could not settle from the code.',
@@ -474,6 +479,7 @@ function hunterPrompt(a, g) {
     `- "severity_guess": one of ${levels}. It is a hint only.`,
     '- "mitigations_searched": each guard you looked for (limit, index, batching, timeout, lock, retry policy, cache, upstream cap) and what you found, with a citation.',
     '- "rule_pattern_hint": fill it only when the same code shape could be matched by a static rule elsewhere.',
+    '- "reviewed": every file you actually opened and read, as a repo-relative path; use [] if you read nothing. A file that only showed up in a search result does not count. The list ends up in the hunt summary, so the lead can see what this hunt covered and what it did not.',
     '- If nothing in your scope passes the gates, return an empty candidate list and say in notes what you looked at.',
     '',
     'RULES',
@@ -580,7 +586,8 @@ tasks.forEach((t, i) => {
   candidates.push(...r.candidates);
   for (const u of Array.isArray(r.claims_not_resolved) ? r.claims_not_resolved : []) unresolved.push({ group: t.group.key, ...u });
   if (typeof r.notes === 'string' && r.notes.trim()) notes.push({ group: t.group.key, notes: r.notes });
-  perGroup.push({ group: t.group.key, candidates: r.candidates.length });
+  const reviewed = Array.isArray(r.reviewed) ? r.reviewed.filter((p) => typeof p === 'string' && p.trim()) : [];
+  perGroup.push({ group: t.group.key, candidates: r.candidates.length, reviewed });
 });
 if (failed.length) say(`${PHASE}: no result from ${failed.join(', ')}`);
 

@@ -37,6 +37,7 @@ First public version.
 - CI: a `macos-latest` job that runs only when started by hand (`workflow_dispatch`); push and pull-request runs stay on Ubuntu and Windows.
 - Docs: security (`.git` is trusted input, the `.env` rule, deny groups), limits (one run is not exhaustive, as also observed by [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill); known gaps such as `javascript:` link targets not being removed), verification (batch plan, binding, stale verdicts), run order in "Run an audit".
 - `tests/run-all.js` adds an end-to-end builder step with `--strict` and a Semgrep fixture test.
+- Lenses gain seven items with sums, mitigations, false positives and evidence commands (reliability: poison records, detached work, unsafe recovery or replay; performance: aggregate against per-item limits, cache stampede, key cardinality, superlinear regex or parsing); the arithmetic skeptic refutes a missing limit as `hardening:` when no breaking size at or below the target can be derived, and the mechanism and reach skeptics do the same for a defence-in-depth gap alone; each hunter may return the files it read as `reviewed`, kept per hunter in the hunt summary. Ideas from [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT).
 - `SECURITY.md`, `CONTRIBUTING.md` (DCO sign-off, invented code only), `tests/run-all.js` and a CI workflow.
 
 [0.1.0]: https://github.com/mohamedzhioua/before-it-breaks/releases/tag/v0.1.0
