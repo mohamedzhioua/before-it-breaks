@@ -67,7 +67,10 @@
  * target.
  *
  * Exports: main, render, denyRules(prefixes), fileDenyRules(repoDirs),
- *   startingGroups, defaultModules(repos), launchLine(config, repoDirs),
+ *   startingGroups, defaultModules(repos), launchLine(config, repoDirs,
+ *   opts?) (adds --plugin-dir "<kit root>" unless the kit is an installed
+ *   plugin: CLAUDE_PLUGIN_ROOT set and the root under
+ *   <CLAUDE_CONFIG_DIR or ~/.claude>/plugins, links resolved),
  *   placeholderWarnings(config)
  */
 
@@ -423,9 +426,35 @@ function fileDenyRules(repoDirs) {
 
 // The line that starts the lead session: lead model and effort from the
 // config ("inherit" sends no --model), and read access to every repo.
-function launchLine(cfg, repoDirs) {
+// True when kitRoot is a plugin Claude Code installed: CLAUDE_PLUGIN_ROOT is
+// set and the root lies inside <config dir>/plugins, where the config dir is
+// CLAUDE_CONFIG_DIR or <home>/.claude. Both paths are compared after
+// resolving links (a path that cannot be resolved is compared as given).
+function installedPlugin(kitRoot, env, home) {
+  if (!env.CLAUDE_PLUGIN_ROOT) return false;
+  const real = (p) => {
+    try {
+      return fs.realpathSync(p);
+    } catch (e) {
+      return path.resolve(p);
+    }
+  };
+  const configDir = env.CLAUDE_CONFIG_DIR ? path.resolve(env.CLAUDE_CONFIG_DIR) : path.join(home, '.claude');
+  const rel = path.relative(real(path.join(configDir, 'plugins')), real(kitRoot));
+  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+// opts (for tests): { kitRoot, env, home }; defaults are the running kit,
+// process.env and the user's home folder. A kit that is not an installed
+// plugin is loaded with --plugin-dir, so its agents, skills and workflows
+// are there.
+function launchLine(cfg, repoDirs, opts) {
+  const o = opts || {};
+  const kitRoot = o.kitRoot || KIT_ROOT;
   const lead = cfg.models.lead;
+  const pluginDir = installedPlugin(kitRoot, o.env || process.env, o.home || require('os').homedir()) ? [] : [`--plugin-dir "${posix(kitRoot)}"`];
   return ['claude']
+    .concat(pluginDir)
     .concat(lead.model === 'inherit' ? [] : [`--model ${lead.model}`], [`--effort ${lead.effort}`])
     .concat(repoDirs.map((p) => `--add-dir "${posix(p)}"`)).join(' ');
 }

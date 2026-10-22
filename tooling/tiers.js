@@ -29,7 +29,8 @@
  * Exports: buildTiers(config) -> [{ id, label, max? }], tierOf(item, config)
  *   -> tier id, maturity(counts, levels), fmtN(n), breaksText(item),
  *   levelsOf(config); text helpers cap, one, prose, cell, code, rel(from, to,
- *   anchor); pageTop(opts), legend(), trustLine(measured, total, link),
+ *   anchor), hasRecommendations(paths); pageTop(opts), legend(),
+ *   trustLine(measured, total, link),
  *   kitDocUrl(page); workspace helpers loadWorkspace(ws, opts?),
  *   readCandidates, readFinal, checkFresh, checkSynthesis, readInputs,
  *   sortFindings, countBy, readJson, readJsonSha, readOptional, problems,
@@ -145,6 +146,16 @@ function code(s) {
   const fence = '`'.repeat(longest + 1);
   const pad = t.startsWith('`') || t.endsWith('`') ? ' ' : '';
   return `${fence}${pad}${t}${pad}${fence}`;
+}
+
+// True when the recommend phase saved a result: at least one module plan in
+// work/phase6/recs/ or work/phase6/cross-cutting.json. Pages decide from
+// these inputs, never from whether 05 has been generated yet.
+function hasRecommendations(paths) {
+  const dir = path.join(paths.work, 'phase6');
+  const recs = path.join(dir, 'recs');
+  const plans = fs.existsSync(recs) && fs.readdirSync(recs).some((f) => /\.json$/i.test(f));
+  return plans || fs.existsSync(path.join(dir, 'cross-cutting.json'));
 }
 
 // Relative Markdown link target from one file to another, with / separators.
@@ -455,6 +466,7 @@ module.exports = {
   cell,
   code,
   rel,
+  hasRecommendations,
   kitDocUrl,
   legend,
   trustLine,

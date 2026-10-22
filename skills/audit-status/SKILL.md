@@ -31,11 +31,12 @@ This table is also what `run-phase` checks before it starts a step: the gate of 
 | synthesize | `work/phase3/verdicts.json` | — |
 | overrides | an overrides review entry in the HANDOFF: who approved the list in `work/phase3/master-overrides.json` (an empty list is fine) and when. The file alone does not mean the step is done | every override has a reason and an `approved_by`, the approver's OK is in the HANDOFF, and `synthesize` ran again after the last change |
 | build log | `03-verification-log.md` | — |
+| build measurements | `04-measurements.md` | — |
 | report-inputs | `work/phase5/report-inputs.json` | — |
+| recommend (optional, experimental) | `work/phase6/cross-cutting.json` and `work/phase6/recs/`, or the HANDOFF records that the audit skips recommendations | — |
+| build recommendations (only after recommend) | `05-recommendations.md` (and, if built after it, `work/phase6/issues.csv` and `work/explorer-data.json`), or recommend skipped (recorded in HANDOFF.md) | — |
 | build report | `02-audit-report.md` | — |
-| recommend (experimental) | `work/phase6/cross-cutting.json` and `work/phase6/recs/` | — |
-| build recommendations | `05-recommendations.md` (and, if built after it, `work/phase6/issues.csv` and `work/explorer-data.json`) | — |
-| measure (optional; designed, not yet proven) | `04-measurements.md` and results under `work/phase4/` | access agreed with the user, never production load |
+| measure (optional; designed, not yet proven) | results under `work/phase4/` | access agreed with the user, never production load |
 | closing checks | the `check secrets` record, `check unchanged` and `check links` all passing | a person writes `01-executive-summary.md` (the kit never generates it) |
 
 Count files and entries with short commands (for example the number of candidates or verdicts) instead of reading large JSON into the conversation.

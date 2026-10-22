@@ -40,11 +40,12 @@ Run the line `doctor` printed from inside the workspace, then `/hooks` (check th
 | synthesize | `kit synthesize <ws>` | `work/phase3/verdicts.json` |
 | overrides | write `work/phase3/master-overrides.json`, get approval, `kit synthesize <ws>` again, then `kit build log <ws>` again if it was already built | the same |
 | build log | `kit build log <ws>` | `03-verification-log.md`, plus `claim-verdicts.json` and `final-verdicts.json` in `work/phase3/` |
+| build measurements | `kit build measurements <ws>`, right after build log and before build report. No agents: it lists the live checks from the candidates, the receipts index, the final verdicts and the config's `measure` section, and never reads `work/phase4/`. The report and the log always link this page, so a skipped build shows up as a broken link in `kit check links` | `04-measurements.md` |
 | report-inputs | agent phase `report-inputs` | `work/phase5/report-inputs.json` |
-| build report | `kit build report <ws>` | `02-audit-report.md` |
-| recommend (experimental) | agent phase `recommend` | `work/phase6/recs/`, `work/phase6/cross-cutting.json` |
-| build recommendations | `kit build recommendations <ws>`, then as wanted `kit build issues <ws>` and `kit build explorer <ws>` (both read `work/phase6/finding-modules.json`, which this step writes) | `05-recommendations.md`, the target-architecture page, `work/phase6/issues.*`, `work/explorer-data.json` |
-| measure (optional) | `kit build measurements <ws>`; run only the checks access was agreed for | `04-measurements.md`, `work/phase4/` |
+| recommend (optional, experimental) | agent phase `recommend`; it needs only `kit synthesize` and the saved report inputs | `work/phase6/recs/`, `work/phase6/cross-cutting.json` |
+| build recommendations (only after recommend) | `kit build recommendations <ws>`, then as wanted `kit build issues <ws>` and `kit build explorer <ws>` (both read `work/phase6/finding-modules.json`, which this step writes) | `05-recommendations.md`, the target-architecture page, `work/phase6/issues.*`, `work/explorer-data.json` |
+| build report | `kit build report <ws>`, after the recommend steps (or when recommend is skipped): the report links `05-recommendations.md` only when a recommend result was saved, and otherwise says there are no recommendations | `02-audit-report.md` |
+| measure (optional) | run only the checks in `04-measurements.md` that access was agreed for | `work/phase4/` |
 | closing checks | `kit check secrets <ws>`, `kit check unchanged <ws>`, `kit check links <ws>` | `work/secrets-scan.json` and `.md` |
 
 Run order matters, because the kit ties votes and verdicts to the exact content of each candidate, the pins and the receipts:
@@ -80,7 +81,7 @@ kit args <phase> --run <N> <ws> > <ws>/work/args/<phase>-<N>.json
 
 Script notes: `kit init` writes one default module rule per repo (check it); `check secrets` applies the home-path and email rules to the published files only and the secret patterns to everything; `doctor` warns when `kit.root` is stale, so run `init <ws> --refresh-prompts` after a plugin update; `check mermaid` needs `--modules <dir>`; `build report` and `build recommendations` take `--strict`, which exits 1 on any `check:` warning (for `build report`, that includes a finding whose report input is not drafted yet); hunt summaries are saved to `work/phase2/hunt-<N>.json`.
 
-`kit args recommend` needs `kit synthesize` to have run first; it starts one planner per module that holds surviving findings, and finding ids that map to no module go to the cross-cutting agent. `doctor` has a required "method files" line: every lens and skeptic brief in use must exist.
+`kit args recommend` needs `kit synthesize` to have run and the report inputs to be saved first; it starts one planner per module that holds surviving findings, and finding ids that map to no module go to the cross-cutting agent. `doctor` has a required "method files" line: every lens and skeptic brief in use must exist.
 
 `kit pin` refuses a repo whose `.git` folder can start a program or fetch, and a repo that is a `git worktree` or submodule checkout (`.git` is a file); the reasons are printed. The refusal list is in [security](security.md). Clone the repo again from a remote you trust, or, only if the user agrees, pin with `--trust-git-dir` (recorded in `pins.json` and the baseline; it skips the .git-folder check entirely: a .git file, commondir, alternates, core.worktree, includes, filter and diff drivers are then all allowed, and the isolated git environment still applies).
 

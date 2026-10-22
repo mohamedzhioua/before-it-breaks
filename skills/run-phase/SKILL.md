@@ -28,11 +28,12 @@ The workspace is the current folder unless the user names another; call it `<ws>
 | synthesize | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" synthesize <ws>` | `work/phase3/verdicts.json` |
 | overrides | lead + person | see section 7 | `work/phase3/master-overrides.json` |
 | build log | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build log <ws>` | `03-verification-log.md` |
+| build measurements | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build measurements <ws>`, right after build log and before build report: no agents, it lists the live checks from the candidates, the receipts and the verdicts (the report and the log link this page) | `04-measurements.md` |
 | report-inputs | agents | workflow `report-inputs` | `work/phase5/report-inputs.json` |
-| build report | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build report <ws> --strict` (exit 1 means a `check:` warning: show it to the user and fix the data, or run again without `--strict` once they accept it) | `02-audit-report.md` |
-| recommend | agents | workflow `recommend` (**experimental**); `kit args recommend` needs `synthesize` first and plans one module per planner for modules with surviving findings (unmapped ids go to the cross-cutting agent) | `work/phase6/recs/`, `cross-cutting.json` |
-| build recommendations | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build recommendations <ws> --strict` (same rule for exit 1), then, if wanted, `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build issues <ws>` and `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build explorer <ws>` (both read `work/phase6/finding-modules.json`, which `build recommendations` writes) | `05-recommendations.md`, `work/phase6/issues.{csv,md}`, `work/explorer-data.json` |
-| measure (optional) | lead + person | **designed, not yet proven**: `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build measurements <ws>` lists the read-only live checks; run only those the user has given access for, never load on production, and ask before anything that touches a shared environment | `04-measurements.md`, `work/phase4/` |
+| recommend (optional) | agents | workflow `recommend` (**experimental**; skip it when the audit wants no recommendations); `kit args recommend` needs `synthesize` and the saved report inputs first, and plans one module per planner for modules with surviving findings (unmapped ids go to the cross-cutting agent) | `work/phase6/recs/`, `cross-cutting.json` |
+| build recommendations (only after recommend) | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build recommendations <ws> --strict` (same rule for exit 1), then, if wanted, `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build issues <ws>` and `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build explorer <ws>` (both read `work/phase6/finding-modules.json`, which `build recommendations` writes) | `05-recommendations.md`, `work/phase6/issues.{csv,md}`, `work/explorer-data.json` |
+| build report | script | after the recommend steps, or right after report-inputs when recommend is skipped: `node "${CLAUDE_PLUGIN_ROOT}/kit.js" build report <ws> --strict` (exit 1 means a `check:` warning: show it to the user and fix the data, or run again without `--strict` once they accept it) | `02-audit-report.md` |
+| measure (optional) | lead + person | **designed, not yet proven**: run only those checks in `04-measurements.md` the user has given access for, never load on production, and ask before anything that touches a shared environment | `work/phase4/` |
 | check secrets | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" check secrets <ws>`; keep the record file it writes | its record file |
 | check unchanged | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" check unchanged <ws>` | — |
 | check links | script | `node "${CLAUDE_PLUGIN_ROOT}/kit.js" check links <ws>` | — |
@@ -57,7 +58,7 @@ node "${CLAUDE_PLUGIN_ROOT}/kit.js" args <phase> --run <N> <ws> > <ws>/work/args
 
 ## 4. Save the result at once
 
-As soon as a run returns, write its result to a file (for example `<ws>/work/results/<phase>-<N>.json`) and save it into place:
+As soon as a run returns, save it into place. When the Workflow tool wrote its output to a file, save the Workflow's output file as it is; `kit save` unwraps it. Otherwise write the result to a file (for example `<ws>/work/results/<phase>-<N>.json`) first:
 
 ```
 node "${CLAUDE_PLUGIN_ROOT}/kit.js" save <phase> <result-file> --run <N> <ws>

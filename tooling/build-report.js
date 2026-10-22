@@ -18,7 +18,9 @@
  * with its title and "not drafted yet"; their ids are printed on stdout,
  * also as a `check:` line, and each counts as a check under --strict.
  *
- * Size check: when a report input and the verified candidate disagree on
+ * Size check: when a report input and the verified finding's effective size
+ * (the skeptics' corrected threshold when the finding was corrected, the
+ * math skeptic's first; otherwise the hunter's breaks_at) disagree on
  * whether the finding is size-driven (a breaking size or "any size" on one
  * side, "not size-driven" on the other), or a report input's threshold text
  * says "any size" next to a "not size-driven" basis, a `check:` line is
@@ -53,21 +55,58 @@ function inputKind(x) {
   return x.breaks_at === 0 ? 'any' : 'size';
 }
 
+// A number with a size word or unit after it: "40k", "2M", "500 users",
+// "10k docs", "5 MB", "300/s". A bare count ("fails after 3 retries") is not a
+// size.
+const SIZE_WORDS = 'sessions?|users?|requests?|reqs?|docs?|documents?|items?|rows?|records?|notes?|workspaces?|tenants?|jobs?|messages?|events?|keys?|connections?|files?|entries|calls?|queries|writes?|reads?|ops|bytes?|[kmgt]i?b';
+const SIZED = new RegExp('\\d[\\d,.]*\\s*(?:[km]\\b|(?:' + SIZE_WORDS + ')\\b|/\\s*s\\b|per second\\b)', 'i');
+
+// How a skeptic's corrected threshold (free text) scales, or null when the
+// text gives no readable size kind (the caller then uses the hunter's size).
+function correctedKind(text) {
+  const t = T.one(text || '');
+  if (!t.trim()) return null;
+  if (/not size[- ]driven|^n\/a\b/i.test(t)) return 'n/s';
+  if (/\bany size\b/i.test(t)) return 'any';
+  return SIZED.test(t) ? 'size' : null;
+}
+
+// The corrected threshold of a verified finding the skeptics corrected, from
+// PARTIAL votes only: the math skeptic's when it gave one, else the first in
+// lens order. Text on a REAL, REFUTED or OUT_OF_SCOPE vote is ignored.
+function correctedThreshold(verdict, lenses) {
+  if (!verdict || !verdict.corrected || !verdict.votes) return '';
+  const order = ['math'].concat(lenses.filter((l) => l !== 'math'));
+  for (const l of order) {
+    const v = verdict.votes[l];
+    if (v && v.vote === 'PARTIAL' && typeof v.corrected_threshold === 'string' && v.corrected_threshold.trim()) return v.corrected_threshold;
+  }
+  return '';
+}
+
 const KIND_TEXT = { 'n/s': 'not size-driven', any: 'breaks at any size', size: 'a breaking size', grows: 'no hard break' };
 
-// Report inputs that disagree with the verified candidate (or with their own
-// threshold text) on whether the finding is size-driven.
-function sizeConflicts(findings, inputs, cands, config) {
+// Report inputs that disagree with the verified finding's effective size
+// (or with their own threshold text) on whether the finding is size-driven.
+// The effective size is the skeptics' corrected threshold when the finding
+// was corrected (corrections: id -> text, see correctedThreshold), else the
+// hunter's breaks_at.
+function sizeConflicts(findings, inputs, cands, config, corrections) {
   const out = [];
   for (const f of findings) {
     const x = inputs.get(f.id);
     if (!x) continue;
     const c = cands.get(f.id);
+    const text = corrections && corrections.get(f.id);
+    // An unreadable corrected threshold falls back to the hunter's size.
+    const fixed = text && correctedKind(text) ? text : null;
     const ri = inputKind(x);
-    const ck = candidateKind(c);
+    const ck = fixed ? correctedKind(fixed) : candidateKind(c);
     if (ck && ck !== ri && (ck === 'n/s' || ri === 'n/s') && ck !== 'grows' && ri !== 'grows') {
-      const was = c.breaks_at === null ? 'null' : `"${T.one(c.breaks_at)}"`;
-      out.push(`${f.id}: the report input says ${KIND_TEXT[ri]} (${T.breaksText(x)}, tier ${T.tierOf(x, config)}) but the verified candidate says ${KIND_TEXT[ck]} (breaks_at ${was}, basis "${T.one(c.breaks_at_basis)}"); the tier follows the report input`);
+      const said = fixed
+        ? `the skeptics' corrected threshold says ${KIND_TEXT[ck]} ("${T.one(fixed)}")`
+        : `the verified candidate says ${KIND_TEXT[ck]} (breaks_at ${c.breaks_at === null ? 'null' : `"${T.one(c.breaks_at)}"`}, basis "${T.one(c.breaks_at_basis)}")`;
+      out.push(`${f.id}: the report input says ${KIND_TEXT[ri]} (${T.breaksText(x)}, tier ${T.tierOf(x, config)}) but ${said}; the tier follows the report input`);
     } else if (ri === 'n/s' && /\bany size\b/i.test(x.threshold || '')) {
       out.push(`${f.id}: the report input threshold says "any size" (tier T0) but its basis is not size-driven (tier n/s); the tier follows the basis`);
     }
@@ -87,7 +126,11 @@ function build(ws, io, strict) {
   const open = T.openIds(doc, io);
   const others = doc.findings.filter((f) => !f.in_report && f.verdict !== 'NEEDS-REVIEW');
   const missing = findings.filter((f) => !inputs.has(f.id)).map((f) => f.id);
-  const conflicts = sizeConflicts(findings, inputs, cands, config);
+  const vdoc = T.readJson(path.join(paths.work, 'phase3', 'verdicts.json'), 'work/phase3/verdicts.json');
+  const byId = new Map((vdoc && Array.isArray(vdoc.verdicts) ? vdoc.verdicts : []).map((v) => [v.id, v]));
+  const lenses = vdoc && Array.isArray(vdoc.skeptic_lenses) ? vdoc.skeptic_lenses : [];
+  const corrections = new Map(findings.filter((f) => f.corrected).map((f) => [f.id, correctedThreshold(byId.get(f.id), lenses)]).filter(([, t]) => t));
+  const conflicts = sizeConflicts(findings, inputs, cands, config, corrections);
   const inp = (f) => inputs.get(f.id) || null;
   const areaOf = (f) => (inp(f) ? inp(f).area : 'not classified yet');
   const row = (list) => levels.map((l) => list.filter((f) => f.severity === l).length);
@@ -114,7 +157,7 @@ function build(ws, io, strict) {
       '',
       `The size that matters is **${T.prose(s.unit)}**, with a target of ${T.fmtN(s.target)}${s.platform_target ? ` and ${T.fmtN(s.platform_target)} across the whole platform` : ''}. Audit date ${config.audit.date}; pinned commits ${T.pinList(config, pins)}. Citations read \`repo@commit:path:line\`.`,
       '',
-      `Findings appear most severe first; within one severity, the one that fails at the smallest size comes first. How each one was tested: [the verification log](${T.rel(file, paths.outputs.log)}). What to change, module by module: [the recommendations](${T.rel(file, paths.outputs.recommendations)}).`,
+      `Findings appear most severe first; within one severity, the one that fails at the smallest size comes first. How each one was tested: [the verification log](${T.rel(file, paths.outputs.log)}). ${T.hasRecommendations(paths) ? `What to change, module by module: [the recommendations](${T.rel(file, paths.outputs.recommendations)}).` : 'There are no recommendations in this audit.'}`,
     ].join('\n'),
   }));
 
@@ -202,6 +245,6 @@ function main(argv, io) {
     (ws, opts, out) => build(ws, out, opts.strict === true));
 }
 
-module.exports = { main, sizeConflicts };
+module.exports = { main, sizeConflicts, correctedThreshold, correctedKind };
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2));

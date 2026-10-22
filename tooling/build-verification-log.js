@@ -31,7 +31,8 @@
  * check that would settle it, so "looked at, could not settle" stays apart
  * from "no candidate tested it". Hunter notes that mention instructions,
  * prompts or injection (text in a repo that tried to steer an agent) are
- * listed under "Notes for the audit team", as are unresolved entries that
+ * listed under "Notes for the audit team" (quoted up to 120 characters on
+ * each side of the first such word), as are unresolved entries that
  * name an unknown claim. The output depends only on the input files, so a
  * rebuild is byte-identical.
  *
@@ -91,6 +92,18 @@ const STEERING = /\b(instruct\w*|inject\w*|prompts?|ignore (?:all|any|every|the|
 function clipped(s, n) {
   const t = T.one(s);
   return t.length > n ? `${t.slice(0, n)}...` : t;
+}
+
+// Up to radius characters on each side of the first match of re, on one
+// line, with "..." where the text was cut; the start of the text when re
+// does not match.
+function aroundMatch(s, re, radius) {
+  const t = T.one(s);
+  const m = re.exec(t);
+  if (!m) return clipped(t, 2 * radius);
+  const start = Math.max(0, m.index - radius);
+  const end = Math.min(t.length, m.index + m[0].length + radius);
+  return `${start > 0 ? '...' : ''}${t.slice(start, end)}${end < t.length ? '...' : ''}`;
 }
 
 function finalVerdicts(verdicts, cands, full) {
@@ -295,7 +308,7 @@ function notesForTeam(hunts, claimsIn) {
   for (const h of hunts) {
     for (const n of h.notes) {
       if (typeof n.notes === 'string' && STEERING.test(n.notes)) {
-        out.push(`Hunter ${T.code(clipped(n.group || '?', 60))} (work/phase2/${h.name}) reports text that may have tried to instruct it: ${T.code(clipped(n.notes, 400))}`);
+        out.push(`Hunter ${T.code(clipped(n.group || '?', 60))} (work/phase2/${h.name}) reports text that may have tried to instruct it: ${T.code(aroundMatch(n.notes, STEERING, 120))}`);
       }
     }
     for (const u of h.unresolved) {
@@ -348,6 +361,6 @@ function main(argv, io) {
   return T.runCli(argv, io, { name: 'build-verification-log', usage: 'usage: node tooling/build-verification-log.js [<workspace>]' }, (ws, opts, out) => build(ws, out));
 }
 
-module.exports = { main, finalVerdicts, claimVerdicts, readHuntSummaries, notesForTeam };
+module.exports = { main, finalVerdicts, claimVerdicts, readHuntSummaries, notesForTeam, aroundMatch };
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2));

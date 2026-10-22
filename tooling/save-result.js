@@ -62,6 +62,11 @@
  *                  replaces the whole file; later runs merge).
  * Saving exactly the same content again is always allowed.
  *
+ * The Workflow tool's output file may be saved as it is: a top-level
+ * { result: ... } without the phase's own key (maps, candidates, results,
+ * items, recs) is unwrapped, and a "result" that is JSON text is parsed
+ * once; the note "unwrapped Workflow result" says so.
+ *
  * Nothing is written when the result is invalid. Files are written to a
  * temporary name first and then renamed.
  *
@@ -343,10 +348,31 @@ function planRecommend(result, ctx) {
 
 const PLAN = { map: planMap, hunt: planHunt, verify: planVerify, 'report-inputs': planReport, recommend: planRecommend };
 
-function saveResult(phase, result, opts) {
+// The key a phase's own result has at the top level; a { result } object
+// without it is the Workflow tool's output wrapper.
+const OWN_KEY = { map: 'maps', hunt: 'candidates', verify: 'results', 'report-inputs': 'items', recommend: 'recs' };
+
+// Unwraps the Workflow tool's output file: { result: <object> } or
+// { result: "<JSON text>" } (parsed once). Returns { value, unwrapped }.
+function unwrapWorkflow(phase, result) {
+  if (!isObj(result) || !('result' in result) || OWN_KEY[phase] in result) return { value: result, unwrapped: false };
+  let inner = result.result;
+  if (typeof inner === 'string') {
+    try {
+      inner = JSON.parse(inner.replace(/^\uFEFF/, ''));
+    } catch (e) {
+      throw new ResultError([`result: the Workflow output's "result" text is not valid JSON (${e.message})`]);
+    }
+  }
+  return { value: inner, unwrapped: true };
+}
+
+function saveResult(phase, given, opts) {
   if (!PHASES.includes(phase)) throw new CliError(`unknown phase "${phase}" (one of ${PHASES.join(', ')})`);
   const { config, paths } = loadConfig(opts.workspace || '.');
   const ctx = { config, paths, run: '1', force: opts.force === true, source: opts.source || 'result', notes: [] };
+  const { value: result, unwrapped } = unwrapWorkflow(phase, given);
+  if (unwrapped) ctx.notes.push('note: unwrapped Workflow result');
   // The run a hunt result names itself; checked by checkHuntSummary in planHunt.
   const own = phase === 'hunt' && isObj(result) && isObj(result.summary) && ['number', 'string'].includes(typeof result.summary.run)
     && RUN.test(String(result.summary.run)) ? String(result.summary.run) : null;
