@@ -259,17 +259,30 @@ function gitTopLevel(dir) {
   return out ? out.trim() : null;
 }
 
+// The real path of p, or p when it cannot be resolved. git prints long
+// paths, so a Windows 8.3 short path (a folder shown as RUNNER~1) must be
+// expanded before the two are compared.
+function realOr(p) {
+  try { return fs.realpathSync.native(p); } catch { return p; }
+}
+
 // Relative path used for @except / allow matching on a single file argument.
 function relForFile(file) {
-  const top = gitTopLevel(path.dirname(path.resolve(file)));
-  return toPosix(path.relative(top || process.cwd(), path.resolve(file)));
+  const abs = realOr(path.resolve(file));
+  const top = gitTopLevel(path.dirname(abs));
+  return toPosix(path.relative(realOr(top || process.cwd()), abs));
 }
 
 function diskLoader(abs) {
   return () => {
     try {
       const st = fs.lstatSync(abs);
-      if (st.isSymbolicLink()) return { buf: Buffer.from(fs.readlinkSync(abs), 'utf8'), link: true };
+      // A link is scanned as its target string, with forward slashes on
+      // Windows too (git for Windows records link targets that way).
+      if (st.isSymbolicLink()) {
+        const target = fs.readlinkSync(abs);
+        return { buf: Buffer.from(process.platform === 'win32' ? target.replace(/\\/g, '/') : target, 'utf8'), link: true };
+      }
       return { buf: fs.readFileSync(abs), link: false };
     } catch (e) { throw fsError(e, abs); }
   };
@@ -349,7 +362,7 @@ function collectStaged(root) {
   }
   return items.map((x, n) => {
     const abs = path.resolve(dir, x.relToDir);
-    const rel = st.isDirectory() ? x.relToDir : toPosix(path.relative(top, abs));
+    const rel = st.isDirectory() ? x.relToDir : toPosix(path.relative(realOr(top), realOr(abs)));
     const display = toPosix(st.isDirectory() ? path.join(root, x.relToDir) : root);
     return { key: 'index:' + abs, display, rel, load: () => ({ buf: blobs[n], link: x.mode === '120000' }) };
   });
