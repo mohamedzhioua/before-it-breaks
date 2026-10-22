@@ -49,21 +49,22 @@ For the person who runs an audit, and for anyone who wants to know why each step
 ### Phase 4: measure (optional; designed, not yet proven)
 
 - **Input:** the evidence commands that need a live system, and the access the user agrees to.
-- **Output:** `04-measurements.md` (the catalogue of read-only checks) and results under `work/phase4/`.
+- **Output:** the results of the checks you ran, under `work/phase4/`. The catalogue of checks, `04-measurements.md`, is a standard step: `kit build measurements` builds it right after `kit build log`, with no agents; it lists the checks, never runs them and does not read `work/phase4/`.
 - **Gate before:** access agreed in writing; never load on production; ask before touching any shared environment.
 - **Why:** it is the only route from a calculated size to a measured one. See [Measuring](measuring.md).
 
 ### Phase 5: report
 
 - **Input:** the final verdicts and the system docs written so far.
-- **Output:** `work/phase5/report-inputs.json` (plain one-liner, threshold, breaking size and what it grows with, fix direction, effort, area per finding), then `02-audit-report.md`, the issues file and the explorer data. The docs writer tidies `system-docs/` and normalises its citations.
+- **Output:** `work/phase5/report-inputs.json` (plain one-liner, threshold, breaking size and what it grows with, fix direction, effort, area per finding), then `02-audit-report.md`, built after the recommend steps (or when recommend is skipped). The docs writer tidies `system-docs/` and normalises its citations.
 - **Gate before:** overrides approved and synthesis re-run.
 - **Why:** the report is rebuilt from data every time, so it can never disagree with the verdicts.
 
 ### Phase 6: recommend (experimental)
 
+- **Gate before:** synthesis has run and the report inputs are saved.
 - **Input:** the report inputs and the module rules in `modules`.
-- **Output:** `work/phase6/recs/<module>.json`, `work/phase6/cross-cutting.json` (decision records and a now / next / later roadmap), then `05-recommendations.md` and the target-architecture page.
+- **Output:** `work/phase6/recs/<module>.json`, `work/phase6/cross-cutting.json` (decision records and a now / next / later roadmap), then `05-recommendations.md` and the target-architecture page; the issues file and the explorer data come from the same step. Build it before `kit build report`: the report links the recommendations only when a recommend result was saved, and otherwise says "There are no recommendations in this audit."
 - **Why:** findings say what breaks; engineers also need an order of work. Architects plan; they never re-argue verdicts.
 
 ### Closing checks

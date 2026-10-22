@@ -1,12 +1,12 @@
 # Examples
 
-This folder holds example configurations and, later, example results.
-Nothing here is a real audit result yet.
+This folder holds example configurations and one excerpt of real output from a pilot run. The demo config is invented; the Novu example is a plan that has not been run.
 
 | Folder | What it is | Status |
 |---|---|---|
 | [`demo-config/`](demo-config/audit.config.json) | An invented "notes platform" (workspaces, notes, users, imports, notifications). It shows every config field in use and is the config the tests check. There is no code behind it. | Invented; used by the tests |
 | [`novu-v3.19.0/`](novu-v3.19.0/README.md) | A plan for a public worked example on the open-source notification platform Novu, at one release tag. It shows how a real project would be set up: scope, question, size tiers, hunt groups. | Planned, not run yet |
+| [`pilot-connect-mongo/`](pilot-connect-mongo/README.md) | Excerpt of the first real-agent pilot on connect-mongo@182cfb09ad (lite, scalability, code only): one High finding, its verification record and evidence receipt. | Real output; run 2026-10-22 |
 
 ## The demo config and the worked example are different things
 
@@ -38,7 +38,7 @@ Examples are **never run inside this repository**.
 2. Create the audit workspace outside the kit as well (`node kit.js init`).
 3. Run the phases there.
 4. Copy only the results (reports, receipts, verdicts, run log) back into
-   `examples/<name>/`, together with a `THIRD-PARTY.md` for any quoted code.
+   `examples/<name>/`, together with the licence of any project whose code it quotes (see `pilot-connect-mongo/LICENSE-connect-mongo`).
 
 This keeps third-party code out of the kit's history, and keeps the kit's own
 checks (`node kit.js check clean`) meaningful.

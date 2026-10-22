@@ -98,7 +98,7 @@ The output depends only on the input files, so running it twice gives the same `
 | REMOVED | Withdrawn by the audit owner, with a recorded reason | no |
 | NOT-CHECKED | For a claim from an earlier audit only: no candidate tested it, so the audit says nothing about it. Shown as "NOT-CHECKED (hunter: unresolved)" when a hunter looked but could not settle it; the entry then names the command that would | — |
 
-When there is something to list, a "Notes for the audit team" section closes the page: in the verification log, hunter notes about suspected attempts to steer an agent and entries naming unknown claim ids; in the report, size conflicts between the report inputs and the verified candidates.
+When there is something to list, a "Notes for the audit team" section closes the page: in the verification log, hunter notes about suspected attempts to steer an agent and entries naming unknown claim ids; in the report, size conflicts between the report inputs and the verified finding's effective size (the PARTIAL skeptics' corrected threshold when it can be read, otherwise the hunter's). Steering notes are quoted about 120 characters either side of the matched word (such as "instruct", "inject", "prompt" or "ignore previous").
 
 The synthesis step never produces PROVEN; in this version no kit step does. It is reserved for findings backed by a measurement (see [measuring](measuring.md)). A claim from earlier work takes the best verdict of the candidates that checked it; a claim nobody checked is NOT-CHECKED, never UNPROVEN.
 

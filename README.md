@@ -46,6 +46,8 @@ All results are written into a separate **workspace** folder that the kit create
 | `system-docs/` | new team members | A description of the system as it is, with diagrams |
 | issues file | the team | One issue per change, as a GitLab CSV import or a Markdown checklist for any tracker |
 
+A real excerpt from the first pilot (a High finding, its verification record and its evidence receipt) is in [`examples/pilot-connect-mongo/`](examples/pilot-connect-mongo/README.md). `02-audit-report.md` says "There are no recommendations in this audit." when no recommend result was saved.
+
 In short, a report entry says this (an invented example, shortened; the kit's examples use a made-up "notes platform"):
 
 > **SVC-JOBS-03 · high · breaks at about 200k notes per workspace** (PROVEN-STATIC)
@@ -57,7 +59,7 @@ PROVEN-STATIC means: the code was re-read at the recorded commit, a script re-ra
 
 ## How it works
 
-Seven steps, numbered 0 to 6. The lead checks each gate before the next step; person gates rely on the skills, not on code, and are recorded with who confirmed them and when.
+Seven phases, numbered 0 to 6. The numbers name the phases; the build order differs a little: `build log`, then `build measurements` (a catalogue of live checks, no agents), then the report inputs, then recommend and `build recommendations` when you use them, and `build report` last. The full order is in [Run an audit](docs/run-an-audit.md#3-the-steps). The lead checks each gate before the next step; person gates rely on the skills, not on code, and are recorded with who confirmed them and when.
 
 | # | Step | What happens | Gate before it |
 |---|---|---|---|
@@ -67,7 +69,7 @@ Seven steps, numbered 0 to 6. The lead checks each gate before the next step; pe
 | 3 | **Verify** | A script re-runs every evidence command (read-only); three skeptics try to refute each candidate; a verifier on another model checks the evidence; fixed rules turn the votes into verdicts | A person has reviewed the list of commands the script would run |
 | 4 | **Measure** (optional) | Read-only checks on a live system turn calculated sizes into measured ones. *Designed, not yet proven* | Access is agreed in writing; never production load |
 | 5 | **Report** | Plain-language write-up of every surviving finding, rebuilt from data | Every lead override has a reason and a named approver |
-| 6 | **Recommend** | Module plans, decision records and a roadmap (experimental) | The report is built |
+| 6 | **Recommend** | Module plans, decision records and a roadmap (experimental) | The report inputs are saved |
 
 More: [How it works, for managers](docs/how-it-works.md) · [the method in full](docs/method.md) · [how findings are verified](docs/verification.md).
 
@@ -90,7 +92,7 @@ More: [How it works, for managers](docs/how-it-works.md) · [the method in full]
 
    Or in one step: `claude plugin install before-it-breaks --marketplace mohamedzhioua/before-it-breaks`.
 3. **Start the audit.** Open Claude Code anywhere and run `/before-it-breaks:start-audit`. It asks the decision-guide questions in one message, creates the workspace, checks the set-up and pins every repo.
-4. **Open the audit session.** The set-up prints a `claude --add-dir ...` line; run it in a terminal from the workspace folder, run `/hooks` once (see [lessons learned](docs/lessons-learned.md)), then `/before-it-breaks:run-phase map`. Check progress any time with `/before-it-breaks:audit-status`.
+4. **Open the audit session.** The set-up prints a `claude ...` line (it starts with `--plugin-dir "<kit folder>"` when the kit is not an installed plugin (so the agents, skills and workflows load), then `--model` (the lead model, unless it is `inherit`) and `--effort`, and one `--add-dir` per repo); run it in a terminal from the workspace folder, run `/hooks` once (see [lessons learned](docs/lessons-learned.md)), then `/before-it-breaks:run-phase map`. Check progress any time with `/before-it-breaks:audit-status`.
 
 **Without the plugin.** Clone this repo and drive the same steps with the kit's command line:
 

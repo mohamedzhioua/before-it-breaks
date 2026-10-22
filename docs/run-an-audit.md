@@ -19,7 +19,7 @@ kit validate <ws>
 kit doctor <ws>
 ```
 
-`doctor` prints one line per check (Node, git 2.40 or newer, optional git 2.44, config, repos and their `.git` folders, pins, clean trees, optional Semgrep and `claude`) and then the `claude --add-dir ...` line that opens a session with read access to every repo. Before Phase 0 only the pins check may fail.
+`doctor` prints one line per check (Node, git 2.40 or newer, optional git 2.44, config, repos and their `.git` folders, pins, clean trees, optional Semgrep and `claude`) and then the `claude ...` line that opens a session with read access to every repo. The line starts with `--plugin-dir "<kit folder>"` when the kit is not an installed plugin (so the agents, skills and workflows load), then `--model` (the lead model, unless it is `inherit`) and `--effort`, and one `--add-dir` per repo. Before Phase 0 only the pins check may fail.
 
 **No plugin?** Run `kit install-agents <ws>` (it copies the agent definitions into the workspace's `.claude/agents/`), set `"agents": { "namespace": "" }` in the config, and run `kit init <ws> --refresh-prompts` again. Without the plugin the workflows are not registered, so each agent phase starts its agents one at a time (see "Without the Workflow tool" in [run-phase](../skills/run-phase/SKILL.md)).
 
@@ -64,7 +64,7 @@ kit args <phase> --run <N> <ws> > <ws>/work/args/<phase>-<N>.json
 ```
 
 1. Pass the object in that file, unchanged, as the `args` of the plugin workflow `/before-it-breaks:<phase>`. Add `"dryRun": true` once to see the rendered prompts without starting any agent. Without the Workflow tool, read `workflows/<phase>.js` and start the same agents one at a time.
-2. Save the result to a file as soon as it returns, then put it in place:
+2. Save the result to a file as soon as it returns (the Workflow tool's output file can be saved as it is: `kit save` unwraps `{ "result": ... }` and notes it), then put it in place:
 
    ```
    kit save <phase> <result-file> --run <N> <ws>
@@ -79,7 +79,7 @@ kit args <phase> --run <N> <ws> > <ws>/work/args/<phase>-<N>.json
 
 4. Append a dated entry to `HANDOFF.md` with the next step.
 
-Script notes: `kit init` writes one default module rule per repo (check it); `check secrets` applies the home-path and email rules to the published files only and the secret patterns to everything; `doctor` warns when `kit.root` is stale, so run `init <ws> --refresh-prompts` after a plugin update; `check mermaid` needs `--modules <dir>`; `build report` and `build recommendations` take `--strict`, which exits 1 on any `check:` warning (for `build report`, that includes a finding whose report input is not drafted yet); hunt summaries are saved to `work/phase2/hunt-<N>.json`.
+Script notes: `kit init` writes one default module rule per repo (check it); `check secrets` applies the home-path and email rules to the published files only and the secret patterns to everything; `doctor` warns when `kit.root` is stale, so run `init <ws> --refresh-prompts` after a plugin update; `check mermaid` needs `--modules <dir>`; `build report` and `build recommendations` take `--strict`, which exits 1 on any `check:` warning (for `build report`, that includes a finding whose report input is not drafted yet, or a size conflict; a corrected finding whose report input follows the skeptics' corrected size raises no check); hunt summaries are saved to `work/phase2/hunt-<N>.json`.
 
 `kit args recommend` needs `kit synthesize` to have run and the report inputs to be saved first; it starts one planner per module that holds surviving findings, and finding ids that map to no module go to the cross-cutting agent. `doctor` has a required "method files" line: every lens and skeptic brief in use must exist.
 

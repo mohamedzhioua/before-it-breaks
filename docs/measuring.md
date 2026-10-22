@@ -11,7 +11,7 @@ Code reading gives PROVEN-STATIC findings: the mechanism is in the code and the 
 ## What the kit does
 
 - During the hunt and the verify step, agents write checks that need a live system as evidence commands starting with `LIVE` (or with a database, cache or cluster client named in `evidence.live_prefixes`). The evidence runner records them as `skipped-live` and **never runs them**.
-- `kit build measurements <ws>` collects those checks into `04-measurements.md`, sorted by kind with the regular expressions in `measure.kinds` (database, cache, queue, cluster, library, benchmark; anything else under "other"), and leaves out candidates that were refuted, out of scope, removed or merged.
+- `kit build measurements <ws>` is a standard step with no agents, run right after `kit build log`. It collects those checks into `04-measurements.md`, sorted by kind with the regular expressions in `measure.kinds` (database, cache, queue, cluster, library, benchmark; anything else under "other"), and leaves out candidates that were refuted, out of scope, removed or merged. It lists the checks and never runs them, and it does not read `work/phase4/`; the optional measure phase is only running the checks access was agreed for.
 - The same page prints the minimum-access table from `measure.access`: which access, given in which safe form, unlocks which checks.
 
 The kit does not run any measurement, and in this version no kit step turns a verdict into PROVEN. Record measured results under `work/phase4/` with the command, the environment, the date and the output, and state in the report and summary which findings were measured.

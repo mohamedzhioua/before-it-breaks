@@ -16,7 +16,7 @@ An AI agent that reads code can find real problems, and it can also be confident
 | 3 | Verify | Re-run the evidence; three skeptics and a mechanical check try to knock each candidate down | A person has seen which commands would run |
 | 4 | Measure (optional) | Check calculated sizes on a live system, read-only. Designed, not yet proven | Access agreed; never production load |
 | 5 | Report | Write every surviving finding in plain words | Every human decision has a reason and a named approver |
-| 6 | Recommend | Plan the fixes and their order (experimental) | The report is built |
+| 6 | Recommend | Plan the fixes and their order (experimental; done before the report page is built) | The report inputs are saved |
 
 ## What you receive
 
