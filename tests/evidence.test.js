@@ -317,6 +317,53 @@ test('a symlink inside a repo that points outside it is refused', (t) => {
   assert.match(r.reason, /through a symlink/);
 });
 
+// Makes a link, or skips the test when this machine does not allow links
+// (EPERM, EACCES). -> true when the link was made.
+function linkOrSkip(t, target, at, type) {
+  try {
+    fs.symlinkSync(target, at, type);
+    return true;
+  } catch (e) {
+    if (e.code !== 'EPERM' && e.code !== 'EACCES') throw e;
+    t.skip(`symlinks not available here (${e.code})`);
+    return false;
+  }
+}
+
+test('a link with an ordinary name that leads to an .env file is refused', (t) => {
+  const { dir, ctx } = classifyCtx(t);
+  fs.writeFileSync(path.join(dir, '.env'), 'x\n');
+  if (!linkOrSkip(t, path.join(dir, '.env'), path.join(dir, 'cfg'), 'file')) return;
+  const r = classify('cat {repo:notes-api}/cfg', EV, ctx);
+  assert.equal(r.status, 'skipped-unsafe');
+  assert.equal(r.reason, 'reads an .env file (through a link)');
+});
+
+test('a linked folder that leads into an .env folder is refused', (t) => {
+  const { dir, ctx } = classifyCtx(t);
+  fs.mkdirSync(path.join(dir, '.env'));
+  fs.writeFileSync(path.join(dir, '.env', 'x'), 'x\n');
+  if (!linkOrSkip(t, path.join(dir, '.env'), path.join(dir, 'd'), 'junction')) return;
+  const r = classify('cat {repo:notes-api}/d/x', EV, ctx);
+  assert.equal(r.status, 'skipped-unsafe');
+  assert.equal(r.reason, 'reads an .env file (through a link)');
+  // An ordinary file reached through a linked ordinary folder still runs.
+  fs.mkdirSync(path.join(dir, 'conf'));
+  fs.writeFileSync(path.join(dir, 'conf', 'x'), 'x\n');
+  if (!linkOrSkip(t, path.join(dir, 'conf'), path.join(dir, 'e'), 'junction')) return;
+  assert.notEqual(classify('cat {repo:notes-api}/e/x', EV, ctx).status, 'skipped-unsafe');
+});
+
+test('a chain of links (a -> b -> .env) is refused', (t) => {
+  const { dir, ctx } = classifyCtx(t);
+  fs.writeFileSync(path.join(dir, '.env'), 'x\n');
+  if (!linkOrSkip(t, path.join(dir, '.env'), path.join(dir, 'b'), 'file')) return;
+  if (!linkOrSkip(t, path.join(dir, 'b'), path.join(dir, 'a'), 'file')) return;
+  const r = classify('cat {repo:notes-api}/a', EV, ctx);
+  assert.equal(r.status, 'skipped-unsafe');
+  assert.equal(r.reason, 'reads an .env file (through a link)');
+});
+
 test('heads without an option table stay refused even if the config allows them', () => {
   const ev = { ...EV, allowed_heads: EV.allowed_heads.concat(['find', 'tee', 'xargs', 'bash', 'semgrep', 'awk', 'jq']) };
   for (const c of ['find . -name x', 'tee out', 'xargs cat', 'bash -c id', 'semgrep --config r .']) {
@@ -452,6 +499,87 @@ test('.env files and folders never reach a receipt through a folder search; user
   assert.equal(gitGreps.length, 2);
   for (const c of gitGreps) assert.deepEqual(c.args.slice(-GIT_ENV_EXCLUDE.length), GIT_ENV_EXCLUDE);
   assert.ok(Array.isArray(RG_ENV_EXCLUDE) && RG_ENV_EXCLUDE[0].startsWith('--iglob=!'));
+});
+
+test('git show, log and diff get the .env exclude pathspecs only where they print files', (t) => {
+  const { GIT_ENV_EXCLUDE } = require('../tooling/run-evidence');
+  const cand = (id, cmd) => ({ ...base0(), id, evidence: [{ cmd, expect: 'see the output' }] });
+  const G = 'git -C {repo:notes-api}';
+  const P = '{pin:notes-api}';
+  // id -> [command, exclude expected (null: refused)]
+  const steps = {
+    'SVC-JOBS-40': [`${G} log -p ${P}`, true],
+    'SVC-JOBS-41': [`${G} log --oneline ${P}`, false],
+    'SVC-JOBS-42': [`${G} log --follow -p ${P} -- src/a.ts`, false],
+    'SVC-JOBS-43': [`${G} show -s ${P}`, true],
+    'SVC-JOBS-44': [`${G} show ${P}:package.json`, true],
+    'SVC-JOBS-45': [`${G} show ${P}`, true],
+    'SVC-JOBS-46': [`${G} diff ${P}~1 ${P} --stat`, true],
+    'SVC-JOBS-47': [`${G} show ${P}:.env`, null],
+    // git's last option wins: -s or --no-patch followed by -p prints a patch.
+    'SVC-JOBS-50': [`${G} show -s -p ${P}`, true],
+    'SVC-JOBS-51': [`${G} show --no-patch -p ${P}`, true],
+    'SVC-JOBS-52': [`${G} show -sp ${P}`, true],
+    // A commit and a blob in one show: the commit part still needs the excludes.
+    'SVC-JOBS-53': [`${G} show ${P} ${P}:package.json`, true],
+    'SVC-JOBS-54': [`${G} show ${P}:notes.txt`, true],
+    'SVC-JOBS-55': [`${G} log --unified=1 ${P}`, true],
+    'SVC-JOBS-56': [`${G} log -s --unified=1 ${P}`, true],
+    'SVC-JOBS-57': [`${G} log --unified ${P}`, true],
+    // The same reads with the author line left out, so the receipt keeps the output.
+    'SVC-JOBS-48': [`${G} show --format=%s ${P}`, true],
+    'SVC-JOBS-49': [`${G} log -p --format=%s ${P}`, true],
+    'SVC-JOBS-58': [`${G} show -s -p --format=%s ${P}`, true],
+    'SVC-JOBS-59': [`${G} show --format=%s ${P} ${P}:package.json`, true],
+  };
+  const { ws, repo } = setup(t, 'gitenv', Object.entries(steps).map(([id, [cmd]]) => cand(id, cmd)));
+  fs.writeFileSync(path.join(repo.path, '.env'), 'SECRET_FROM_ENV=1\n');
+  fs.writeFileSync(path.join(repo.path, 'notes.txt'), 'visible change\n');
+  git(repo.path, ['add', '-A']);
+  git(repo.path, ['commit', '-q', '-m', 'add env']);
+  const sha = git(repo.path, ['rev-parse', 'HEAD']);
+  assert.equal(kit(['pin', ws]).code, 0);
+  const run = runnerTraced(t, [ws]);
+  const dir = path.join(ws, 'work', 'phase3', 'receipts');
+  const receipt = (id) => fs.readFileSync(path.join(dir, `${id}.md`), 'utf8');
+  const fixed = ['--no-ext-diff', '--no-textconv', '--ignore-submodules=all'];
+  // The argv each step gave, as the kit passed it on: the subcommand, the
+  // kit's fixed options, the step's own words, then what the kit added.
+  const tails = run.calls.filter((c) => /(^|[\\/])git(\.exe)?$/i.test(c.bin)).map((c) => {
+    const at = c.args.findIndex((a) => ['show', 'log', 'diff'].includes(a));
+    return at < 0 || c.args.slice(at + 1, at + 4).join() !== fixed.join() ? null : [c.args[at], ...c.args.slice(at + 4)];
+  }).filter(Boolean);
+  for (const [id, [cmd, excluded]] of Object.entries(steps)) {
+    if (excluded === null) continue;
+    const own = cmd.replace(/\{pin:notes-api\}/g, sha).split(' ').slice(3);
+    const found = tails.filter((a) => a.slice(0, own.length).join('\n') === own.join('\n'));
+    const exact = found.filter((a) => a.length === own.length || a[own.length] === '--' || a[own.length].startsWith(':(exclude'));
+    assert.equal(exact.length, 1, `${id}: ${JSON.stringify(found)}`);
+    const args = exact[0];
+    if (excluded) {
+      assert.deepEqual(args.slice(-GIT_ENV_EXCLUDE.length), GIT_ENV_EXCLUDE, `${id}: ${JSON.stringify(args)}`);
+      if (!own.includes('--')) assert.equal(args[args.length - GIT_ENV_EXCLUDE.length - 1], '--', `${id}: ${JSON.stringify(args)}`);
+    } else {
+      assert.ok(!args.some((a) => a.startsWith(':(exclude')), `${id}: ${JSON.stringify(args)}`);
+    }
+  }
+  for (const id of ['SVC-JOBS-45', 'SVC-JOBS-40', 'SVC-JOBS-50', 'SVC-JOBS-51', 'SVC-JOBS-52', 'SVC-JOBS-53']) {
+    assert.doesNotMatch(receipt(id), /SECRET_FROM_ENV/, id);
+  }
+  for (const id of ['SVC-JOBS-44', 'SVC-JOBS-53', 'SVC-JOBS-54', 'SVC-JOBS-55', 'SVC-JOBS-56', 'SVC-JOBS-57']) {
+    assert.match(receipt(id), /classification: ran\nexit code: 0/, id);
+  }
+  for (const id of ['SVC-JOBS-48', 'SVC-JOBS-49', 'SVC-JOBS-58']) {
+    assert.match(receipt(id), /classification: ran\nexit code: 0/, id);
+    assert.match(receipt(id), /visible change/, `${id} still shows the commit`);
+    assert.doesNotMatch(receipt(id), /SECRET_FROM_ENV/, id);
+  }
+  assert.match(receipt('SVC-JOBS-54'), /visible change/, 'a blob still prints with the excludes');
+  assert.match(receipt('SVC-JOBS-44'), /notes-service/, 'a blob still prints with the excludes');
+  assert.match(receipt('SVC-JOBS-59'), /classification: ran\nexit code: 0/);
+  assert.match(receipt('SVC-JOBS-59'), /notes-service/, 'the blob part still prints');
+  assert.doesNotMatch(receipt('SVC-JOBS-59'), /SECRET_FROM_ENV/);
+  assert.match(receipt('SVC-JOBS-47'), /reads an \.env file/);
 });
 
 test('the kit puts its excludes after the step options, never inside an option value', () => {

@@ -67,7 +67,7 @@
  *     = q Q { } s y and no s///w or s///e flag, and sed runs with --sandbox
  *     when the installed sed supports it (checked once per run; --dry-run
  *     says when it does not).
- *   - A file or folder named .env, or .env followed by '.', '-' or '_' (any case), is never read by name and is excluded from folder searches (grep, rg, git grep). History and diff output (git show, git log -p, git diff) and links under other names rely on the output detectors. The kit never promises that a secret cannot reach a receipt: the output detectors are the last line, and a withheld output is the signal to look.
+ *   - A file or folder named .env, or .env followed by '.', '-' or '_' (any case), is never read by name and is excluded from folder searches (grep, rg, git grep) and from git show, git diff and git log with a patch or file list (not with -L or --follow, which take no extra pathspecs). A file operand that is a link to such a name is refused too. The kit never promises that a secret cannot reach a receipt: the output detectors are the last line, and a withheld output is the signal to look.
  *     Such names are refused as file operands, rev:path and option values
  *     (also glued to an option; search patterns and sed scripts may name
  *     .env), git pathspecs after -- may hold wildcards unless they could
@@ -592,6 +592,10 @@ function operandProblem(head, table, parsed, roots) {
     if (GLOB.test(f)) return `"${f}": glob characters (* ? [) are not allowed in file operands`;
     const p = pathProblem(f, roots);
     if (p) return p;
+    // A link with an ordinary name can still lead to an .env file in the repo.
+    const real = realNearest(f);
+    const root = roots.find((r) => inside(f, r.dir));
+    if (real && root && root.real && ENV_NAME.test(path.sep + path.relative(root.real, real))) return 'reads an .env file (through a link)';
   }
   return null;
 }
@@ -910,6 +914,21 @@ const RG_ENV_EXCLUDE = ['--iglob=!.env', '--iglob=!.env.*', '--iglob=!.env-*', '
 const GIT_ENV_EXCLUDE = [':(exclude,icase,glob)**/.env', ':(exclude,icase,glob)**/.env.*', ':(exclude,icase,glob)**/.env-*', ':(exclude,icase,glob)**/.env_*', ':(exclude,icase,glob)**/.env/**', ':(exclude,icase,glob)**/.env.*/**', ':(exclude,icase,glob)**/.env-*/**', ':(exclude,icase,glob)**/.env_*/**'];
 const FILE_PATTERN_OPTS = { grep: ['include', 'exclude', 'exclude-dir'], rg: ['g', 'glob', 'iglob'] };
 
+// Whether a git step can print the content or names of files from a tree,
+// so it gets GIT_ENV_EXCLUDE after "--". show always does: git's last option
+// wins (-s -p prints a patch), and on a blob or with -s the pathspec changes
+// nothing. log does when it is given a patch or file-list option, unless -L
+// or --follow is given (they take no extra pathspecs); a plain listing does not.
+const LOG_FILE_OUTPUT = ['p', 'patch', 'unified', 'stat', 'numstat', 'shortstat', 'name-only', 'name-status'];
+function gitShowsFiles(sub, rest) {
+  if (sub === 'grep' || sub === 'diff' || sub === 'show') return true;
+  if (sub !== 'log') return false;
+  const sep = optionsEnd(rest, GIT.log);
+  const { opts = [] } = parseOptions('git log', sep < 0 ? rest : rest.slice(0, sep), GIT.log);
+  const names = opts.map((o) => o.name);
+  return names.some((n) => LOG_FILE_OUTPUT.includes(n)) && !names.some((n) => n === 'L' || n === 'follow');
+}
+
 // How args are laid out, read with the same table as parseOptions (so an
 // option value, such as an -e pattern or a "--" given to -e, is not an
 // operand): sep = index of the "--" that ends the options, first = index of
@@ -1032,7 +1051,7 @@ function execute(steps, ctx, ev) {
         const fixed = GIT[args[sub]].fixed || [];
         const root = ctx.roots.find((r) => norm(r.dir) === norm(args[args.indexOf('-C') + 1]));
         let rest = args.slice(sub + 1);
-        if (args[sub] === 'grep') rest = optionsEnd(rest, GIT.grep) < 0 ? [...rest, '--', ...GIT_ENV_EXCLUDE] : [...rest, ...GIT_ENV_EXCLUDE];
+        if (gitShowsFiles(args[sub], rest)) rest = optionsEnd(rest, GIT[args[sub]]) < 0 ? [...rest, '--', ...GIT_ENV_EXCLUDE] : [...rest, ...GIT_ENV_EXCLUDE];
         args = [...GIT_PRE, ...args.slice(0, sub + 1), ...fixed, ...rest];
         if (root && ctx.emptyTree[root.name]) env.GIT_ATTR_SOURCE = ctx.emptyTree[root.name];
       }
