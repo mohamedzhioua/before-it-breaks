@@ -2,6 +2,33 @@
 
 All notable changes to this project are written down here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-10-23
+
+A fix release: two evidence-runner gaps, the `--trust-git-dir` re-check, safer generated pages, and docs.
+
+### Security
+
+- **Evidence runner, `.env` in history and diffs:** `git show` and `git diff` always get the `.env` exclude pathspecs, as `git grep` already did; `git log` gets them when it prints patches or file lists (`-p`, `--patch`, `--stat`, `--numstat`, `--shortstat`, `--name-only`, `--name-status`, `--unified`), not with `-L` or `--follow`, where git takes no extra pathspec. Option order cannot turn them off (`show -s -p` still gets them). A file operand that resolves through a link, a linked folder or a chain of links to a `.env` file is refused. Still relying on the output detectors, and listed in limits and security: reading a `.env` blob by its object id, and `git log --follow` or `-L`.
+- **`--trust-git-dir` is re-checked:** `kit pin --trust-git-dir` now records the problems it accepted and a digest of the repo's `.git` control files (following one `gitdir:` and one `commondir` pointer) in `pins.json`. `kit doctor`, `kit evidence` and `kit check unchanged` refuse the repo when any of those files changed since pinning, until it is cloned again or re-pinned; before, the flag skipped the check entirely. A pointer that cannot be resolved is refused at pin time. A file named by an include is not in the digest (see security).
+- **Generated pages:** agent-written text keeps a Markdown link only when its target starts with `http://`, `https://`, `mailto:` or `#`, or is a plain relative path; any other link (`javascript:`, `data:`, a scheme spelled with an HTML entity or a backslash-escaped colon) is shown as plain text.
+
+### Upgrading
+
+- A repo pinned with `--trust-git-dir` by 0.1.0 has no digest and is refused until it is re-pinned with `--trust-git-dir` (re-pinning at the same commit rewrites `pins.json` and the baseline; receipts and verdicts, which name the commit, stay valid). Other pins are unaffected.
+- A `pins.json` written by 0.1.1 with `--trust-git-dir` carries `git_dir_digest` and `git_dir_problems`, which 0.1.0 rejects.
+
+### Fixed
+
+- The verification log's excerpts never cut an emoji in half.
+- `kit build issues --tracker github` is accepted as another name for `markdown`.
+- `.claude-plugin/marketplace.json` names the plugin source as `"."`, the documented spelling for the repository root.
+
+### Docs
+
+- README: the reason for the `/hooks` step, and the Claude Code version (2.1.292 or later) that the one-step install command needs.
+- security.md: the evidence-runner paragraph is split into bullets; the deny-rule groups no longer carry hard-coded counts (`config/defaults.json` is the list); the full `--trust-git-dir` text lives there (including the include-file gap), and limits, run-an-audit, method and the config reference link to it.
+- run-an-audit.md: after `kit batches` is re-cut, save the next verify run as a new number.
+
 ## [0.1.0] - 2026-10-22
 
 First public version.
@@ -51,4 +78,5 @@ Found by the first CI runs on Windows and macOS:
 - On Windows, a work-tree link is scanned as its target with forward slashes, as git records it, so a home path in a link target is caught.
 - A test now accepts the padded count that BSD `wc` prints on macOS.
 
+[0.1.1]: https://github.com/mohamedzhioua/before-it-breaks/releases/tag/v0.1.1
 [0.1.0]: https://github.com/mohamedzhioua/before-it-breaks/releases/tag/v0.1.0
