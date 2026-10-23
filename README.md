@@ -90,9 +90,9 @@ More: [How it works, for managers](docs/how-it-works.md) · [the method in full]
    claude plugin install before-it-breaks@before-it-breaks
    ```
 
-   Or in one step: `claude plugin install before-it-breaks --marketplace mohamedzhioua/before-it-breaks`.
+   Or in one step: `claude plugin install before-it-breaks --marketplace mohamedzhioua/before-it-breaks` (Claude Code 2.1.292 or later; the two-step form works on earlier versions).
 3. **Start the audit.** Open Claude Code anywhere and run `/before-it-breaks:start-audit`. It asks the decision-guide questions in one message, creates the workspace, checks the set-up and pins every repo.
-4. **Open the audit session.** The set-up prints a `claude ...` line (it starts with `--plugin-dir "<kit folder>"` when the kit is not an installed plugin (so the agents, skills and workflows load), then `--model` (the lead model, unless it is `inherit`) and `--effort`, and one `--add-dir` per repo); run it in a terminal from the workspace folder, run `/hooks` once (see [lessons learned](docs/lessons-learned.md)), then `/before-it-breaks:run-phase map`. Check progress any time with `/before-it-breaks:audit-status`.
+4. **Open the audit session.** The set-up prints a `claude ...` line (it starts with `--plugin-dir "<kit folder>"` when the kit is not an installed plugin (so the agents, skills and workflows load), then `--model` (the lead model, unless it is `inherit`) and `--effort`, and one `--add-dir` per repo); run it in a terminal from the workspace folder, run `/hooks` once, so another plugin's Stop hook cannot block the session (see [lessons learned](docs/lessons-learned.md)), then `/before-it-breaks:run-phase map`. Check progress any time with `/before-it-breaks:audit-status`.
 
 **Without the plugin.** Clone this repo and drive the same steps with the kit's command line:
 
@@ -125,7 +125,7 @@ In short: findings are proven on code, not measured; the method has been used en
 
 ## Security
 
-The agents read code nobody has vetted, so instructions hidden in that code can try to steer them. The evidence runner re-runs commands that agents wrote; it accepts only a short list of read-only programs and options, and **it is an allowlist, not a sandbox**. A repo's `.git` folder is trusted input too: `kit pin` and `kit doctor` refuse one that can start a program or fetch, unless you pass `--trust-git-dir`, which skips that check entirely. The deny rules written into the workspace are a layer, not a boundary. Run the kit only on code you may read, clone from a remote you trust, keep workspaces private, never put secrets in the config, and use a container, a VM or Claude Code's sandbox with the network off for repos you do not trust. Threat model and safe use: [docs/security.md](docs/security.md).
+The agents read code nobody has vetted, so instructions hidden in that code can try to steer them. The evidence runner re-runs commands that agents wrote; it accepts only a short list of read-only programs and options, and **it is an allowlist, not a sandbox**. A repo's `.git` folder is trusted input too: `kit pin` and `kit doctor` refuse one that can start a program or fetch, unless you pass `--trust-git-dir`, which accepts the problems found at pin time and refuses the repo if its `.git` folder changes later. The deny rules written into the workspace are a layer, not a boundary. Run the kit only on code you may read, clone from a remote you trust, keep workspaces private, never put secrets in the config, and use a container, a VM or Claude Code's sandbox with the network off for repos you do not trust. Threat model and safe use: [docs/security.md](docs/security.md).
 
 ## Documentation
 

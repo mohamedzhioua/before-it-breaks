@@ -18,7 +18,7 @@ For the person who runs an audit, and for anyone who wants to know why each step
 - **Input:** the repos named in `audit.config.json`.
 - **Output:** `work/pins.json` and `work/phase0-baseline.md` (commit, branch, commit date, uncommitted-change count per repo).
 - **Gate before:** `doctor` passes everything except the pins check.
-- **Why:** a finding has to point at code anyone can check out later. A repo with uncommitted changes is refused unless `--allow-dirty` is given, and that choice is recorded. A repo's `.git` folder is trusted input, so before git runs the kit reads it as text and refuses one that can start a program or fetch (including worktree and submodule checkouts) unless `--trust-git-dir` is given; that choice is recorded too and skips the .git-folder check entirely (see [security](security.md)).
+- **Why:** a finding has to point at code anyone can check out later. A repo with uncommitted changes is refused unless `--allow-dirty` is given, and that choice is recorded. A repo's `.git` folder is trusted input, so before git runs the kit reads it as text and refuses one that can start a program or fetch (including worktree and submodule checkouts) unless `--trust-git-dir` is given; that choice is recorded too, and a later change to the .git folder is refused (see [security](security.md#threats)).
 
 ### Phase 1: map
 

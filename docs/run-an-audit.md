@@ -36,7 +36,7 @@ Run the line `doctor` printed from inside the workspace, then `/hooks` (check th
 | hunt | agent phase `hunt`, one run per `--run N` | `work/candidates.json` |
 | evidence | `kit evidence <ws> --dry-run`, show it to the user, then `kit evidence <ws>` once, before verify | `work/phase3/receipts/` |
 | batches | `kit batches <ws>` (cuts the candidates into batches and writes the batch plan) | `work/phase3/batches/`, `work/phase3/runs.json` |
-| verify | agent phase `verify`, one run per entry in `runs.json`; save each result with `kit save verify` | `work/phase3/votes-<N>.json` |
+| verify | agent phase `verify`, one run per entry in `runs.json`; save each result with `kit save verify`; after `kit batches` is re-cut, save the next run as a new number | `work/phase3/votes-<N>.json` |
 | synthesize | `kit synthesize <ws>` | `work/phase3/verdicts.json` |
 | overrides | write `work/phase3/master-overrides.json`, get approval, `kit synthesize <ws>` again, then `kit build log <ws>` again if it was already built | the same |
 | build log | `kit build log <ws>` | `03-verification-log.md`, plus `claim-verdicts.json` and `final-verdicts.json` in `work/phase3/` |
@@ -83,7 +83,7 @@ Script notes: `kit init` writes one default module rule per repo (check it); `ch
 
 `kit args recommend` needs `kit synthesize` to have run and the report inputs to be saved first; it starts one planner per module that holds surviving findings, and finding ids that map to no module go to the cross-cutting agent. `doctor` has a required "method files" line: every lens and skeptic brief in use must exist.
 
-`kit pin` refuses a repo whose `.git` folder can start a program or fetch, and a repo that is a `git worktree` or submodule checkout (`.git` is a file); the reasons are printed. The refusal list is in [security](security.md). Clone the repo again from a remote you trust, or, only if the user agrees, pin with `--trust-git-dir` (recorded in `pins.json` and the baseline; it skips the .git-folder check entirely: a .git file, commondir, alternates, core.worktree, includes, filter and diff drivers are then all allowed, and the isolated git environment still applies).
+`kit pin` refuses a repo whose `.git` folder can start a program or fetch, and a repo that is a `git worktree` or submodule checkout (`.git` is a file); the reasons are printed. The refusal list is in [security](security.md). Clone the repo again from a remote you trust, or, only if the user agrees, pin with `--trust-git-dir` (recorded in `pins.json` and the baseline; what it allows, and how a later change to the .git folder is refused, is in [security](security.md#threats)).
 
 `args` for verify reads `runs.json`; `args report-inputs` accepts `--target-design <file>`; `--date YYYY-MM-DD` overrides the audit date.
 

@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "before-it-breaks",
-      "source": "./",
+      "source": ".",
       "description": "Evidence-first scalability, reliability and performance audits: map, hunt, verify with skeptics and a mechanical verifier, report and recommend.",
       "category": "development"
     }
