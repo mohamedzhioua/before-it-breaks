@@ -301,7 +301,7 @@ function digestEntry(p) {
 // A pointer (gitdir: line, link target or commondir line) resolved against
 // base, one hop: it must lstat as a directory, else null.
 function pointedDir(text, base) {
-  const line = String(text).split(/\r?\n/)[0].trim().replace(/\\/g, '/');
+  const line = String(text).split(/\r?\n/)[0].trim();
   if (!line) return null;
   const p = path.resolve(base, line);
   const st = lstat(p);
