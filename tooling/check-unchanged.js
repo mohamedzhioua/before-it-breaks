@@ -11,7 +11,8 @@
  * pinned with --allow-dirty must show exactly the uncommitted changes it had
  * when pinned. Before git runs, each repo's .git folder gets the check of
  * kit pin (lib/git-env.js gitDirCheck); a refused folder is a failure,
- * unless pins.json records trust_git_dir for that repo.
+ * unless pins.json records trust_git_dir for that repo; then the folder
+ * fails when its digest differs from git_dir_digest, or none was recorded.
  *
  * Exit codes: 0 all unchanged, 1 a repo moved or changed, 2 usage, config or
  * missing pins.
@@ -21,7 +22,7 @@
 
 const { loadConfig, ConfigError } = require('./lib/config');
 const { repoState, readPins } = require('./pin');
-const { gitDirCheck } = require('./lib/git-env');
+const { gitDirCheck, gitDirDrift } = require('./lib/git-env');
 
 class CliError extends Error {}
 
@@ -34,14 +35,20 @@ function compareToPins(config, paths, pins) {
       out.push({ repo: r.name, ok: false, problem: 'not in pins.json (run `kit pin` again)' });
       continue;
     }
-    // The .git check of kit pin, again, before git runs (unless the repo
-    // was pinned with --trust-git-dir).
+    // The .git check of kit pin, again, before git runs (a repo pinned
+    // with --trust-git-dir fails when its .git folder changed since).
     const chk = gitDirCheck(paths.repos[r.name]);
     if (chk.notRepo) {
       out.push({ repo: r.name, ok: false, problem: `not a git repository: ${paths.repos[r.name]}` });
       continue;
     }
-    if (chk.problems.length && !pin.trust_git_dir) {
+    if (pin.trust_git_dir) {
+      const drift = gitDirDrift(pin, chk);
+      if (drift) {
+        out.push({ repo: r.name, ok: false, problem: drift });
+        continue;
+      }
+    } else if (chk.problems.length) {
       out.push({ repo: r.name, ok: false, problem: `.git folder refused (git not run): ${chk.problems.join('; ')}` });
       continue;
     }

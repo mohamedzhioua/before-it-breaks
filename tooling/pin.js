@@ -27,7 +27,10 @@
  * or config or attributes that can start a program or fetch are refused
  * with the list of reasons. A folder with no usable .git is "not a git
  * repository". --trust-git-dir pins anyway and records trust_git_dir: true
- * for each refused repo in pins.json and the baseline. git always runs
+ * a digest of its .git control files (git_dir_digest, lib/git-env.js) for
+ * each refused repo in pins.json, with the problems found (git_dir_problems,
+ * for display), and names the repo in the baseline. Later checks refuse the
+ * repo when that digest changes. git always runs
  * with the isolated environment of lib/git-env.js (global and system
  * config ignored except core.autocrlf/core.eol, so a repo owned by another
  * user fails as "dubious ownership"; no fetching).
@@ -180,14 +183,15 @@ function run(opts, io) {
   const pins = { date: config.audit.date, allow_dirty: opts.allowDirty, repos: {} };
   // The .git folders are checked before git runs on any of them.
   const refused = [];
-  const trusted = new Set();
+  const trusted = new Map();
   for (const r of repos) {
     const dir = paths.repos[r.name];
     if (!fs.existsSync(dir)) throw new ConfigError(`repo ${r.name}: folder not found: ${dir}`);
-    const { notRepo, problems } = gitDirCheck(dir);
+    const { notRepo, problems, digest } = gitDirCheck(dir);
     if (notRepo) throw new ConfigError(`repo ${r.name}: not a git repository: ${dir}`);
     if (!problems.length) continue;
-    if (opts.trustGitDir) trusted.add(r.name);
+    if (opts.trustGitDir && digest) trusted.set(r.name, { git_dir_digest: digest, git_dir_problems: problems });
+    else if (opts.trustGitDir) refused.push([r.name, [...problems, 'cannot resolve .git pointer: --trust-git-dir needs a .git folder, or a .git file or link (and any commondir) that points to one']]);
     else refused.push([r.name, problems]);
   }
   if (refused.length) {
@@ -196,9 +200,9 @@ function run(opts, io) {
       io.err(`  ${name}:`);
       for (const p of problems) io.err(`    - ${p}`);
     }
-    io.err('Clone the repo again from a remote you trust, or pin anyway with --trust-git-dir (recorded). That skips this');
-    io.err('check entirely, so everything listed above is allowed; the isolated git environment (no signature checks, gpg,');
-    io.err('fsmonitor or fetching) still applies.');
+    io.err('Clone the repo again from a remote you trust, or pin anyway with --trust-git-dir (recorded). That records');
+    io.err('a digest of the .git folder as it is now; any later change to it is refused. The isolated git environment (no');
+    io.err('signature checks, gpg, fsmonitor or fetching) still applies.');
     return 2;
   }
   const dirty = [];
@@ -210,7 +214,7 @@ function run(opts, io) {
       throw new ConfigError(`repo ${r.name}: ${e.message}`);
     }
     if (st.porcelain > 0) dirty.push(`${r.name}: ${st.porcelain} uncommitted change${st.porcelain === 1 ? '' : 's'}`);
-    pins.repos[r.name] = trusted.has(r.name) ? { ...st, trust_git_dir: true } : st;
+    pins.repos[r.name] = trusted.has(r.name) ? { ...st, trust_git_dir: true, ...trusted.get(r.name) } : st;
   }
   if (dirty.length && !opts.allowDirty) {
     io.err('pin: refusing to pin repos with uncommitted changes:');
@@ -221,7 +225,7 @@ function run(opts, io) {
   fs.mkdirSync(paths.work, { recursive: true });
   fs.writeFileSync(pinsFile(paths), JSON.stringify(pins, null, 2) + '\n');
   fs.writeFileSync(path.join(paths.work, 'phase0-baseline.md'), baseline(config, pins));
-  for (const name of trusted) io.err(`pin: WARNING ${name}: .git folder refusal skipped (--trust-git-dir, recorded in pins.json)`);
+  for (const name of trusted.keys()) io.err(`pin: WARNING ${name}: .git folder problems accepted (--trust-git-dir; digest recorded in pins.json, any later change to .git is refused)`);
   for (const r of repos) {
     const p = pins.repos[r.name];
     io.out(`${r.name} ${p.short} ${p.branch} ${p.commit_date} uncommitted=${p.porcelain}`);

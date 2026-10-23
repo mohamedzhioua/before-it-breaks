@@ -12,7 +12,8 @@
  *             config is valid, every repo
  *             folder exists and is a git repo whose .git folder passes the
  *             check of `kit pin` (lib/git-env.js gitDirCheck, done before
- *             git runs; skipped for a repo pinned with --trust-git-dir),
+ *             git runs; a repo pinned with --trust-git-dir fails when its
+ *             .git digest differs from the one recorded at pin time),
  *             pins exist (`kit pin`), and
  *             every repo is still at its pin with a clean tree. bash too when
  *             rules.enabled: the rule tests (rules/semgrep/run-tests.sh) need
@@ -44,7 +45,7 @@ const { spawnSync } = require('child_process');
 const { loadConfig, ConfigError, kitRootMoved } = require('./lib/config');
 const { checkLensFiles } = require('./check-workflows');
 const { repoState, readPins } = require('./pin');
-const { gitDirCheck } = require('./lib/git-env');
+const { gitDirCheck, gitDirDrift } = require('./lib/git-env');
 const { compareToPins } = require('./check-unchanged');
 const { launchLine, placeholderWarnings } = require('./init-workspace');
 
@@ -127,7 +128,8 @@ function run(opts, io) {
   add(!config || config.rules.enabled, Boolean(bash), 'bash (rule tests)', bash ? `${sh.shell}: ${bash}` : (sh.error || `${sh.shell} did not run`));
 
   // The .git folder of each repo is checked as text before git runs on it;
-  // a repo pinned with --trust-git-dir (recorded in pins.json) is not.
+  // a repo pinned with --trust-git-dir (recorded in pins.json) is refused
+  // when its .git digest differs from the one recorded at pin time.
   let trustedPins = {};
   if (config) {
     try {
@@ -143,18 +145,21 @@ function run(opts, io) {
     for (const r of config.repos) {
       if (typeof r.path !== 'string') continue;
       const dir = paths.repos[r.name];
-      const trusted = Boolean(trustedPins[r.name] && trustedPins[r.name].trust_git_dir);
-      const check = fs.existsSync(dir) ? gitDirCheck(dir) : { notRepo: null, problems: [] };
+      const pin = trustedPins[r.name];
+      const trusted = Boolean(pin && pin.trust_git_dir);
+      const exists = fs.existsSync(dir);
+      const check = exists ? gitDirCheck(dir) : { notRepo: null, problems: [], digest: null };
       if (check.notRepo) {
         reposOk = false;
         add(true, false, `repo ${r.name}`, `not a git repository: ${dir}`);
         continue;
       }
-      const problems = trusted ? [] : check.problems;
-      if (problems.length) {
+      const drift = trusted && exists ? gitDirDrift(pin, check) : null;
+      if (drift || (!trusted && check.problems.length)) {
         reposOk = false;
         refused++;
-        add(true, false, `repo ${r.name}`, `.git folder refused (git not run): ${problems.join('; ')}; clone it again from a remote you trust, or pin it with --trust-git-dir`);
+        add(true, false, `repo ${r.name}`, drift
+          || `.git folder refused (git not run): ${check.problems.join('; ')}; clone it again from a remote you trust, or pin it with --trust-git-dir`);
         continue;
       }
       try {

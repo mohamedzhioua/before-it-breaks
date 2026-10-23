@@ -302,6 +302,8 @@ const PINS = {
           porcelain: { type: 'integer', minimum: 0, description: 'Number of uncommitted changes.' },
           changes_sha256: str('sha256 of the uncommitted changes, contents included.', '^[0-9a-f]{64}$'),
           trust_git_dir: { type: 'boolean', description: 'true when the .git folder check found problems and --trust-git-dir pinned anyway.' },
+          git_dir_problems: strList('The .git folder problems found when --trust-git-dir pinned anyway (for display).'),
+          git_dir_digest: str('sha256 of the .git control files when --trust-git-dir pinned anyway; later checks refuse the repo if it changes.', '^[0-9a-f]{64}$'),
         },
       },
     },

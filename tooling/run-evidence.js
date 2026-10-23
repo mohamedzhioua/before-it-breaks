@@ -106,8 +106,9 @@
  *     The steps run one after another, so a step sees all of the previous
  *     step's (capped) output at once.
  * What it does NOT guarantee: that a program has no bug, that a repo pinned
- * with --trust-git-dir has a harmless .git folder (its filter and diff
- * drivers can then run; lib/git-env.js gitDirCheck), or that reading inside
+ * with --trust-git-dir has a harmless .git folder (the filter and diff
+ * drivers it had at pin time can then run; any later change to its .git
+ * control files is refused; lib/git-env.js gitDirDrift), or that reading inside
  * the repo folders is free of secrets. For code you do not trust, run the
  * kit in a container or VM with the repos mounted read-only, and review
  * candidates.json (or use --dry-run) first. Ways around these rules are
@@ -155,7 +156,7 @@ const { validateCandidates } = require('./lib/shapes');
 const { contentSha } = require('./lib/content-sha');
 const { readPins } = require('./pin');
 const { buildMasks, mask, detect } = require('./lib/mask');
-const { GIT_PRE, NO_FETCH, gitEnv, gitDirCheck } = require('./lib/git-env');
+const { GIT_PRE, NO_FETCH, gitEnv, gitDirCheck, gitDirDrift } = require('./lib/git-env');
 
 class CliError extends Error {}
 
@@ -1204,16 +1205,23 @@ function run(opts, io) {
   const roots = makeRoots(paths.repos);
   const base = { expand, roots };
   // The .git check of kit pin, again, before git runs on any repo.
+  // A repo pinned with --trust-git-dir is refused when its .git digest
+  // differs from the one recorded at pin time.
   const refused = [];
   for (const r of roots) {
-    if (pins.repos[r.name] && pins.repos[r.name].trust_git_dir) continue;
+    const pin = pins.repos[r.name];
     const chk = gitDirCheck(r.dir);
+    if (!chk.notRepo && pin && pin.trust_git_dir) {
+      const drift = gitDirDrift(pin, chk);
+      if (drift) refused.push(`${r.name}: ${drift}`);
+      continue;
+    }
     const why = chk.notRepo ? [`not a git repository (${chk.notRepo})`] : chk.problems;
     if (why.length) refused.push(`${r.name}: ${why.join('; ')}`);
   }
   if (refused.length) {
     const list = refused.map((m) => `  - ${m}`).join('\n');
-    throw new CliError(`refusing to run git on these repos; their .git folder can start programs or point git elsewhere:\n${list}\nClone the repo again from a remote you trust, or re-pin with --trust-git-dir (recorded).`);
+    throw new CliError(`refusing to run git on these repos; their .git folder can start programs, point git elsewhere, or changed since pinning:\n${list}\nClone the repo again from a remote you trust, or re-pin with --trust-git-dir (recorded).`);
   }
 
   if (opts.dryRun) {

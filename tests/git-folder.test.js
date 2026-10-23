@@ -295,7 +295,7 @@ test('gpg fixture: pin and doctor refuse before git runs; --trust-git-dir pins a
 
   const trusted = kit(['pin', ws, '--trust-git-dir']);
   assert.equal(trusted.code, 0, trusted.out + trusted.err);
-  assert.match(trusted.err, /refusal skipped \(--trust-git-dir/);
+  assert.match(trusted.err, /problems accepted \(--trust-git-dir; digest recorded in pins\.json/);
   const pins = JSON.parse(fs.readFileSync(path.join(ws, 'work', 'pins.json'), 'utf8'));
   assert.deepEqual(validatePins(pins), []);
   assert.equal(pins.repos['notes-api'].sha, sha);
@@ -306,6 +306,167 @@ test('gpg fixture: pin and doctor refuse before git runs; --trust-git-dir pins a
   const after = kit(['doctor', ws, '--no-optional']);
   assert.match(after.out, /ok {3}repo notes-api: git repository found \(\.git folder trusted/);
   assert.ok(!fs.existsSync(marker), 'the marker never ran');
+});
+
+// ---------- --trust-git-dir: the digest of the .git control files ----------
+
+// Runs doctor, check unchanged and evidence --dry-run on ws.
+function allThree(ws) {
+  return {
+    doctor: kit(['doctor', ws, '--no-optional']),
+    unchanged: kit(['check', 'unchanged', ws]),
+    evidence: kit(['evidence', ws, '--dry-run']),
+  };
+}
+
+function expectPass(ws, why) {
+  const r = allThree(ws);
+  assert.match(r.doctor.out, /ok {3}repo notes-api: git repository found \(\.git folder trusted/, `${why}: doctor\n${r.doctor.out}`);
+  assert.equal(r.unchanged.code, 0, `${why}: check unchanged\n${r.unchanged.out}${r.unchanged.err}`);
+  assert.equal(r.evidence.code, 0, `${why}: evidence\n${r.evidence.out}${r.evidence.err}`);
+}
+
+function expectRefused(ws, re, why) {
+  const r = allThree(ws);
+  assert.notEqual(r.doctor.code, 0, `${why}: doctor\n${r.doctor.out}`);
+  assert.match(r.doctor.out, new RegExp(`FAIL repo notes-api: ${re.source}`, re.flags), `${why}: doctor`);
+  assert.equal(r.unchanged.code, 1, `${why}: check unchanged\n${r.unchanged.out}${r.unchanged.err}`);
+  assert.match(r.unchanged.out, re, `${why}: check unchanged`);
+  assert.equal(r.evidence.code, 2, `${why}: evidence\n${r.evidence.out}${r.evidence.err}`);
+  assert.match(r.evidence.err, re, `${why}: evidence`);
+}
+
+const CHANGED = /\.git folder changed since pinning[^\n]*; clone again or re-pin with --trust-git-dir/;
+const LEGACY = /\.git folder pinned by kit 0\.1\.0 without a digest; re-pin with --trust-git-dir/;
+
+// A repo whose .git/config names a filter program (A) that nothing points
+// at (no attributes), pinned with --trust-git-dir.
+function trustedFilterRepo(t, name) {
+  const s = setup(t, name);
+  fs.copyFileSync(path.join(__dirname, 'fixtures', 'data', 'fixture-candidates.json'), path.join(s.ws, 'work', 'candidates.json'));
+  const a = markerScript(s.root);
+  const progB = a.program.replace(/marker\.sh$/, 'marker-b.sh');
+  fs.copyFileSync(path.join(s.root, 'marker.sh'), path.join(s.root, 'marker-b.sh'));
+  appendConfig(s.repo.path, `[filter "x"]\n\tclean = ${a.program}\n`);
+  const pin = kit(['pin', s.ws, '--trust-git-dir']);
+  assert.equal(pin.code, 0, pin.out + pin.err);
+  assert.match(pin.err, /\.git folder problems accepted \(--trust-git-dir; digest recorded in pins\.json, any later change to \.git is refused\)/);
+  const configPath = path.join(s.repo.path, '.git', 'config');
+  return { ...s, marker: a.marker, progA: a.program, progB, configPath, original: fs.readFileSync(configPath), pinsPath: path.join(s.ws, 'work', 'pins.json') };
+}
+
+test('--trust-git-dir records a digest; any change to the .git control files is refused by doctor, check unchanged and evidence', (t) => {
+  const f = trustedFilterRepo(t, 'digest');
+  const pins = JSON.parse(fs.readFileSync(f.pinsPath, 'utf8'));
+  const entry = pins.repos['notes-api'];
+  assert.match(entry.git_dir_digest, /^[0-9a-f]{64}$/);
+  assert.equal(entry.git_dir_digest, gitDirCheck(f.repo.path).digest);
+  assert.match(entry.git_dir_problems.join('\n'), /filter\.x\.clean/);
+  assert.deepEqual(validatePins(pins), []);
+  const restore = () => fs.writeFileSync(f.configPath, f.original);
+
+  expectPass(f.ws, 'unchanged');
+
+  // The same key on the same line with another program.
+  fs.writeFileSync(f.configPath, f.original.toString('utf8').replace(f.progA, f.progB));
+  expectRefused(f.ws, CHANGED, 'filter.x.clean A -> B');
+  restore();
+
+  // A value no check calls a problem still changes the folder.
+  git(f.repo.path, ['config', 'core.autocrlf', 'true']);
+  expectRefused(f.ws, CHANGED, 'core.autocrlf true');
+  restore();
+
+  git(f.repo.path, ['config', 'core.hooksPath', 'x']);
+  expectRefused(f.ws, /\.git folder changed since pinning: [^\n]*core\.hookspath[^\n]*; clone again or re-pin with --trust-git-dir/, 'core.hooksPath');
+
+  // Re-pinning after a change accepts the folder as it is now.
+  assert.equal(kit(['pin', f.ws, '--trust-git-dir']).code, 0);
+  expectPass(f.ws, 're-pinned');
+  restore();
+  expectRefused(f.ws, CHANGED, 'restored after re-pin');
+  assert.ok(!fs.existsSync(f.marker), 'the marker never ran');
+});
+
+test('a --trust-git-dir pin of kit 0.1.0 (no digest) is refused', (t) => {
+  const f = trustedFilterRepo(t, 'legacy');
+  const pins = JSON.parse(fs.readFileSync(f.pinsPath, 'utf8'));
+  delete pins.repos['notes-api'].git_dir_digest;
+  fs.writeFileSync(f.pinsPath, JSON.stringify(pins, null, 2) + '\n');
+  expectRefused(f.ws, LEGACY, 'no digest, problems kept');
+  delete pins.repos['notes-api'].git_dir_problems;
+  fs.writeFileSync(f.pinsPath, JSON.stringify(pins, null, 2) + '\n');
+  assert.deepEqual(validatePins(pins), [], 'a 0.1.0 pin still validates');
+  expectRefused(f.ws, LEGACY, 'no digest, no problems');
+  assert.ok(!fs.existsSync(f.marker), 'the marker never ran');
+});
+
+test('a trusted .git file is refused once its gitdir line changes', (t) => {
+  const s = setup(t, 'gitfile');
+  fs.copyFileSync(path.join(__dirname, 'fixtures', 'data', 'fixture-candidates.json'), path.join(s.ws, 'work', 'candidates.json'));
+  const store = path.join(s.root, 'store-a');
+  fs.renameSync(path.join(s.repo.path, '.git'), store);
+  fs.cpSync(store, path.join(s.root, 'store-b'), { recursive: true });
+  const dotgit = path.join(s.repo.path, '.git');
+  fs.writeFileSync(dotgit, `gitdir: ${store.replace(/\\/g, '/')}\n`);
+  assert.match(gitDirCheck(s.repo.path).problems.join('\n'), /\.git is a file/);
+  assert.equal(kit(['pin', s.ws, '--trust-git-dir']).code, 0);
+  expectPass(s.ws, '.git file unchanged');
+  fs.writeFileSync(dotgit, `gitdir: ${path.join(s.root, 'store-b').replace(/\\/g, '/')}\n`);
+  expectRefused(s.ws, CHANGED, 'gitdir edited');
+});
+
+test('a trusted git worktree checkout is refused when the main repo config or its config.worktree changes', (t) => {
+  const s = setup(t, 'worktree');
+  fs.copyFileSync(path.join(__dirname, 'fixtures', 'data', 'fixture-candidates.json'), path.join(s.ws, 'work', 'candidates.json'));
+  const main = path.join(s.root, 'main');
+  fs.renameSync(s.repo.path, main);
+  git(main, ['worktree', 'add', '-q', '--detach', s.repo.path]);
+  assert.match(gitDirCheck(s.repo.path).problems.join('\n'), /\.git is a file/);
+  assert.equal(kit(['pin', s.ws, '--trust-git-dir']).code, 0);
+  expectPass(s.ws, 'worktree unchanged');
+
+  const mainConfig = path.join(main, '.git', 'config');
+  const original = fs.readFileSync(mainConfig);
+  fs.appendFileSync(mainConfig, '[notes]\n\tlabel = changed\n');
+  expectRefused(s.ws, CHANGED, 'main repo .git/config edited');
+  fs.writeFileSync(mainConfig, original);
+  expectPass(s.ws, 'main repo config restored');
+
+  fs.writeFileSync(path.join(main, '.git', 'worktrees', 'notes-api', 'config.worktree'), '[notes]\n\tlabel = worktree\n');
+  expectRefused(s.ws, CHANGED, 'config.worktree written');
+});
+
+test('a commondir planted in a plain .git folder brings the folder it names into the digest', (t) => {
+  const root = tmp(t, 'commondir');
+  const repo = makeFixtureRepo(path.join(root, 'repo')).path;
+  const other = makeFixtureRepo(path.join(root, 'other')).path;
+  fs.writeFileSync(path.join(repo, '.git', 'commondir'), path.join(other, '.git').replace(/\\/g, '/') + '\n');
+  const before = gitDirCheck(repo).digest;
+  assert.match(before, /^[0-9a-f]{64}$/);
+  appendConfig(other, '[notes]\n\tlabel = changed\n');
+  assert.notEqual(gitDirCheck(repo).digest, before);
+  fs.writeFileSync(path.join(repo, '.git', 'commondir'), path.join(root, 'missing').replace(/\\/g, '/') + '\n');
+  assert.equal(gitDirCheck(repo).digest, null, 'a commondir that leads nowhere');
+});
+
+test('--trust-git-dir refuses a .git pointer it cannot resolve', (t) => {
+  const s = setup(t, 'nopointer');
+  fs.rmSync(path.join(s.repo.path, '.git'), { recursive: true, force: true });
+  fs.writeFileSync(path.join(s.repo.path, '.git'), `gitdir: ${path.join(s.root, 'missing').replace(/\\/g, '/')}\n`);
+  assert.equal(gitDirCheck(s.repo.path).digest, null);
+  const pin = kit(['pin', s.ws, '--trust-git-dir']);
+  assert.equal(pin.code, 2, pin.out + pin.err);
+  assert.match(pin.err, /cannot resolve \.git pointer/);
+  assert.ok(!fs.existsSync(path.join(s.ws, 'work', 'pins.json')));
+});
+
+test('validatePins rejects a git_dir_digest that is not 64 hex characters', () => {
+  const entry = { sha: PIN, short: PIN.slice(0, 10), branch: 'main', commit_date: '2026-01-01T00:00:00Z', porcelain: 0, changes_sha256: 'b'.repeat(64), trust_git_dir: true };
+  const pins = (d) => ({ date: '2026-01-01', allow_dirty: false, repos: { 'notes-api': { ...entry, git_dir_digest: d } } });
+  assert.deepEqual(validatePins(pins('c'.repeat(64))), []);
+  assert.notDeepEqual(validatePins(pins('not-a-digest')), []);
+  assert.notDeepEqual(validatePins(pins('C'.repeat(64))), []);
 });
 
 test('filter fixture: pin refuses a filter in .git/config named by info/attributes', (t) => {

@@ -3,7 +3,7 @@
  * git-env.js - how the kit runs git on a repo it did not create, and the
  * check of a repo's .git folder made before the first git call.
  *
- *   const { GIT_PRE, NO_FETCH, gitEnv, systemCarry, gitDirCheck } = require('./lib/git-env');
+ *   const { GIT_PRE, NO_FETCH, gitEnv, systemCarry, gitDirCheck, gitDirDrift } = require('./lib/git-env');
  *
  *   GIT_PRE          -c settings put before every git subcommand: no
  *                    attributes file, no fsmonitor, no signature check, no
@@ -25,7 +25,7 @@
  *                    per process, outside any repo, and given to git as a
  *                    system config file of their own, so a repo's own
  *                    value still wins.
- *   gitDirCheck(dir) -> { gitDir, top, notRepo, problems: string[] }.
+ *   gitDirCheck(dir) -> { gitDir, top, notRepo, problems: string[], digest }.
  *                    Finds the .git of dir by walking up from its real
  *                    path (git is not run) and reads its config and
  *                    info/attributes as text. notRepo (a reason) when no
@@ -48,12 +48,36 @@
  *                    - an info/attributes line that names filter= or diff=.
  *                    Included files are never read: an include is refused
  *                    on sight.
+ *                    digest: sha256 over the control files git would
+ *                    read: .git itself; then config, config.worktree,
+ *                    info/attributes, commondir and objects/info/alternates
+ *                    of the real git folder (.git, or what a .git file's
+ *                    "gitdir:" line or a .git link points to, resolved
+ *                    against the repo top); then, when that folder has a
+ *                    commondir file, config, info/attributes and
+ *                    objects/info/alternates of the folder it names
+ *                    (resolved against the real git folder). One
+ *                    `label\0kind\0sha256(bytes)\n` each; kind is dir,
+ *                    file, link, absent, unreadable or other (lstat, links
+ *                    never followed; a link's bytes are its target, a
+ *                    file's its content with no size cap, the others have
+ *                    none). Each pointer is followed one hop and must be a
+ *                    directory. null when no .git was found or a pointer
+ *                    cannot be resolved.
+ *   gitDirDrift(pin, chk) -> string | null: for a pins.json repo entry made
+ *                    with --trust-git-dir, the refusal message when chk (a
+ *                    gitDirCheck result) has a digest other than the one
+ *                    recorded (git_dir_digest), or when the pin has none
+ *                    (kit 0.1.0); null when the .git folder is unchanged.
+ *                    The digest decides; the problems not recorded in
+ *                    git_dir_problems are listed for display only.
  *
  * Git's own setting `safe.directory` lives in the global config, so a repo
  * owned by another user fails with "dubious ownership" here; the kit does
  * not add it back.
  */
 
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -249,9 +273,80 @@ function readSmall(p, label, problems) {
   }
 }
 
+// The control files hashed into the digest, in this order: those of the
+// real git folder, then those of the folder its commondir names.
+const GITDIR_FILES = ['config', 'config.worktree', 'info/attributes', 'commondir', 'objects/info/alternates'];
+const COMMONDIR_FILES = ['config', 'info/attributes', 'objects/info/alternates'];
+
+function sha256(bytes) {
+  return crypto.createHash('sha256').update(bytes).digest('hex');
+}
+
+function digestEntry(p) {
+  let st;
+  try {
+    st = fs.lstatSync(p);
+  } catch (e) {
+    return e.code === 'ENOENT' || e.code === 'ENOTDIR' ? ['absent', null] : ['unreadable', null];
+  }
+  try {
+    if (st.isSymbolicLink()) return ['link', Buffer.from(fs.readlinkSync(p), 'utf8')];
+    if (st.isFile()) return ['file', fs.readFileSync(p)];
+  } catch (e) {
+    return ['unreadable', null];
+  }
+  return [st.isDirectory() ? 'dir' : 'other', null];
+}
+
+// A pointer (gitdir: line, link target or commondir line) resolved against
+// base, one hop: it must lstat as a directory, else null.
+function pointedDir(text, base) {
+  const line = String(text).split(/\r?\n/)[0].trim().replace(/\\/g, '/');
+  if (!line) return null;
+  const p = path.resolve(base, line);
+  const st = lstat(p);
+  return st && st.isDirectory() ? p : null;
+}
+
+function gitDirDigest(dotGit) {
+  const top = path.dirname(dotGit);
+  const [kind, bytes] = digestEntry(dotGit);
+  let real = null;
+  try {
+    if (kind === 'dir') real = dotGit;
+    else if (kind === 'link') real = pointedDir(bytes.toString('utf8'), top);
+    else if (kind === 'file') {
+      const m = /^gitdir:(.*)$/m.exec(bytes.toString('utf8').split(/\r?\n/)[0]);
+      real = m ? pointedDir(m[1], top) : null;
+    }
+  } catch (e) {
+    real = null;
+  }
+  if (!real) return null;
+  const h = crypto.createHash('sha256');
+  const add = (label, p) => {
+    const [k, b] = digestEntry(p);
+    h.update(`${label}\0${k}\0${sha256(b || Buffer.alloc(0))}\n`);
+  };
+  add('.git', dotGit);
+  for (const name of GITDIR_FILES) add(`gitdir/${name}`, path.join(real, ...name.split('/')));
+  const [ck, cb] = digestEntry(path.join(real, 'commondir'));
+  if (ck === 'file') {
+    let common = null;
+    try {
+      common = pointedDir(cb.toString('utf8'), real);
+    } catch (e) {
+      common = null;
+    }
+    if (!common) return null;
+    for (const name of COMMONDIR_FILES) add(`commondir/${name}`, path.join(common, ...name.split('/')));
+  }
+  return h.digest('hex');
+}
+
 function gitDirCheck(dir) {
   const problems = [];
-  const none = { gitDir: null, top: null, notRepo: null, problems };
+  const none = { gitDir: null, top: null, notRepo: null, problems, digest: null };
   let cur;
   try {
     cur = fs.realpathSync.native(path.resolve(dir));
@@ -281,7 +376,7 @@ function gitDirCheck(dir) {
   }
   if (!found) return { ...none, notRepo: 'no .git in it or above it' };
   const { gitDir, top, st } = found;
-  const base = { gitDir, top, notRepo: null, problems };
+  const base = { gitDir, top, notRepo: null, problems, digest: gitDirDigest(gitDir) };
   if (st.isSymbolicLink()) problems.push('.git is a link: git would read the folder it points to');
   else if (st.isFile()) problems.push('.git is a file (a worktree or submodule checkout): git would read another folder');
   else if (!st.isDirectory()) problems.push('.git is not a folder');
@@ -319,4 +414,14 @@ function gitDirCheck(dir) {
   return base;
 }
 
-module.exports = { GIT_PRE, NO_FETCH, gitEnv, systemCarry, gitDirCheck, configKeys };
+function gitDirDrift(pin, chk) {
+  if (!pin || typeof pin.git_dir_digest !== 'string') {
+    return '.git folder pinned by kit 0.1.0 without a digest; re-pin with --trust-git-dir';
+  }
+  if (chk.digest && chk.digest === pin.git_dir_digest) return null;
+  const known = new Set(Array.isArray(pin.git_dir_problems) ? pin.git_dir_problems : []);
+  const added = chk.problems.filter((p) => !known.has(p));
+  return `.git folder changed since pinning${added.length ? `: ${added.join('; ')}` : ''}; clone again or re-pin with --trust-git-dir`;
+}
+
+module.exports = { GIT_PRE, NO_FETCH, gitEnv, systemCarry, gitDirCheck, configKeys, gitDirDrift };
