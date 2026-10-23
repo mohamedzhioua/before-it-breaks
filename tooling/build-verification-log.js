@@ -89,9 +89,15 @@ function readHuntSummaries(paths) {
 
 const STEERING = /\b(instruct\w*|inject\w*|prompts?|ignore (?:all|any|every|the|previous|prior)\b)/i;
 
+// Cut points move inward so a surrogate pair (an emoji, say) is never split.
+const highAt = (t, i) => i >= 0 && i < t.length && t.charCodeAt(i) >= 0xd800 && t.charCodeAt(i) <= 0xdbff;
+const lowAt = (t, i) => i >= 0 && i < t.length && t.charCodeAt(i) >= 0xdc00 && t.charCodeAt(i) <= 0xdfff;
+
 function clipped(s, n) {
   const t = T.one(s);
-  return t.length > n ? `${t.slice(0, n)}...` : t;
+  if (t.length <= n) return t;
+  const end = highAt(t, n - 1) ? n - 1 : n;
+  return `${t.slice(0, end)}...`;
 }
 
 // Up to radius characters on each side of the first match of re, on one
@@ -101,8 +107,10 @@ function aroundMatch(s, re, radius) {
   const t = T.one(s);
   const m = re.exec(t);
   if (!m) return clipped(t, 2 * radius);
-  const start = Math.max(0, m.index - radius);
-  const end = Math.min(t.length, m.index + m[0].length + radius);
+  let start = Math.max(0, m.index - radius);
+  let end = Math.min(t.length, m.index + m[0].length + radius);
+  if (lowAt(t, start)) start++;
+  if (highAt(t, end - 1)) end--;
   return `${start > 0 ? '...' : ''}${t.slice(start, end)}${end < t.length ? '...' : ''}`;
 }
 

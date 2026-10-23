@@ -4,13 +4,13 @@
  * tracker, each listing the findings it closes.
  *
  * Usage:
- *   node tooling/build-issues.js [<workspace>] [--tracker gitlab|markdown]
+ *   node tooling/build-issues.js [<workspace>] [--tracker gitlab|markdown|github]
  *                                [--base-url <url>]
  *
  *   --tracker gitlab    <work>/phase6/issues.csv: the two columns a GitLab
  *                       CSV import reads (title, description), CRLF lines.
  *   --tracker markdown  <work>/phase6/issues.md: a checklist to paste into
- *                       any tracker.
+ *                       any tracker. --tracker github is the same.
  *   Default: publish.tracker of the config (gitlab -> gitlab, github ->
  *   markdown; none -> nothing is written).
  *   --base-url          web address of the folder that holds the published
@@ -30,7 +30,7 @@ const { validateCrossCutting } = require('./lib/shapes');
 const T = require('./tiers');
 
 const PHASES = ['now', 'next', 'later'];
-const USAGE = 'usage: node tooling/build-issues.js [<workspace>] [--tracker gitlab|markdown] [--base-url <url>]';
+const USAGE = 'usage: node tooling/build-issues.js [<workspace>] [--tracker gitlab|markdown|github] [--base-url <url>]';
 
 function shortTitle(change) {
   let t = T.one(change).split(/(?<=[.:;])\s/)[0].replace(/[.:;]$/, '');
@@ -43,10 +43,10 @@ const csv = (v) => `"${String(v).replace(/^[=+\-@\t\r]/, (c) => `'${c}`).replace
 
 function build(ws, opts, io) {
   const { config, paths } = T.loadWorkspace(ws);
-  let tracker = opts.tracker;
+  let tracker = opts.tracker === 'github' ? 'markdown' : opts.tracker;
   if (tracker === undefined) tracker = { gitlab: 'gitlab', github: 'markdown', none: null }[config.publish.tracker];
-  if (tracker === null) { io.out('build-issues: publish.tracker is "none"; nothing written (pass --tracker gitlab or --tracker markdown)'); return 0; }
-  if (!['gitlab', 'markdown'].includes(tracker)) throw new T.BuildError(`--tracker must be gitlab or markdown (got "${tracker}")`);
+  if (tracker === null) { io.out('build-issues: publish.tracker is "none"; nothing written (pass --tracker gitlab, markdown or github)'); return 0; }
+  if (!['gitlab', 'markdown'].includes(tracker)) throw new T.BuildError(`--tracker must be gitlab, markdown or github (got "${tracker}")`);
   const base = String(opts.baseUrl !== undefined ? opts.baseUrl : config.publish.base_url || '').replace(/\/+$/, '');
 
   const cross = T.readJson(path.join(paths.work, 'phase6', 'cross-cutting.json'), 'work/phase6/cross-cutting.json (the roadmap)');

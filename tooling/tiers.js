@@ -133,9 +133,19 @@ function breaksText(item) {
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 const one = (s) => String(s === null || s === undefined ? '' : s).replace(/\s+/g, ' ').trim();
 // Agent-written text placed in Markdown prose: one line, with "<" written as
-// &lt; (no raw HTML) and "![" as "!\[" (no image that loads from elsewhere).
+// &lt; (no raw HTML), "![" as "!\[" (no image that loads from elsewhere) and
+// "](" as "]\(" unless the link target is http(s), mailto, an anchor or a
+// plain relative path (no link that runs code when clicked). The target is
+// read up to the first ")" or space; one holding ":", "&" or "\" is not
+// plain, since CommonMark decodes entities and backslash escapes there.
 // one() keeps the raw text; code() keeps the raw text inside backticks.
-const prose = (s) => one(s).replace(/</g, '&lt;').replace(/!\[/g, '!\\[');
+const safeTarget = (t) => t === '' || /^(https?:\/\/|mailto:|#)/i.test(t) || !/[:&\\]/.test(t);
+const prose = (s) => one(s)
+  // "<" goes first, so an angle-bracket target <javascript:x> reaches the
+  // link rule as &lt;javascript:x> and is broken there.
+  .replace(/</g, '&lt;')
+  .replace(/!\[/g, '!\\[')
+  .replace(/\]\((?=\s*([^)\s]*))/g, (m, t) => (safeTarget(t) ? m : ']\\('));
 const cell = (s) => prose(s).replace(/\|/g, '\\|') || '-';
 // A code span that always holds: the fence is one backtick longer than the
 // longest backtick run inside, padded with a space when the text starts or

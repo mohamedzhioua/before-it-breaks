@@ -18,6 +18,7 @@ const shapes = require('../tooling/lib/shapes');
 const tiers = require('../tooling/tiers');
 const { loadConfig } = require('../tooling/lib/config');
 const { slugGithub, slugGitlab, headingText } = require('../tooling/check-links');
+const { aroundMatch } = require('../tooling/build-verification-log');
 
 const AT_SIGN = String.fromCharCode(64);
 const BUILDS = ['log', 'report', 'measurements', 'recommendations', 'issues', 'explorer'];
@@ -263,6 +264,15 @@ test('build issues: gitlab CSV with a base URL; tracker "none" writes nothing', 
   assert.equal(kit(['build', 'issues', ws, '--tracker', 'jira']).code, 2);
 });
 
+test('build issues: --tracker github writes the markdown checklist', (t) => {
+  const ws = workspace(t, 'issues-github');
+  buildAll(ws);
+  fs.rmSync(path.join(ws, 'work', 'phase6', 'issues.md'), { force: true });
+  const r = kit(['build', 'issues', ws, '--tracker', 'github']);
+  assert.equal(r.code, 0, r.err);
+  assert.ok(fs.existsSync(path.join(ws, 'work', 'phase6', 'issues.md')));
+});
+
 test('build explorer refuses to write when the counts do not hold', (t) => {
   const ws = workspace(t, 'explorer');
   buildAll(ws);
@@ -352,6 +362,34 @@ test('prose() and cell() escape raw HTML and images; one() and code() keep the r
   assert.equal(tiers.one('a <b>'), 'a <b>');
   assert.equal(tiers.code('grep -n "<T>" src'), '`grep -n "<T>" src`');
   assert.equal(tiers.code('![x](y)'), '`![x](y)`');
+});
+
+test('prose() keeps only plain link targets and breaks the rest', () => {
+  const bs = String.fromCharCode(92);
+  const broken = (s) => s.split('](').join(']' + bs + '(');
+  for (const s of ['[x](javascript:alert(1))', '[x]( DATA:text/html,x)', '[x](java&#115;cript:x)',
+    '[x](javascript&colon;alert(1))', '[x](javascript&#58;alert(1))', `[x](javascript${bs}:alert(1))`,
+    '[x](&#106;avascript:x)', '[x](vbscript:x) [y](file:///etc/hosts)']) {
+    assert.equal(tiers.prose(s), broken(s), s);
+  }
+  assert.equal(tiers.prose('[x](<javascript:x>)'), `[x]${bs}(&lt;javascript:x>)`);
+  for (const s of ['[x](https://a.invalid/?a=1&b=c:d)', '[x](https://a "t")', '[x]( https://a)', '[x]()',
+    '[x](./x.md)', '[x](#f1)', `[x](mailto:a${AT_SIGN}b.invalid)`, '[x](HTTPS://A)']) {
+    assert.equal(tiers.prose(s), s, s);
+  }
+  const once = tiers.prose('[x](javascript:alert(1)) and [y](<data:x>)');
+  assert.equal(tiers.prose(once), once);
+  assert.equal(tiers.cell('[x](javascript:y)'), `[x]${bs}(javascript:y)`);
+});
+
+test('aroundMatch never splits a surrogate pair at either cut', () => {
+  const emoji = String.fromCodePoint(0x1f600);
+  const both = aroundMatch(`x${emoji}abcdMATCHefgh${emoji}tail`, /MATCH/, 5);
+  assert.ok(both.isWellFormed(), JSON.stringify(both));
+  assert.equal(both, '...abcdMATCHefgh...');
+  const head = aroundMatch(`abc${emoji}def`, /none/, 2);
+  assert.ok(head.isWellFormed(), JSON.stringify(head));
+  assert.equal(head, 'abc...');
 });
 
 // Removes CommonMark code spans: a run of n backticks up to the next run of
